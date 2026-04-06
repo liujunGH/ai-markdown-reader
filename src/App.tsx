@@ -7,8 +7,10 @@ import { Outline } from './components/Outline'
 import { SearchBox } from './components/SearchBox'
 import { ProgressBar } from './components/ProgressBar'
 import { StatusBar } from './components/StatusBar'
+import { RecentFiles } from './components/RecentFiles'
 import { useOutline } from './hooks/useOutline'
 import { useSearch } from './hooks/useSearch'
+import { getRecentFiles, addRecentFile, RecentFile } from './utils/recentFiles'
 
 const testContent = `
 # Markdown Reader
@@ -83,8 +85,14 @@ function App() {
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
   const [showSource, setShowSource] = useState(false)
+  const [showRecent, setShowRecent] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [fontSize, setFontSize] = useState(16)
   const markdownRef = useRef<MarkdownRendererRef>(null)
+
+  useEffect(() => {
+    setRecentFiles(getRecentFiles())
+  }, [])
 
   const outlineItems = useOutline(content)
   const {
@@ -102,6 +110,14 @@ function App() {
   const handleFileOpen = (fileContent: string, name: string) => {
     setContent(fileContent)
     setFilename(name)
+    addRecentFile({ name, content: fileContent })
+    setRecentFiles(getRecentFiles())
+  }
+
+  const handleRecentSelect = (file: RecentFile) => {
+    setContent(file.content)
+    setFilename(file.name)
+    setShowRecent(false)
   }
 
   const handleOutlineClick = (id: string) => {
@@ -200,7 +216,24 @@ function App() {
           zIndex: 100,
           backgroundColor: 'var(--bg-primary)'
         }}>
-          <FileOpener onFileOpen={handleFileOpen} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <FileOpener onFileOpen={handleFileOpen} />
+            <button 
+              onClick={() => setShowRecent(!showRecent)}
+              style={{
+                background: showRecent ? 'var(--accent)' : 'transparent',
+                color: showRecent ? 'white' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+              title="最近打开"
+            >
+              📜 最近
+            </button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button 
               onClick={() => setShowOutline(!showOutline)}
@@ -328,6 +361,13 @@ function App() {
           )}
         </div>
         <StatusBar content={content} />
+        {showRecent && (
+          <RecentFiles 
+            files={recentFiles}
+            onSelect={handleRecentSelect}
+            onClose={() => setShowRecent(false)}
+          />
+        )}
         {showSearch && (
           <SearchBox 
             query={query}
