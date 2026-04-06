@@ -165,6 +165,10 @@ function App() {
         e.preventDefault()
         setShowSource(prev => !prev)
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault()
+        window.print()
+      }
       if (e.key === 'Escape' && showSearch) {
         handleCloseSearch()
       }
@@ -273,6 +277,21 @@ function App() {
                 A+
               </button>
             </div>
+            <button 
+              onClick={() => window.print()}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--text-secondary)'
+              }}
+              title="打印 (Ctrl+P)"
+            >
+              🖨️
+            </button>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               {filename}
             </span>
