@@ -55,9 +55,12 @@ jobs:
         run: npx electron-builder --linux --config.asar=false
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/**/*
-          generate_release_notes: true
+        run: |
+          cd release
+          for f in $(find . -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage"); do
+            echo "Uploading $f..."
+            gh release upload ${{ github.ref_name }} "$f" --clobber
+          done
+          gh release view ${{ github.ref_name }} --json uploadUrl,browserDownloadUrl -q '.assets[] | select(.name | contains("exe")) | .browserDownloadUrl'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
