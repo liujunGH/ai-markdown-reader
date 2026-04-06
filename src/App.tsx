@@ -17,11 +17,21 @@ import { BookmarkPanel, useBookmarks } from './components/Bookmark'
 import { useOutline } from './hooks/useOutline'
 import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
-import { getRecentFiles, addRecentFile, RecentFile } from './utils/recentFiles'
+import { getRecentFiles, addRecentFile, removeRecentFile, clearRecentFiles, RecentFile } from './utils/recentFiles'
+import { TabBar } from './components/TabBar'
+import { Tab, createTab, getWelcomeTab } from './types/Tab'
 
 declare global {
   interface Window {
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
+    electronAPI?: {
+      openFileDialog: () => Promise<{ filePath: string; content: string } | null>
+      openFolderDialog: () => Promise<string | null>
+      readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+      getFileInfo: (filePath: string) => Promise<{ success: boolean; info?: { name: string; size: number; lastModified: number; created: number }; error?: string }>
+      showInFolder: (filePath: string) => Promise<void>
+      onOpenFile: (callback: (filePath: string) => void) => void
+    }
   }
   interface FileSystemDirectoryHandle {
     values(): AsyncIterableIterator<FileSystemFileHandle>
@@ -36,85 +46,26 @@ const LAST_FILE_KEY = 'last-opened-file'
 const LAST_FOLDER_KEY = 'last-opened-folder'
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 
-const welcomeContent = `
-# 欢迎使用 AI Markdown Reader
-
-一款沉浸式的 Markdown 阅读器，支持丰富的功能特性。
-
-## 功能特性
-
-### 📖 沉浸式阅读
-专注模式（Ctrl+.）隐藏所有界面元素，只保留内容，带来沉浸式阅读体验。
-
-### 🎨 主题切换
-点击右上角的太阳/月亮图标切换深色/浅色模式，支持自定义主题颜色。
-
-### 🔍 强大搜索
-按 \`Ctrl+F\` 打开搜索框，支持正则表达式，↑↓ 键导航搜索结果。
-
-### 📊 Mermaid 图表
-支持在 Markdown 中嵌入 Mermaid 流程图，可导出为 SVG 或 PNG 图片。
-
-\`\`\`mermaid
-graph TD
-    A[打开文件] --> B{拖拽或点击}
-    B -->|点击| C[文件选择器]
-    B -->|拖拽| D[直接读取]
-    C --> E[渲染预览]
-    D --> E
-\`\`\`
-
-### 📝 代码高亮
-支持 JavaScript、TypeScript、Python、Go 等多种编程语言的语法高亮。
-
-### 🔢 数学公式
-支持 KaTeX 数学公式渲染，行内公式使用 \`$...$\`，块级公式使用 \`$$...$$\`。
-
-$$
-\\sum_{i=1}^{n} x_i = x_1 + x_2 + \\cdots + x_n
-$$
-
-### 🖼️ 图片预览
-点击图片可放大查看，支持 PNG、JPG、GIF、SVG 等格式。
-
-### 📋 代码复制
-悬停代码块可看到复制按钮，一键复制代码内容。
-
-### ⌨️ 快捷键支持
-按 \`Ctrl+/\` 或 \`F1\` 查看所有快捷键。
-
-## 快速开始
-
-1. 点击左上角的 **📂 打开文件** 按钮选择 .md 文件
-2. 或直接将 .md 文件 **拖拽** 到窗口中
-3. 使用 **📑 目录** 按钮查看文档大纲
-4. 按 **🔍 搜索** 或 \`Ctrl+F\` 搜索内容
-
-## 开始使用
-
-打开一个 Markdown 文件开始阅读，或查看最近打开的文件。
-`
-
-function getInitialContent() {
+function getInitialTabs(): { tabs: Tab[]; activeTabId: string } {
   const stored = localStorage.getItem(LAST_FILE_KEY)
   if (stored) {
     try {
       const { content, name } = JSON.parse(stored)
       if (content && name) {
-        return { content, name, isRestored: true }
+        const tab = createTab(name, content)
+        return { tabs: [tab], activeTabId: tab.id }
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
-  return { content: welcomeContent, name: '欢迎使用.md', isRestored: false }
+  const welcomeTab = getWelcomeTab()
+  return { tabs: [welcomeTab], activeTabId: welcomeTab.id }
 }
 
 function App() {
-  const initial = getInitialContent()
-  const [content, setContent] = useState(initial.content)
-  const [filename, setFilename] = useState(initial.name)
-  const [showOutline, setShowOutline] = useState(!initial.isRestored)
+  const { tabs: initialTabs, activeTabId: initialActiveTabId } = getInitialTabs()
+  const [tabs, setTabs] = useState<Tab[]>(initialTabs)
+  const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId)
+  const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [showRecent, setShowRecent] = useState(false)
@@ -131,29 +82,36 @@ function App() {
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number; lastModified: number } | null>(null)
   const [showGuide, setShowGuide] = useState(() => {
     const hasSeen = localStorage.getItem(HAS_SEEN_GUIDE_KEY)
-    return !hasSeen && !initial.isRestored
+    return !hasSeen && tabs.length === 1 && tabs[0].name === '欢迎使用.md'
   })
   const [lastFolderName] = useState<string | null>(() => {
     return localStorage.getItem(LAST_FOLDER_KEY)
   })
   const markdownRef = useRef<MarkdownRendererRef>(null)
-  const { bookmarks, addBookmark, removeBookmark } = useBookmarks(filename)
+
+  const activeTab = useMemo(() => {
+    return tabs.find(t => t.id === activeTabId) || tabs[0]
+  }, [tabs, activeTabId])
+
+  const { bookmarks, addBookmark, removeBookmark } = useBookmarks(activeTab?.name || '')
 
   useEffect(() => {
     setRecentFiles(getRecentFiles())
   }, [])
 
   useEffect(() => {
-    if (!initial.isRestored) return
+    if (tabs.length === 1 && tabs[0].name === '欢迎使用.md') return
+    const tab = activeTab
+    if (!tab) return
     const recent = getRecentFiles()
-    const exists = recent.some(f => f.name === filename)
+    const exists = recent.some(f => f.name === tab.name)
     if (!exists) {
-      addRecentFile({ name: filename, content })
+      addRecentFile({ name: tab.name, content: tab.content })
       setRecentFiles(getRecentFiles())
     }
-  }, [])
+  }, [activeTab])
 
-  const outlineItems = useOutline(content)
+  const outlineItems = useOutline(activeTab?.content || '')
   const outlineIds = outlineItems.map(item => item.id)
   const activeHeadingId = useScrollSpy(outlineIds)
   const currentHeading = useMemo(() => {
@@ -170,14 +128,66 @@ function App() {
     nextMatch,
     prevMatch,
     clearSearch
-  } = useSearch(content)
+  } = useSearch(activeTab?.content || '')
+
+  const handleNewTab = () => {
+    const welcomeTab = getWelcomeTab()
+    setTabs(prev => [...prev, welcomeTab])
+    setActiveTabId(welcomeTab.id)
+  }
+
+  const handleTabSelect = (tabId: string) => {
+    setActiveTabId(tabId)
+  }
+
+  const handleTabClose = (tabId: string) => {
+    const tabIndex = tabs.findIndex(t => t.id === tabId)
+    if (tabIndex === -1) return
+    
+    const newTabs = tabs.filter(t => t.id !== tabId)
+    if (newTabs.length === 0) {
+      const welcomeTab = getWelcomeTab()
+      setTabs([welcomeTab])
+      setActiveTabId(welcomeTab.id)
+    } else {
+      setTabs(newTabs)
+      if (activeTabId === tabId) {
+        const newIndex = Math.min(tabIndex, newTabs.length - 1)
+        setActiveTabId(newTabs[newIndex].id)
+      }
+    }
+  }
+
+  const handleTabCloseOthers = (tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId)
+    if (!tab) return
+    setTabs([tab])
+    setActiveTabId(tabId)
+  }
+
+  const handleTabCloseAll = () => {
+    const welcomeTab = getWelcomeTab()
+    setTabs([welcomeTab])
+    setActiveTabId(welcomeTab.id)
+  }
 
   const handleFileOpen = (fileContent: string, name: string, file?: File) => {
-    setContent(fileContent)
-    setFilename(name)
+    const existingTab = tabs.find(t => t.name === name && !t.isModified)
+    if (existingTab) {
+      setActiveTabId(existingTab.id)
+      return
+    }
+
+    const newTab = createTab(name, fileContent, file?.name, file)
+    if (file) {
+      newTab.file = file
+    }
+    setTabs(prev => [...prev, newTab])
+    setActiveTabId(newTab.id)
     addRecentFile({ name, content: fileContent })
     setRecentFiles(getRecentFiles())
     localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: fileContent, name }))
+    
     if (file) {
       setFileInfo({
         name: file.name,
@@ -194,10 +204,26 @@ function App() {
   }
 
   const handleRecentSelect = (file: RecentFile) => {
-    setContent(file.content)
-    setFilename(file.name)
+    const existingTab = tabs.find(t => t.name === file.name && !t.isModified)
+    if (existingTab) {
+      setActiveTabId(existingTab.id)
+    } else {
+      const newTab = createTab(file.name, file.content)
+      setTabs(prev => [...prev, newTab])
+      setActiveTabId(newTab.id)
+    }
     setShowRecent(false)
     localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: file.content, name: file.name }))
+  }
+
+  const handleRemoveRecent = (name: string) => {
+    removeRecentFile(name)
+    setRecentFiles(getRecentFiles())
+  }
+
+  const handleClearRecent = () => {
+    clearRecentFiles()
+    setRecentFiles([])
   }
 
   const handleOpenFolder = async () => {
@@ -214,15 +240,13 @@ function App() {
       if (files.length > 0) {
         const firstFile = files[0]
         const content = await firstFile.file.text()
-        handleFileOpen(content, firstFile.name)
+        handleFileOpen(content, firstFile.name, firstFile.file)
         setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
         setCurrentFolderName(handle.name)
         localStorage.setItem(LAST_FOLDER_KEY, handle.name)
         setShowFileSidebar(true)
       }
-    } catch {
-      // User cancelled
-    }
+    } catch {}
   }
 
   const handleRestoreFolder = async () => {
@@ -234,15 +258,13 @@ function App() {
       if (files.length > 0) {
         const firstFile = files[0]
         const content = await firstFile.file.text()
-        handleFileOpen(content, firstFile.name)
+        handleFileOpen(content, firstFile.name, firstFile.file)
         setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
         setCurrentFolderName(handle.name)
         localStorage.setItem(LAST_FOLDER_KEY, handle.name)
         setShowFileSidebar(true)
       }
-    } catch {
-      // User cancelled
-    }
+    } catch {}
   }
 
   const handleFolderFileSelect = (fileContent: string, fileName: string, filePath: string) => {
@@ -280,6 +302,23 @@ function App() {
   }
 
   useEffect(() => {
+    if (!window.electronAPI) return
+    
+    window.electronAPI.onOpenFile(async (filePath: string) => {
+      console.log('[App] Received open-file:', filePath)
+      try {
+        const result = await window.electronAPI!.readFile(filePath)
+        if (result.success && result.content !== undefined) {
+          const name = filePath.split('/').pop() || '未知文件.md'
+          handleFileOpen(result.content, name)
+        }
+      } catch (err) {
+        console.error('[App] Failed to open file:', err)
+      }
+    })
+  }, [handleFileOpen])
+
+  useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
@@ -298,7 +337,7 @@ function App() {
       }
 
       const fileContent = await file.text()
-      handleFileOpen(fileContent, file.name)
+      handleFileOpen(fileContent, file.name, file)
     }
 
     document.addEventListener('dragover', handleDragOver)
@@ -321,6 +360,24 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+        e.preventDefault()
+        handleNewTab()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+        e.preventDefault()
+        if (activeTabId) handleTabClose(activeTabId)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Tab') {
+        e.preventDefault()
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+        if (currentIndex !== -1) {
+          const nextIndex = e.shiftKey 
+            ? (currentIndex - 1 + tabs.length) % tabs.length
+            : (currentIndex + 1) % tabs.length
+          setActiveTabId(tabs[nextIndex].id)
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
         setShowSearch(true)
@@ -379,11 +436,20 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch, showKeyboardShortcuts, showFocusMode, showQuickSwitcher])
+  }, [activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode, showQuickSwitcher])
 
   return (
     <ThemeProvider>
       <ProgressBar />
+      <TabBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onTabSelect={handleTabSelect}
+        onTabClose={handleTabClose}
+        onTabCloseOthers={handleTabCloseOthers}
+        onTabCloseAll={handleTabCloseAll}
+        onNewTab={handleNewTab}
+      />
       <div className="app">
         <header style={{ 
           padding: '8px 12px', 
@@ -464,8 +530,8 @@ function App() {
             )}
           </div>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={filename}>
-              {filename}
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={activeTab?.name}>
+              {activeTab?.name}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -631,12 +697,12 @@ function App() {
                 fontFamily: 'monospace',
                 fontSize: '14px'
               }}>
-                {content}
+                {activeTab?.content}
               </pre>
             ) : (
               <MarkdownRenderer 
                 ref={markdownRef}
-                content={content}
+                content={activeTab?.content || ''}
                 searchQuery={query}
                 searchRegex={isRegex}
               />
@@ -646,11 +712,13 @@ function App() {
             <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
           )}
         </div>
-        <StatusBar content={content} />
+        <StatusBar content={activeTab?.content || ''} />
         {showRecent && (
           <RecentFiles 
             files={recentFiles}
             onSelect={handleRecentSelect}
+            onRemove={handleRemoveRecent}
+            onClearAll={handleClearRecent}
             onClose={() => setShowRecent(false)}
           />
         )}

@@ -94,9 +94,24 @@ function createMenu() {
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: '关于',
+              title: '关于 AI Markdown Reader',
               message: 'AI Markdown Reader',
-              detail: '一款沉浸式的 Markdown 阅读器\n版本 1.1.3'
+              detail: `一款沉浸式的 Markdown 阅读器
+
+版本: 1.0.0
+
+功能特性:
+• 多标签页支持
+• 深色/浅色/护眼主题
+• Mermaid 图表
+• KaTeX 数学公式
+• 代码高亮
+
+开源协议: MIT License
+
+仓库地址: https://github.com/liujunGH/ai-markdown-reader
+
+作者: liujun`
             })
           }
         }
@@ -114,6 +129,8 @@ console.log('[MAIN] __dirname:', __dirname)
 console.log('[MAIN] App path:', app.getAppPath())
 
 let mainWindow: BrowserWindow | null = null
+let pendingFilePath: string | null = null
+let openFileFromEvent = false
 
 const isDev = !app.isPackaged
 
@@ -171,10 +188,15 @@ function createWindow(filePath?: string) {
     mainWindow = null
   })
 
-  if (filePath) {
-    log('File to open:', filePath)
+  if (filePath && !openFileFromEvent) {
+    log('File to open via did-finish-load:', filePath)
     mainWindow.webContents.on('did-finish-load', () => {
+      if (openFileFromEvent) {
+        log('Skipping did-finish-load send, open-file event already handled')
+        return
+      }
       mainWindow?.webContents.send('open-file', filePath)
+      openFileFromEvent = false
     })
   }
 }
@@ -192,9 +214,11 @@ function handleFileOpen(filePath: string) {
 
   if (mainWindow) {
     mainWindow.webContents.send('open-file', filePath)
+    pendingFilePath = null
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   } else {
+    pendingFilePath = filePath
     createWindow(filePath)
   }
 }
@@ -229,6 +253,7 @@ app.whenReady().then(() => {
   app.on('open-file', (event, filePath) => {
     log('open-file event:', filePath)
     event.preventDefault()
+    openFileFromEvent = true
     handleFileOpen(filePath)
   })
 

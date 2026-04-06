@@ -20,7 +20,7 @@ extraMetadata:
 
 win:
   target:
-    - target: portable
+    - target: nsis
       arch:
         - x64
   artifactName: ${productName}-${version}.${ext}

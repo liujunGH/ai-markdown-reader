@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'recent-files'
+const MAX_RECENT_FILES = 10
 
 export interface RecentFile {
   name: string
@@ -28,11 +29,20 @@ export function addRecentFile(file: Omit<RecentFile, 'openedAt'>): void {
     openedAt: Date.now()
   })
   
-  if (files.length > 10) {
+  if (files.length > MAX_RECENT_FILES) {
     files.pop()
   }
   
   localStorage.setItem(STORAGE_KEY, JSON.stringify(files))
+}
+
+export function removeRecentFile(name: string): void {
+  const files = getRecentFiles()
+  const index = files.findIndex(f => f.name === name)
+  if (index !== -1) {
+    files.splice(index, 1)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(files))
+  }
 }
 
 export function clearRecentFiles(): void {

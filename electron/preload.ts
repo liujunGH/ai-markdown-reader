@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFileInfo: (filePath: string) => ipcRenderer.invoke('get-file-info', filePath),
   showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
   onOpenFile: (callback: (filePath: string) => void) => {
+    ipcRenderer.removeAllListeners('open-file')
     ipcRenderer.on('open-file', (_event, filePath) => callback(filePath))
   }
 })
