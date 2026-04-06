@@ -2,8 +2,6 @@ appId: com.aimarkdownreader.app
 productName: AI Markdown Reader
 copyright: Copyright © 2024
 
-publish: never
-
 directories:
   output: release
   buildResources: build
