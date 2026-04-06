@@ -32,3 +32,10 @@ body {
   color: var(--text-primary);
   transition: background-color 0.2s, color 0.2s;
 }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}

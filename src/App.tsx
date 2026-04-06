@@ -131,7 +131,11 @@ function App() {
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: 'var(--bg-primary)'
         }}>
           <FileOpener onFileOpen={handleFileOpen} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
