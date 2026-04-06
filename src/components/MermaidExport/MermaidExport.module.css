@@ -1,0 +1,24 @@
+.container {
+  display: flex;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.button {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -180,3 +180,42 @@
 .renderer :global(.copy-button:hover) {
   background: var(--bg-tertiary);
 }
+
+.renderer :global(.mermaid-container) {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 1em 0;
+}
+
+.renderer :global(.mermaid-svg-wrapper) {
+  overflow-x: auto;
+}
+
+.renderer :global(.mermaid-svg-wrapper svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.renderer :global(.mermaid-btn-container) {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.renderer :global(.mermaid-export-btn) {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.renderer :global(.mermaid-export-btn:hover) {
+  background: var(--bg-primary);
+}

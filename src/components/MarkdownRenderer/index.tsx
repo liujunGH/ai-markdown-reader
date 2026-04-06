@@ -24,6 +24,31 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function downloadFile(data: string, filename: string, mimeType: string) {
+  const blob = mimeType === 'image/png' 
+    ? dataToBlob(data, mimeType)
+    : new Blob([data], { type: mimeType })
+  
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function dataToBlob(data: string, mimeType: string): Blob {
+  const byteString = atob(data.split(',')[1])
+  const ab = new ArrayBuffer(byteString.length)
+  const ia = new Uint8Array(ab)
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i)
+  }
+  return new Blob([ab], { type: mimeType })
+}
+
 export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
@@ -82,7 +107,55 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
             const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
             const { svg } = await mermaid.render(id, code)
             if (wrapper) {
-              wrapper.innerHTML = svg
+              const containerDiv = document.createElement('div')
+              containerDiv.className = 'mermaid-container'
+              
+              const svgWrapper = document.createElement('div')
+              svgWrapper.className = 'mermaid-svg-wrapper'
+              svgWrapper.innerHTML = svg
+              
+              const btnContainer = document.createElement('div')
+              btnContainer.className = 'mermaid-btn-container'
+              
+              const svgBtn = document.createElement('button')
+              svgBtn.className = 'mermaid-export-btn'
+              svgBtn.innerHTML = '📥 SVG'
+              svgBtn.onclick = async () => {
+                downloadFile(svg, 'diagram.svg', 'image/svg+xml')
+              }
+              
+              const pngBtn = document.createElement('button')
+              pngBtn.className = 'mermaid-export-btn'
+              pngBtn.innerHTML = '📥 PNG'
+              pngBtn.onclick = async () => {
+                try {
+                  const canvas = document.createElement('canvas')
+                  const ctx = canvas.getContext('2d')
+                  if (ctx) {
+                    const img = new Image()
+                    img.onload = () => {
+                      canvas.width = img.width * 2
+                      canvas.height = img.height * 2
+                      ctx.scale(2, 2)
+                      ctx.fillStyle = 'white'
+                      ctx.fillRect(0, 0, canvas.width, canvas.height)
+                      ctx.drawImage(img, 0, 0)
+                      downloadFile(canvas.toDataURL('image/png'), 'diagram.png', 'image/png')
+                    }
+                    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+                  }
+                } catch (err) {
+                  console.error('Failed to export PNG:', err)
+                }
+              }
+              
+              btnContainer.appendChild(svgBtn)
+              btnContainer.appendChild(pngBtn)
+              
+              containerDiv.appendChild(svgWrapper)
+              containerDiv.appendChild(btnContainer)
+              wrapper.innerHTML = ''
+              wrapper.appendChild(containerDiv)
             }
           } catch (err) {
             if (wrapper) {
