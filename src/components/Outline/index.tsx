@@ -3,10 +3,11 @@ import styles from './Outline.module.css'
 
 interface Props {
   items: OutlineItem[]
+  activeId: string | null
   onItemClick: (id: string) => void
 }
 
-export function Outline({ items, onItemClick }: Props) {
+export function Outline({ items, activeId, onItemClick }: Props) {
   if (items.length === 0) {
     return <div className={styles.empty}>暂无目录</div>
   }
@@ -22,7 +23,7 @@ export function Outline({ items, onItemClick }: Props) {
             style={{ paddingLeft: `${(item.level - 1) * 12 + 8}px` }}
           >
             <button 
-              className={styles.link}
+              className={`${styles.link} ${activeId === item.id ? styles.active : ''}`}
               onClick={() => onItemClick(item.id)}
             >
               {item.text}

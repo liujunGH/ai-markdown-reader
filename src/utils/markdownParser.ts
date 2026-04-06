@@ -36,6 +36,7 @@ import 'prismjs/components/prism-lua'
 import 'prismjs/components/prism-perl'
 import 'prismjs/components/prism-r'
 import mk from 'markdown-it-katex'
+import { full } from 'markdown-it-emoji'
 
 function escapeHtml(str: string): string {
   return str
@@ -76,6 +77,7 @@ const md: MarkdownIt = new MarkdownIt({
 })
 
 md.use(mk)
+md.use(full)
 
 export function parseMarkdown(content: string): string {
   return md.render(content)

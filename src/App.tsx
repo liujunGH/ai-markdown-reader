@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer, MarkdownRendererRef } from './components/MarkdownRenderer'
@@ -8,93 +8,154 @@ import { SearchBox } from './components/SearchBox'
 import { ProgressBar } from './components/ProgressBar'
 import { StatusBar } from './components/StatusBar'
 import { RecentFiles } from './components/RecentFiles'
+import KeyboardShortcuts from './components/KeyboardShortcuts'
+import FirstUseGuide from './components/FirstUseGuide'
+import QuickSwitcher from './components/QuickSwitcher'
+import { SidebarFileExplorer } from './components/SidebarFileExplorer'
+import { FileInfoPanel } from './components/FileInfoPanel'
+import { BookmarkPanel, useBookmarks } from './components/Bookmark'
 import { useOutline } from './hooks/useOutline'
+import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
 import { getRecentFiles, addRecentFile, RecentFile } from './utils/recentFiles'
 
-const testContent = `
-# Markdown Reader
-
-这是一个测试文档，用于验证 Markdown 渲染功能。
-
-## 代码示例
-
-\`\`\`javascript
-const hello = 'world';
-console.log(hello);
-
-function greet(name) {
-  return \`Hello, \${name}!\`;
+declare global {
+  interface Window {
+    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
+  }
+  interface FileSystemDirectoryHandle {
+    values(): AsyncIterableIterator<FileSystemFileHandle>
+    getFile(): Promise<File>
+    getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle>
+    queryPermission(options?: { mode?: string }): Promise<PermissionState>
+    requestPermission(options?: { mode?: string }): Promise<PermissionState>
+  }
 }
-\`\`\`
 
-## Mermaid 流程图
+const LAST_FILE_KEY = 'last-opened-file'
+const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
+
+const welcomeContent = `
+# 欢迎使用 AI Markdown Reader
+
+一款沉浸式的 Markdown 阅读器，支持丰富的功能特性。
+
+## 功能特性
+
+### 📖 沉浸式阅读
+专注模式（Ctrl+.）隐藏所有界面元素，只保留内容，带来沉浸式阅读体验。
+
+### 🎨 主题切换
+点击右上角的太阳/月亮图标切换深色/浅色模式，支持自定义主题颜色。
+
+### 🔍 强大搜索
+按 \`Ctrl+F\` 打开搜索框，支持正则表达式，↑↓ 键导航搜索结果。
+
+### 📊 Mermaid 图表
+支持在 Markdown 中嵌入 Mermaid 流程图，可导出为 SVG 或 PNG 图片。
 
 \`\`\`mermaid
 graph TD
-    A[开始] --> B{判断}
-    B -->|是| C[操作1]
-    B -->|否| D[操作2]
-    C --> E[结束]
+    A[打开文件] --> B{拖拽或点击}
+    B -->|点击| C[文件选择器]
+    B -->|拖拽| D[直接读取]
+    C --> E[渲染预览]
     D --> E
 \`\`\`
 
-## 列表
+### 📝 代码高亮
+支持 JavaScript、TypeScript、Python、Go 等多种编程语言的语法高亮。
 
-- 列表项 1
-- 列表项 2
-- 列表项 3
+### 🔢 数学公式
+支持 KaTeX 数学公式渲染，行内公式使用 \`$...$\`，块级公式使用 \`$$...$$\`。
 
-### 子列表
+$$
+\\sum_{i=1}^{n} x_i = x_1 + x_2 + \\cdots + x_n
+$$
 
-- 嵌套项 A
-- 嵌套项 B
+### 🖼️ 图片预览
+点击图片可放大查看，支持 PNG、JPG、GIF、SVG 等格式。
 
-## 引用
+### 📋 代码复制
+悬停代码块可看到复制按钮，一键复制代码内容。
 
-> 这是一段引用文字
-> 可以有多行
+### ⌨️ 快捷键支持
+按 \`Ctrl+/\` 或 \`F1\` 查看所有快捷键。
 
-## 表格
+## 快速开始
 
-| 名称 | 描述 |
-|------|------|
-| 项目1 | 说明1 |
-| 项目2 | 说明2 |
+1. 点击左上角的 **📂 打开文件** 按钮选择 .md 文件
+2. 或直接将 .md 文件 **拖拽** 到窗口中
+3. 使用 **📑 目录** 按钮查看文档大纲
+4. 按 **🔍 搜索** 或 \`Ctrl+F\` 搜索内容
 
-## 任务列表
+## 开始使用
 
-- [x] 已完成任务
-- [ ] 未完成任务
-- [ ] 另一个任务
-
-## 链接
-
-[访问 Google](https://www.google.com)
-
----
-
-**加粗** 和 *斜体* 以及 ~~删除线~~
-
-行内代码：\`const x = 1\`
+打开一个 Markdown 文件开始阅读，或查看最近打开的文件。
 `
 
+function getInitialContent() {
+  const stored = localStorage.getItem(LAST_FILE_KEY)
+  if (stored) {
+    try {
+      const { content, name } = JSON.parse(stored)
+      if (content && name) {
+        return { content, name, isRestored: true }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return { content: welcomeContent, name: '欢迎使用.md', isRestored: false }
+}
+
 function App() {
-  const [content, setContent] = useState(testContent)
-  const [filename, setFilename] = useState('欢迎阅读.md')
-  const [showOutline, setShowOutline] = useState(true)
+  const initial = getInitialContent()
+  const [content, setContent] = useState(initial.content)
+  const [filename, setFilename] = useState(initial.name)
+  const [showOutline, setShowOutline] = useState(!initial.isRestored)
   const [showSearch, setShowSearch] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [showRecent, setShowRecent] = useState(false)
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
+  const [showFocusMode, setShowFocusMode] = useState(false)
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
+  const [showFileSidebar, setShowFileSidebar] = useState(false)
+  const [currentFolderHandle, setCurrentFolderHandle] = useState<FileSystemDirectoryHandle | null>(null)
+  const [currentFolderName, setCurrentFolderName] = useState<string>('')
+  const [currentFilePath, setCurrentFilePath] = useState<string>('')
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [fontSize, setFontSize] = useState(16)
+  const [showFileInfo, setShowFileInfo] = useState(false)
+  const [fileInfo, setFileInfo] = useState<{ name: string; size: number; lastModified: number } | null>(null)
+  const [showGuide, setShowGuide] = useState(() => {
+    const hasSeen = localStorage.getItem(HAS_SEEN_GUIDE_KEY)
+    return !hasSeen && !initial.isRestored
+  })
   const markdownRef = useRef<MarkdownRendererRef>(null)
+  const { bookmarks, addBookmark, removeBookmark } = useBookmarks(filename)
 
   useEffect(() => {
     setRecentFiles(getRecentFiles())
   }, [])
 
+  useEffect(() => {
+    if (!initial.isRestored) return
+    const recent = getRecentFiles()
+    const exists = recent.some(f => f.name === filename)
+    if (!exists) {
+      addRecentFile({ name: filename, content })
+      setRecentFiles(getRecentFiles())
+    }
+  }, [])
+
   const outlineItems = useOutline(content)
+  const outlineIds = outlineItems.map(item => item.id)
+  const activeHeadingId = useScrollSpy(outlineIds)
+  const currentHeading = useMemo(() => {
+    const activeItem = outlineItems.find(item => item.id === activeHeadingId)
+    return activeItem?.text || ''
+  }, [outlineItems, activeHeadingId])
   const {
     query,
     setQuery,
@@ -107,23 +168,84 @@ function App() {
     clearSearch
   } = useSearch(content)
 
-  const handleFileOpen = (fileContent: string, name: string) => {
+  const handleFileOpen = (fileContent: string, name: string, file?: File) => {
     setContent(fileContent)
     setFilename(name)
     addRecentFile({ name, content: fileContent })
     setRecentFiles(getRecentFiles())
+    localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: fileContent, name }))
+    if (file) {
+      setFileInfo({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified
+      })
+    } else {
+      setFileInfo({
+        name,
+        size: new Blob([fileContent]).size,
+        lastModified: Date.now()
+      })
+    }
   }
 
   const handleRecentSelect = (file: RecentFile) => {
     setContent(file.content)
     setFilename(file.name)
     setShowRecent(false)
+    localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: file.content, name: file.name }))
+  }
+
+  const handleOpenFolder = async () => {
+    if (!window.showDirectoryPicker) {
+      alert('您的浏览器不支持打开文件夹功能，请使用 Chrome 或 Edge 浏览器')
+      return
+    }
+    try {
+      const handle = await window.showDirectoryPicker()
+      const { addFolderBookmark, getFilesInFolder } = await import('./utils/folderBookmarks')
+      await addFolderBookmark(handle.name, handle as unknown as FileSystemDirectoryHandle)
+      
+      const files = await getFilesInFolder(handle as unknown as FileSystemDirectoryHandle)
+      if (files.length > 0) {
+        const firstFile = files[0]
+        const content = await firstFile.file.text()
+        handleFileOpen(content, firstFile.name)
+        setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
+        setCurrentFolderName(handle.name)
+        setShowFileSidebar(true)
+      }
+    } catch {
+      // User cancelled
+    }
+  }
+
+  const handleFolderFileSelect = (fileContent: string, fileName: string, filePath: string) => {
+    handleFileOpen(fileContent, fileName)
+    setCurrentFilePath(filePath)
+  }
+
+  const handleCloseFileSidebar = () => {
+    setShowFileSidebar(false)
+    setCurrentFolderHandle(null)
+    setCurrentFolderName('')
+    setCurrentFilePath('')
   }
 
   const handleOutlineClick = (id: string) => {
     const element = document.getElementById(id)
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const handleBookmarkNavigate = (heading: string) => {
+    const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
+    for (const h of headings) {
+      if (h.textContent === heading || h.textContent?.startsWith(heading)) {
+        h.scrollIntoView({ behavior: 'smooth' })
+        break
+      }
     }
   }
 
@@ -164,6 +286,15 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (showFocusMode) {
+      document.body.classList.add('focus-mode')
+    } else {
+      document.body.classList.remove('focus-mode')
+    }
+    return () => document.body.classList.remove('focus-mode')
+  }, [showFocusMode])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
@@ -185,8 +316,21 @@ function App() {
         e.preventDefault()
         window.print()
       }
-      if (e.key === 'Escape' && showSearch) {
-        handleCloseSearch()
+      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+        e.preventDefault()
+        setShowQuickSwitcher(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '.') {
+        e.preventDefault()
+        setShowFocusMode(prev => !prev)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShowKeyboardShortcuts(true)
+      }
+      if (e.key === 'F1') {
+        e.preventDefault()
+        setShowKeyboardShortcuts(true)
       }
       if (e.key === 'F11') {
         e.preventDefault()
@@ -196,10 +340,21 @@ function App() {
           document.exitFullscreen()
         }
       }
+      if (e.key === 'Escape') {
+        if (showSearch) {
+          handleCloseSearch()
+        } else if (showKeyboardShortcuts) {
+          setShowKeyboardShortcuts(false)
+        } else if (showFocusMode) {
+          setShowFocusMode(false)
+        } else if (showQuickSwitcher) {
+          setShowQuickSwitcher(false)
+        }
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearch])
+  }, [showSearch, showKeyboardShortcuts, showFocusMode, showQuickSwitcher])
 
   return (
     <ThemeProvider>
@@ -220,6 +375,7 @@ function App() {
             <FileOpener onFileOpen={handleFileOpen} />
             <button 
               onClick={() => setShowRecent(!showRecent)}
+              data-guide="recent-files"
               style={{
                 background: showRecent ? 'var(--accent)' : 'transparent',
                 color: showRecent ? 'white' : 'var(--text-primary)',
@@ -233,10 +389,43 @@ function App() {
             >
               📜 最近
             </button>
+            <button 
+              onClick={handleOpenFolder}
+              style={{
+                background: 'transparent',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+              title="打开文件夹"
+            >
+              📂 文件夹
+            </button>
+            {currentFolderHandle && (
+              <button 
+                onClick={() => setShowFileSidebar(!showFileSidebar)}
+                style={{
+                  background: showFileSidebar ? 'var(--accent)' : 'transparent',
+                  color: showFileSidebar ? 'white' : 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+                title="文件列表"
+              >
+                📋 文件
+              </button>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button 
               onClick={() => setShowOutline(!showOutline)}
+              data-guide="outline"
               style={{
                 background: showOutline ? 'var(--accent)' : 'transparent',
                 color: showOutline ? 'white' : 'var(--text-primary)',
@@ -251,6 +440,7 @@ function App() {
             </button>
             <button 
               onClick={() => setShowSearch(true)}
+              data-guide="search"
               style={{
                 background: 'transparent',
                 border: '1px solid var(--border)',
@@ -265,6 +455,7 @@ function App() {
             </button>
             <button 
               onClick={() => setShowSource(!showSource)}
+              data-guide="source"
               style={{
                 background: showSource ? 'var(--accent)' : 'transparent',
                 color: showSource ? 'white' : 'var(--text-primary)',
@@ -277,7 +468,38 @@ function App() {
             >
               📄 源码
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button 
+              onClick={() => setShowFocusMode(!showFocusMode)}
+              data-guide="focus-mode"
+              style={{
+                background: showFocusMode ? 'var(--accent)' : 'transparent',
+                color: showFocusMode ? 'white' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+              title="专注模式 (Ctrl+.)"
+            >
+              👁️ 专注
+            </button>
+            <button 
+              onClick={() => setShowKeyboardShortcuts(true)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--text-secondary)'
+              }}
+              title="快捷键 (Ctrl+/)"
+            >
+              ⌨️
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} data-guide="font-size">
               <button 
                 onClick={() => setFontSize(prev => Math.max(prev - 2, 12))}
                 style={{
@@ -325,6 +547,28 @@ function App() {
             >
               🖨️
             </button>
+            <button 
+              onClick={() => setShowFileInfo(true)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--text-secondary)'
+              }}
+              title="文件信息"
+            >
+              ℹ️
+            </button>
+            <BookmarkPanel
+              bookmarks={bookmarks}
+              onAdd={addBookmark}
+              onRemove={removeBookmark}
+              onNavigate={handleBookmarkNavigate}
+              currentHeading={currentHeading}
+            />
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               {filename}
             </span>
@@ -332,6 +576,15 @@ function App() {
           </div>
         </header>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {showFileSidebar && currentFolderHandle && (
+            <SidebarFileExplorer
+              folderName={currentFolderName}
+              handle={currentFolderHandle}
+              currentFilePath={currentFilePath}
+              onFileSelect={handleFolderFileSelect}
+              onClose={handleCloseFileSidebar}
+            />
+          )}
           <main style={{ 
             flex: 1, 
             overflowY: 'auto',
@@ -357,7 +610,7 @@ function App() {
             )}
           </main>
           {showOutline && !showSource && (
-            <Outline items={outlineItems} onItemClick={handleOutlineClick} />
+            <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
           )}
         </div>
         <StatusBar content={content} />
@@ -379,6 +632,37 @@ function App() {
             onNext={nextMatch}
             onPrev={prevMatch}
             onClose={handleCloseSearch}
+          />
+        )}
+        {showKeyboardShortcuts && (
+          <KeyboardShortcuts onClose={() => setShowKeyboardShortcuts(false)} />
+        )}
+        {showGuide && (
+          <FirstUseGuide 
+            onComplete={() => {
+              localStorage.setItem(HAS_SEEN_GUIDE_KEY, 'true')
+              setShowGuide(false)
+            }}
+            onSkip={() => {
+              localStorage.setItem(HAS_SEEN_GUIDE_KEY, 'true')
+              setShowGuide(false)
+            }}
+          />
+        )}
+        {showQuickSwitcher && (
+          <QuickSwitcher
+            recentFiles={recentFiles}
+            onFileSelect={(content, name) => {
+              handleFileOpen(content, name)
+              setShowQuickSwitcher(false)
+            }}
+            onClose={() => setShowQuickSwitcher(false)}
+          />
+        )}
+        {showFileInfo && (
+          <FileInfoPanel
+            fileInfo={fileInfo}
+            onClose={() => setShowFileInfo(false)}
           />
         )}
       </div>

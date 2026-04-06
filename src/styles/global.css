@@ -19,6 +19,16 @@
   --border: #3d3d3d;
 }
 
+[data-theme="sepia"] {
+  --bg-primary: #f4ecd8;
+  --bg-secondary: #ebe1c8;
+  --bg-tertiary: #e0d5b8;
+  --text-primary: #5c4b37;
+  --text-secondary: #8b7355;
+  --accent: #b8860b;
+  --border: #d4c4a8;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -38,6 +48,42 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+body.focus-mode .app > header {
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  position: absolute;
+  pointer-events: none;
+}
+
+body.focus-mode .app:hover > header,
+body.focus-mode .app > header:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  position: sticky;
+  pointer-events: auto;
+}
+
+body.focus-mode .outline {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+body.focus-mode .outline:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.focus-mode .status-bar {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body.focus-mode:hover .status-bar {
+  opacity: 1;
 }
 
 .search-highlight {

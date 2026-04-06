@@ -23,7 +23,7 @@ export function FileOpener({ onFileOpen }: Props) {
   }
 
   return (
-    <button className={styles.button} onClick={handleClick}>
+    <button className={styles.button} onClick={handleClick} data-guide="file-opener">
       📂 打开文件
       <input
         ref={inputRef}

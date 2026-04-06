@@ -1,0 +1,112 @@
+.sidebar {
+  width: 240px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.folderIcon {
+  font-size: 16px;
+}
+
+.folderName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.fileList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.loading,
+.empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.treeItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  gap: 6px;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.treeItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.expandIcon {
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: 12px;
+  text-align: center;
+}
+
+.folderIcon {
+  font-size: 14px;
+}
+
+.fileIcon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.nodeName {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treeItem.fileItem.active {
+  background: var(--accent);
+  color: white;
+}
+
+.treeItem.fileItem.active .nodeName {
+  color: white;
+}

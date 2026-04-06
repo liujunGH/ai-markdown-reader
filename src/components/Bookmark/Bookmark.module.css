@@ -1,0 +1,156 @@
+.container {
+  position: relative;
+}
+
+.toggleBtn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.2s;
+}
+
+.toggleBtn:hover {
+  background: var(--bg-tertiary);
+}
+
+.panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 280px;
+  max-width: 320px;
+  max-height: 400px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  line-height: 1;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+}
+
+.actions {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.addBtn {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.addBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.current {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.itemContent {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemContent:hover {
+  background: var(--bg-secondary);
+}
+
+.title {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.heading {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+
+.removeBtn:hover {
+  color: #e53935;
+}
