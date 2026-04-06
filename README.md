@@ -1,4 +1,4 @@
-# AI Markdown Reader
+# Markdown Reader
 
 一款沉浸式的 Markdown 阅读器，支持丰富的功能特性，让阅读 Markdown 文档成为一种享受。
 
@@ -12,32 +12,40 @@
 - **专注模式** - 隐藏所有界面元素，只保留内容，带来沉浸式阅读体验
 - **滚动高亮** - 目录自动跟踪当前阅读位置
 
+### 多标签页
+- **多文档浏览** - 同时打开多个 Markdown 文件
+- **标签管理** - 右键菜单支持复制文件名、关闭标签、关闭其他、关闭全部
+- **快捷键** - `Ctrl+T` 新建标签、`Ctrl+W` 关闭标签、`Ctrl+Tab` 切换标签
+
 ### 主题支持
 - **浅色模式** - 清晰的白色背景
 - **深色模式** - 舒适的深色背景
 - **护眼模式** - 米黄色纸张风格，减少眼睛疲劳
-- **自定义主题色** - 6 种预设强调色可选
 
 ### 强大的编辑辅助
-- **Mermaid 图表** - 支持流程图、时序图、甘特图等
+- **Mermaid 图表** - 支持流程图、时序图、甘特图等，支持导出 SVG/PNG
 - **KaTeX 数学公式** - 行内公式 `$...$`，块级公式 `$$...$$`
-- **代码高亮** - 多语言支持，可切换高亮主题
+- **代码高亮** - 多语言支持
 - **Emoji 支持** - 冒号语法自动转换为 Emoji
 
 ### 文件管理
 - **文件关联** - 双击 .md 文件直接用此应用打开
 - **文件夹浏览** - 侧边栏树形目录导航
-- **最近文件** - 快速访问最近打开的文档
+- **最近文件** - 快速访问最近打开的文档，支持删除和清空
 - **快速切换器** - `Ctrl+O` 快速切换文件
 
 ### 搜索功能
 - **内容搜索** - `Ctrl+F` 快速查找
 - **正则支持** - 支持正则表达式搜索
-- **高亮显示** - 搜索结果高亮标记
+- **高亮导航** - 点击上下箭头跳转匹配位置
 
 ### 快捷键支持
 | 快捷键 | 功能 |
 |--------|------|
+| `Ctrl + T` | 新建标签 |
+| `Ctrl + W` | 关闭当前标签 |
+| `Ctrl + Tab` | 切换到下一个标签 |
+| `Ctrl + Shift + Tab` | 切换到上一个标签 |
 | `Ctrl + F` | 搜索 |
 | `Ctrl + O` | 快速切换器 |
 | `Ctrl + .` | 专注模式 |
@@ -50,14 +58,13 @@
 
 ## 安装
 
+从 [GitHub Releases](https://github.com/liujunGH/ai-markdown-reader/releases) 下载对应平台的安装包。
+
 ### Windows
-下载 `AI Markdown Reader-1.0.0-Setup.exe` 并运行安装程序。
+下载 `Markdown-Reader-x.x.x.exe` 并运行安装程序。
 
 ### macOS
-下载 `AI Markdown Reader-1.0.0.dmg` 并拖入应用程序文件夹。
-
-### Linux
-下载 `AI Markdown Reader-1.0.0.AppImage` 并添加执行权限。
+下载 `Markdown-Reader-x.x.x.dmg` 并拖入应用程序文件夹。
 
 ## 开发
 
@@ -90,7 +97,7 @@ npm run electron:build:linux # Linux
 ## 项目结构
 
 ```
-ai-markdown-reader/
+markdown-reader/
 ├── src/
 │   ├── components/     # React 组件
 │   ├── context/        # React Context
