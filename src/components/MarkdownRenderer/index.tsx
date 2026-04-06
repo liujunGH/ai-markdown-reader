@@ -1,9 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { parseMarkdown } from '../../utils/markdownParser'
 import styles from './MarkdownRenderer.module.css'
 
+export interface MarkdownRendererRef {
+  getContainer: () => HTMLDivElement | null
+}
+
 interface Props {
   content: string
+  searchQuery?: string
+  searchRegex?: boolean
 }
 
 function decodeBase64(str: string): string {
@@ -17,8 +23,12 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-export function MarkdownRenderer({ content }: Props) {
+export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    getContainer: () => containerRef.current
+  }))
 
   const html = parseMarkdown(content)
 
@@ -73,6 +83,52 @@ export function MarkdownRenderer({ content }: Props) {
     }
   }, [content])
 
+  useEffect(() => {
+    if (!containerRef.current || !searchQuery) return
+
+    const container = containerRef.current
+
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null
+    )
+
+    const textNodes: Text[] = []
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode as Text)
+    }
+
+    textNodes.forEach(textNode => {
+      if (!textNode.textContent) return
+      const parent = textNode.parentElement
+      if (!parent || parent.closest('.search-box')) return
+      if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return
+
+      let nodeHtml = textNode.textContent
+      let hasMatch = false
+
+      try {
+        const pattern = searchRegex 
+          ? new RegExp(`(${searchQuery})`, 'gi')
+          : new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+        
+        if (pattern.test(nodeHtml)) {
+          hasMatch = true
+          nodeHtml = nodeHtml.replace(pattern, '<mark class="search-highlight">$1</mark>')
+        }
+      } catch {
+        // Invalid regex, skip
+      }
+
+      if (hasMatch) {
+        const span = document.createElement('span')
+        span.innerHTML = nodeHtml
+        textNode.parentNode?.replaceChild(span, textNode)
+      }
+    })
+  }, [searchQuery, searchRegex])
+
   return (
     <div 
       ref={containerRef}
@@ -80,4 +136,6 @@ export function MarkdownRenderer({ content }: Props) {
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
-}
+})
+
+MarkdownRenderer.displayName = 'MarkdownRenderer'

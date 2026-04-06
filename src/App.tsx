@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
-import { MarkdownRenderer } from './components/MarkdownRenderer'
+import { MarkdownRenderer, MarkdownRendererRef } from './components/MarkdownRenderer'
 import { FileOpener } from './components/FileOpener'
 import { Outline } from './components/Outline'
 import { SearchBox } from './components/SearchBox'
 import { ProgressBar } from './components/ProgressBar'
 import { StatusBar } from './components/StatusBar'
 import { useOutline } from './hooks/useOutline'
+import { useSearch } from './hooks/useSearch'
 
 const testContent = `
 # Markdown Reader
@@ -81,8 +82,20 @@ function App() {
   const [filename, setFilename] = useState('欢迎阅读.md')
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
+  const markdownRef = useRef<MarkdownRendererRef>(null)
 
   const outlineItems = useOutline(content)
+  const {
+    query,
+    setQuery,
+    isRegex,
+    setIsRegex,
+    matches,
+    currentMatch,
+    nextMatch,
+    prevMatch,
+    clearSearch
+  } = useSearch(content)
 
   const handleFileOpen = (fileContent: string, name: string) => {
     setContent(fileContent)
@@ -96,9 +109,10 @@ function App() {
     }
   }
 
-  const handleSearch = useCallback((query: string, isRegex: boolean) => {
-    console.log('Searching:', query, isRegex)
-  }, [])
+  const handleCloseSearch = () => {
+    clearSearch()
+    setShowSearch(false)
+  }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,7 +121,7 @@ function App() {
         setShowSearch(true)
       }
       if (e.key === 'Escape' && showSearch) {
-        setShowSearch(false)
+        handleCloseSearch()
       }
       if (e.key === 'F11') {
         e.preventDefault()
@@ -179,7 +193,12 @@ function App() {
             overflowY: 'auto',
             background: 'var(--bg-primary)'
           }}>
-            <MarkdownRenderer content={content} />
+            <MarkdownRenderer 
+              ref={markdownRef}
+              content={content}
+              searchQuery={query}
+              searchRegex={isRegex}
+            />
           </main>
           {showOutline && (
             <Outline items={outlineItems} onItemClick={handleOutlineClick} />
@@ -188,8 +207,15 @@ function App() {
         <StatusBar content={content} />
         {showSearch && (
           <SearchBox 
-            onSearch={handleSearch} 
-            onClose={() => setShowSearch(false)} 
+            query={query}
+            isRegex={isRegex}
+            matches={matches.length}
+            currentMatch={currentMatch}
+            onQueryChange={setQuery}
+            onRegexChange={setIsRegex}
+            onNext={nextMatch}
+            onPrev={prevMatch}
+            onClose={handleCloseSearch}
           />
         )}
       </div>

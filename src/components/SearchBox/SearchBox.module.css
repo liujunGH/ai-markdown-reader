@@ -66,3 +66,34 @@
 .regexLabel input {
   cursor: pointer;
 }
+
+.count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 8px;
+}
+
+.options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.navButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.navBtn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.navBtn:hover {
+  background: var(--bg-primary);
+}

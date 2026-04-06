@@ -1,25 +1,44 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import styles from './SearchBox.module.css'
 
 interface Props {
-  onSearch: (query: string, isRegex: boolean) => void
+  query: string
+  isRegex: boolean
+  matches: number
+  currentMatch: number
+  onQueryChange: (query: string) => void
+  onRegexChange: (isRegex: boolean) => void
+  onNext: () => void
+  onPrev: () => void
   onClose: () => void
 }
 
-export function SearchBox({ onSearch, onClose }: Props) {
-  const [query, setQuery] = useState('')
-  const [isRegex, setIsRegex] = useState(false)
+export function SearchBox({
+  query,
+  isRegex,
+  matches,
+  currentMatch,
+  onQueryChange,
+  onRegexChange,
+  onNext,
+  onPrev,
+  onClose
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
-  useEffect(() => {
-    onSearch(query, isRegex)
-  }, [query, isRegex, onSearch])
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        onPrev()
+      } else {
+        onNext()
+      }
+      e.preventDefault()
+    }
     if (e.key === 'Escape') {
       onClose()
     }
@@ -35,19 +54,32 @@ export function SearchBox({ onSearch, onClose }: Props) {
           className={styles.input}
           placeholder="搜索..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => onQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
         />
+        {query && (
+          <span className={styles.count}>
+            {matches > 0 ? `${currentMatch + 1}/${matches}` : '无结果'}
+          </span>
+        )}
         <button className={styles.closeButton} onClick={onClose}>✕</button>
       </div>
-      <label className={styles.regexLabel}>
-        <input
-          type="checkbox"
-          checked={isRegex}
-          onChange={(e) => setIsRegex(e.target.checked)}
-        />
-        正则表达式
-      </label>
+      <div className={styles.options}>
+        <label className={styles.regexLabel}>
+          <input
+            type="checkbox"
+            checked={isRegex}
+            onChange={(e) => onRegexChange(e.target.checked)}
+          />
+          正则表达式
+        </label>
+        {matches > 0 && (
+          <div className={styles.navButtons}>
+            <button onClick={onPrev} className={styles.navBtn}>↑</button>
+            <button onClick={onNext} className={styles.navBtn}>↓</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
