@@ -2,14 +2,25 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
-// 禁用硬件加速，避免某些环境下的问题
 app.disableHardwareAcceleration()
+
+console.log('[MAIN] App starting...')
+console.log('[MAIN] Is packaged:', app.isPackaged)
+console.log('[MAIN] __dirname:', __dirname)
+console.log('[MAIN] App path:', app.getAppPath())
 
 let mainWindow: BrowserWindow | null = null
 
 const isDev = !app.isPackaged
 
+function log(message: string, ...args: unknown[]) {
+  const timestamp = new Date().toISOString()
+  console.log(`[MAIN ${timestamp}] ${message}`, ...args)
+}
+
 function createWindow(filePath?: string) {
+  log('Creating window...')
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -23,31 +34,55 @@ function createWindow(filePath?: string) {
     }
   })
 
+  const htmlPath = isDev 
+    ? 'http://localhost:5173'
+    : path.join(__dirname, '../dist/index.html')
+
+  log('Loading HTML:', htmlPath)
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    const loaded = mainWindow.loadFile(htmlPath)
+    log('loadFile returned:', loaded)
   }
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    log('Page finished loading')
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    log('Page failed to load:', errorCode, errorDescription)
+  })
+
+  mainWindow.webContents.on('console-message', (_event, level, message) => {
+    if (level >= 0) {
+      log('[RENDERER]', message)
+    }
+  })
+
   mainWindow.on('closed', () => {
+    log('Window closed')
     mainWindow = null
   })
 
-  // 如果有文件路径，加载它
   if (filePath) {
+    log('File to open:', filePath)
     mainWindow.webContents.on('did-finish-load', () => {
       mainWindow?.webContents.send('open-file', filePath)
     })
   }
 }
 
-// 处理命令行参数（双击 .md 文件时）
 function handleFileOpen(filePath: string) {
+  log('handleFileOpen called:', filePath)
+  
   if (!filePath) return
   
   const ext = path.extname(filePath).toLowerCase()
   if (ext !== '.md' && ext !== '.markdown') {
+    log('Not a markdown file:', ext)
     return
   }
 
@@ -60,14 +95,15 @@ function handleFileOpen(filePath: string) {
   }
 }
 
-// 单实例锁 - 防止多个实例
 const gotTheLock = app.requestSingleInstanceLock()
+log('Got lock:', gotTheLock)
 
 if (!gotTheLock) {
+  log('Another instance is running, quitting...')
   app.quit()
 } else {
   app.on('second-instance', (_event, commandLine) => {
-    // Windows/Linux: 从命令行获取文件路径
+    log('Second instance detected:', commandLine)
     const filePath = commandLine.find(arg => 
       arg.endsWith('.md') || arg.endsWith('.markdown')
     )
@@ -83,32 +119,45 @@ if (!gotTheLock) {
 }
 
 app.whenReady().then(() => {
-  // macOS: 处理 open-file 事件
+  log('App ready')
+
   app.on('open-file', (event, filePath) => {
+    log('open-file event:', filePath)
     event.preventDefault()
     handleFileOpen(filePath)
   })
 
-  // 检查命令行参数
   const filePath = process.argv.find(arg => 
     arg.endsWith('.md') || arg.endsWith('.markdown')
   )
+  log('File from argv:', filePath)
+  log('Full argv:', process.argv)
+
   createWindow(filePath)
 })
 
 app.on('window-all-closed', () => {
+  log('All windows closed')
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
 app.on('activate', () => {
+  log('App activated')
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
 
-// IPC: 打开文件对话框
+process.on('uncaughtException', (error: Error) => {
+  log('Uncaught exception:', error)
+})
+
+process.on('unhandledRejection', (reason: unknown) => {
+  log('Unhandled rejection:', reason)
+})
+
 ipcMain.handle('open-file-dialog', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
@@ -126,7 +175,6 @@ ipcMain.handle('open-file-dialog', async () => {
   return null
 })
 
-// IPC: 打开文件夹对话框
 ipcMain.handle('open-folder-dialog', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
@@ -138,7 +186,6 @@ ipcMain.handle('open-folder-dialog', async () => {
   return null
 })
 
-// IPC: 读取文件
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8')
@@ -148,7 +195,6 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   }
 })
 
-// IPC: 获取文件信息
 ipcMain.handle('get-file-info', async (_event, filePath: string) => {
   try {
     const stats = fs.statSync(filePath)
@@ -166,7 +212,6 @@ ipcMain.handle('get-file-info', async (_event, filePath: string) => {
   }
 })
 
-// IPC: 在文件管理器中显示
 ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
   shell.showItemInFolder(filePath)
 })

@@ -33,6 +33,7 @@ declare global {
 }
 
 const LAST_FILE_KEY = 'last-opened-file'
+const LAST_FOLDER_KEY = 'last-opened-folder'
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 
 const welcomeContent = `
@@ -132,6 +133,9 @@ function App() {
     const hasSeen = localStorage.getItem(HAS_SEEN_GUIDE_KEY)
     return !hasSeen && !initial.isRestored
   })
+  const [lastFolderName] = useState<string | null>(() => {
+    return localStorage.getItem(LAST_FOLDER_KEY)
+  })
   const markdownRef = useRef<MarkdownRendererRef>(null)
   const { bookmarks, addBookmark, removeBookmark } = useBookmarks(filename)
 
@@ -213,6 +217,27 @@ function App() {
         handleFileOpen(content, firstFile.name)
         setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
         setCurrentFolderName(handle.name)
+        localStorage.setItem(LAST_FOLDER_KEY, handle.name)
+        setShowFileSidebar(true)
+      }
+    } catch {
+      // User cancelled
+    }
+  }
+
+  const handleRestoreFolder = async () => {
+    if (!window.showDirectoryPicker) return
+    try {
+      const handle = await window.showDirectoryPicker()
+      const { getFilesInFolder } = await import('./utils/folderBookmarks')
+      const files = await getFilesInFolder(handle as unknown as FileSystemDirectoryHandle)
+      if (files.length > 0) {
+        const firstFile = files[0]
+        const content = await firstFile.file.text()
+        handleFileOpen(content, firstFile.name)
+        setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
+        setCurrentFolderName(handle.name)
+        localStorage.setItem(LAST_FOLDER_KEY, handle.name)
         setShowFileSidebar(true)
       }
     } catch {
@@ -361,17 +386,16 @@ function App() {
       <ProgressBar />
       <div className="app">
         <header style={{ 
-          padding: '16px', 
+          padding: '8px 12px', 
           borderBottom: '1px solid var(--border)',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
           position: 'sticky',
           top: 0,
           zIndex: 100,
           backgroundColor: 'var(--bg-primary)'
         }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
             <FileOpener onFileOpen={handleFileOpen} />
             <button 
               onClick={() => setShowRecent(!showRecent)}
@@ -381,13 +405,13 @@ function App() {
                 color: showRecent ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '13px'
               }}
-              title="最近打开"
+              data-tooltip="最近打开 (Ctrl+Shift+R)"
             >
-              📜 最近
+              📜
             </button>
             <button 
               onClick={handleOpenFolder}
@@ -396,14 +420,31 @@ function App() {
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '13px'
               }}
-              title="打开文件夹"
+              data-tooltip="打开文件夹"
             >
-              📂 文件夹
+              📂
             </button>
+            {lastFolderName && !currentFolderHandle && (
+              <button 
+                onClick={handleRestoreFolder}
+                style={{
+                  background: 'var(--accent)',
+                  color: 'white',
+                  border: '1px solid var(--accent)',
+                  borderRadius: '4px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+                data-tooltip={`恢复上次文件夹: ${lastFolderName}`}
+              >
+                恢复 {lastFolderName.slice(0, 8)}...
+              </button>
+            )}
             {currentFolderHandle && (
               <button 
                 onClick={() => setShowFileSidebar(!showFileSidebar)}
@@ -412,17 +453,22 @@ function App() {
                   color: showFileSidebar ? 'white' : 'var(--text-primary)',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  padding: '8px 12px',
+                  padding: '6px 10px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '13px'
                 }}
-                title="文件列表"
+                data-tooltip="文件列表"
               >
-                📋 文件
+                📋
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: 0 }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={filename}>
+              {filename}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button 
               onClick={() => setShowOutline(!showOutline)}
               data-guide="outline"
@@ -431,12 +477,13 @@ function App() {
                 color: showOutline ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '13px'
               }}
+              data-tooltip="目录"
             >
-              📑 目录
+              📑
             </button>
             <button 
               onClick={() => setShowSearch(true)}
@@ -445,13 +492,14 @@ function App() {
                 background: 'transparent',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 color: 'var(--text-secondary)'
               }}
+              data-tooltip="搜索 (Ctrl+F)"
             >
-              🔍 搜索
+              🔍
             </button>
             <button 
               onClick={() => setShowSource(!showSource)}
@@ -461,12 +509,13 @@ function App() {
                 color: showSource ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '13px'
               }}
+              data-tooltip="源码 (Ctrl+S)"
             >
-              📄 源码
+              📄
             </button>
             <button 
               onClick={() => setShowFocusMode(!showFocusMode)}
@@ -476,45 +525,31 @@ function App() {
                 color: showFocusMode ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '13px'
               }}
-              title="专注模式 (Ctrl+.)"
+              data-tooltip="专注模式 (Ctrl+.)"
             >
-              👁️ 专注
+              👁️
             </button>
-            <button 
-              onClick={() => setShowKeyboardShortcuts(true)}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                color: 'var(--text-secondary)'
-              }}
-              title="快捷键 (Ctrl+/)"
-            >
-              ⌨️
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} data-guide="font-size">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }} data-guide="font-size">
               <button 
                 onClick={() => setFontSize(prev => Math.max(prev - 2, 12))}
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  padding: '4px 8px',
+                  padding: '4px 6px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '12px',
                   color: 'var(--text-secondary)'
                 }}
+                data-tooltip="缩小"
               >
                 A-
               </button>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', minWidth: '30px', textAlign: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', minWidth: '24px', textAlign: 'center' }}>
                 {fontSize}
               </span>
               <button 
@@ -523,29 +558,30 @@ function App() {
                   background: 'transparent',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  padding: '4px 8px',
+                  padding: '4px 6px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '12px',
                   color: 'var(--text-secondary)'
                 }}
+                data-tooltip="放大"
               >
                 A+
               </button>
             </div>
             <button 
-              onClick={() => window.print()}
+              onClick={() => setShowKeyboardShortcuts(true)}
               style={{
                 background: 'transparent',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 color: 'var(--text-secondary)'
               }}
-              title="打印 (Ctrl+P)"
+              data-tooltip="快捷键 (Ctrl+/)"
             >
-              🖨️
+              ⌨️
             </button>
             <button 
               onClick={() => setShowFileInfo(true)}
@@ -553,12 +589,12 @@ function App() {
                 background: 'transparent',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '13px',
                 color: 'var(--text-secondary)'
               }}
-              title="文件信息"
+              data-tooltip="文件信息"
             >
               ℹ️
             </button>
@@ -569,9 +605,6 @@ function App() {
               onNavigate={handleBookmarkNavigate}
               currentHeading={currentHeading}
             />
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-              {filename}
-            </span>
             <ThemeToggle />
           </div>
         </header>

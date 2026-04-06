@@ -29,6 +29,28 @@
   --border: #d4c4a8;
 }
 
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  border-radius: 4px;
+  z-index: 1000;
+  margin-top: 6px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 * {
   margin: 0;
   padding: 0;
