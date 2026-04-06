@@ -116,6 +116,37 @@ function App() {
   }
 
   useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    const handleDrop = async (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const files = e.dataTransfer?.files
+      if (!files || files.length === 0) return
+
+      const file = files[0]
+      if (!file.name.endsWith('.md') && !file.name.endsWith('.markdown')) {
+        return
+      }
+
+      const fileContent = await file.text()
+      handleFileOpen(fileContent, file.name)
+    }
+
+    document.addEventListener('dragover', handleDragOver)
+    document.addEventListener('drop', handleDrop)
+
+    return () => {
+      document.removeEventListener('dragover', handleDragOver)
+      document.removeEventListener('drop', handleDrop)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
