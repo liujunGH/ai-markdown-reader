@@ -14,6 +14,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -54,16 +56,13 @@ jobs:
         if: false  # Skip Linux on Ubuntu
         run: npx electron-builder --linux --config.asar=false
 
-      - name: Create Release
+      - name: Upload to Release
         run: |
           gh release create ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
           cd release
           for f in *.exe; do
-            if [ -f "$f" ]; then
-              echo "Uploading $f..."
-              gh release upload ${{ github.ref_name }} "$f" --clobber
-            fi
+            echo "Uploading $f..."
+            gh release upload ${{ github.ref_name }} "$f" --clobber
           done
-          gh release view ${{ github.ref_name }} --json browserDownloadUrl -q '.assets[0].browserDownloadUrl'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
