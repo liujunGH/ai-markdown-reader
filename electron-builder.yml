@@ -1,0 +1,58 @@
+appId: com.aimarkdownreader.app
+productName: AI Markdown Reader
+copyright: Copyright © 2024
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+
+extraMetadata:
+  main: electron/main.js
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-Setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  artifactName: ${productName}-${version}.${ext}
+  category: public.app-category.productivity
+
+linux:
+  target:
+    - AppImage
+    - deb
+  artifactName: ${productName}-${version}.${ext}
+  category: Office
+
+fileAssociations:
+  - ext: md
+    name: Markdown Document
+    description: Markdown Document
+    mimeType: text/markdown
+    role: Editor
+  - ext: markdown
+    name: Markdown Document
+    description: Markdown Document
+    mimeType: text/markdown
+    role: Editor

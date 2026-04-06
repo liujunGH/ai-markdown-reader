@@ -1,0 +1,46 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: npm run electron:build
+            artifact: '**/release/*.exe'
+          - os: macos-latest
+            script: npm run electron:build:mac
+            artifact: '**/release/*.dmg'
+          - os: ubuntu-latest
+            script: npm run electron:build:linux
+            artifact: '**/release/*.AppImage'
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build ${{ matrix.os }}
+        run: ${{ matrix.script }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-artifact
+          path: ${{ matrix.artifact }}
+          retention-days: 30
