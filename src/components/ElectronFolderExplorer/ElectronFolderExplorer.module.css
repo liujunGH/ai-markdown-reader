@@ -1,0 +1,144 @@
+.sidebar {
+  width: 240px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.folderIcon {
+  font-size: 16px;
+}
+
+.folderName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refreshBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.refreshBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.refreshBtn.hasChanges {
+  color: #ff9800;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.closeBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.fileList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.loading,
+.empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 0.2s;
+}
+
+.fileItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.fileItem.active {
+  background: var(--accent);
+  color: white;
+}
+
+.fileItem.changed {
+  background: #fff3e0;
+}
+
+[data-theme="dark"] .fileItem.changed {
+  background: #3d2e1f;
+}
+
+.fileItem.changed.active {
+  background: var(--accent);
+}
+
+.fileIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.fileName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changedBadge {
+  font-size: 10px;
+  color: #ff9800;
+  background: #fff3e0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .changedBadge {
+  background: #3d2e1f;
+  color: #ffb74d;
+}
+
+.children {
+  margin: 0;
+}

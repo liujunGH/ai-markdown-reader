@@ -5,6 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+![Version](https://img.shields.io/badge/Version-1.2.0-blue)
 
 ## 功能特性
 
@@ -15,12 +16,17 @@
 ### 多标签页
 - **多文档浏览** - 同时打开多个 Markdown 文件
 - **标签管理** - 右键菜单支持复制文件名、关闭标签、关闭其他、关闭全部
+- **标签页拖拽** - 拖拽标签页可以重新排序
+- **标签页数量限制** - 默认最多10个标签页，可配置
+- **会话恢复** - 关闭应用后重新打开，自动恢复上次的工作标签页
 - **快捷键** - `Ctrl+T` 新建标签、`Ctrl+W` 关闭标签、`Ctrl+Tab` 切换标签
 
 ### 主题支持
 - **浅色模式** - 清晰的白色背景
 - **深色模式** - 舒适的深色背景
 - **护眼模式** - 米黄色纸张风格，减少眼睛疲劳
+- **代码主题** - 多种代码高亮主题可选
+- **强调色** - 多种强调色供选择
 
 ### 强大的编辑辅助
 - **Mermaid 图表** - 支持流程图、时序图、甘特图等，支持导出 SVG/PNG
@@ -29,10 +35,19 @@
 - **Emoji 支持** - 冒号语法自动转换为 Emoji
 
 ### 文件管理
-- **文件关联** - 双击 .md 文件直接用此应用打开
-- **文件夹浏览** - 侧边栏树形目录导航
-- **最近文件** - 快速访问最近打开的文档，支持删除和清空
-- **快速切换器** - `Ctrl+O` 快速切换文件
+- **原生文件操作** - 使用 Electron 主进程处理文件，获取真实文件路径
+- **文件关联** - 双击 .md 文件直接用此应用打开（macOS/Windows）
+- **文件夹浏览** - 侧边栏树形目录导航，支持子文件夹结构展示
+- **文件变更检测** - 外部文件修改后自动检测并提示刷新
+- **最近文件** - 快速访问最近打开的文档，最多保存100条历史
+- **快速切换器** - `Ctrl+O` 快速切换文件，支持路径搜索
+- **文件拖拽** - 支持将外部文件拖入应用打开
+- **在 Finder 中显示** - 右键菜单中可选择在文件管理器中显示当前文件
+- **复制文件路径** - 方便复制当前文件的完整路径
+
+### 书签功能
+- **添加书签** - 为当前阅读位置添加书签
+- **书签管理** - 快速跳转至书签位置
 
 ### 搜索功能
 - **内容搜索** - `Ctrl+F` 快速查找
@@ -48,6 +63,7 @@
 | `Ctrl + Shift + Tab` | 切换到上一个标签 |
 | `Ctrl + F` | 搜索 |
 | `Ctrl + O` | 快速切换器 |
+| `Ctrl + Shift + R` | 打开最近文件页面 |
 | `Ctrl + .` | 专注模式 |
 | `Ctrl + /` | 快捷键帮助 |
 | `Ctrl + S` | 切换源码视图 |
@@ -92,7 +108,7 @@ npm run electron:build:linux # Linux
 - **代码高亮**: Prism.js
 - **图表**: Mermaid
 - **数学公式**: KaTeX
-- **桌面打包**: Electron
+- **桌面打包**: Electron 28
 
 ## 项目结构
 
@@ -100,13 +116,47 @@ npm run electron:build:linux # Linux
 markdown-reader/
 ├── src/
 │   ├── components/     # React 组件
+│   │   ├── TabBar/           # 标签栏
+│   │   ├── QuickSwitcher/    # 快速切换器
+│   │   ├── RecentFiles/      # 侧边栏最近文件
+│   │   ├── RecentFilesPage/  # 全屏最近文件页面
+│   │   ├── ElectronFolderExplorer/  # Electron 文件夹浏览器
+│   │   ├── FilePreviewPanel/ # 文件预览面板
+│   │   ├── Outline/          # 目录导航
+│   │   ├── Bookmark/         # 书签
+│   │   ├── SearchBox/        # 搜索框
+│   │   ├── ThemeToggle/      # 主题切换
+│   │   └── StatusBar/        # 状态栏
 │   ├── context/        # React Context
 │   ├── hooks/          # 自定义 Hooks
 │   ├── utils/          # 工具函数
 │   └── styles/         # 全局样式
 ├── electron/           # Electron 主进程
-└── release/            # 构建输出
+│   ├── main.ts         # 主进程入口
+│   └── preload.ts      # 预加载脚本
+└── release/           # 构建输出
 ```
+
+## 更新日志
+
+### v1.2.0
+- 新增：Electron 主进程文件操作，支持真实文件路径
+- 新增：原生文件拖拽支持
+- 新增：外部文件变更检测
+- 新增：标签页拖拽重排序
+- 新增：专注模式隐藏操作栏
+- 新增：文件预览面板
+- 新增：最近文件全屏页面（保存100条历史）
+- 新增：标签页数量限制（默认10个）
+- 优化：文件夹浏览器支持子目录结构展示
+- 优化：文件变更标记和刷新功能
+- 优化：StatusBar 固定显示
+
+### v1.1.6
+- 修复：标签页右键菜单被遮挡问题
+- 新增：复制文件路径功能
+- 新增：在 Finder 中显示功能
+- 新增：快速切换器路径搜索
 
 ## License
 

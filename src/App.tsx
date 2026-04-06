@@ -7,19 +7,34 @@ import { Outline } from './components/Outline'
 import { SearchBox } from './components/SearchBox'
 import { ProgressBar } from './components/ProgressBar'
 import { StatusBar } from './components/StatusBar'
-import { RecentFiles } from './components/RecentFiles'
+import { RecentFilesPage } from './components/RecentFilesPage'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
 import FirstUseGuide from './components/FirstUseGuide'
 import QuickSwitcher from './components/QuickSwitcher'
 import { SidebarFileExplorer } from './components/SidebarFileExplorer'
+import { ElectronFolderExplorer } from './components/ElectronFolderExplorer'
 import { FileInfoPanel } from './components/FileInfoPanel'
+import { FilePreviewPanel } from './components/FilePreviewPanel'
 import { BookmarkPanel, useBookmarks } from './components/Bookmark'
 import { useOutline } from './hooks/useOutline'
 import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
-import { getRecentFiles, addRecentFile, removeRecentFile, clearRecentFiles, RecentFile } from './utils/recentFiles'
 import { TabBar } from './components/TabBar'
 import { Tab, createTab, getWelcomeTab } from './types/Tab'
+
+interface RecentFile {
+  name: string
+  filePath: string
+  openedAt: number
+}
+
+interface FolderFile {
+  name: string
+  filePath: string
+  size?: number
+  lastModified?: number
+  isDirectory?: boolean
+}
 
 declare global {
   interface Window {
@@ -27,10 +42,22 @@ declare global {
     electronAPI?: {
       openFileDialog: () => Promise<{ filePath: string; content: string } | null>
       openFolderDialog: () => Promise<string | null>
+      readFolder: (folderPath: string) => Promise<{ success: boolean; files?: FolderFile[]; error?: string }>
       readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
       getFileInfo: (filePath: string) => Promise<{ success: boolean; info?: { name: string; size: number; lastModified: number; created: number }; error?: string }>
       showInFolder: (filePath: string) => Promise<void>
       onOpenFile: (callback: (filePath: string) => void) => void
+      onFileChanged: (callback: (filePath: string) => void) => void
+      watchFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
+      unwatchFile: (filePath: string) => Promise<void>
+      getRecentFiles: () => Promise<RecentFile[]>
+      addRecentFile: (file: { name: string; filePath: string }) => Promise<void>
+      removeRecentFile: (filePath: string) => Promise<void>
+      clearRecentFiles: () => Promise<void>
+      getLastFolder: () => Promise<string | null>
+      setLastFolder: (folderPath: string) => Promise<void>
+      getMaxRecentFiles: () => Promise<number>
+      setMaxRecentFiles: (max: number) => Promise<void>
     }
   }
   interface FileSystemDirectoryHandle {
@@ -42,18 +69,44 @@ declare global {
   }
 }
 
-const LAST_FILE_KEY = 'last-opened-file'
-const LAST_FOLDER_KEY = 'last-opened-folder'
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
+const SESSION_TABS_KEY = 'session-tabs'
+const SESSION_ACTIVE_TAB_KEY = 'session-active-tab'
+const MAX_TABS_KEY = 'max-tabs'
+const DEFAULT_MAX_TABS = 10
 
-function getInitialTabs(): { tabs: Tab[]; activeTabId: string } {
-  const stored = localStorage.getItem(LAST_FILE_KEY)
+interface StoredTab {
+  id: string
+  name: string
+  content: string
+  filePath?: string
+}
+
+async function getInitialTabs(): Promise<{ tabs: Tab[]; activeTabId: string }> {
+  const stored = localStorage.getItem(SESSION_TABS_KEY)
   if (stored) {
     try {
-      const { content, name } = JSON.parse(stored)
-      if (content && name) {
-        const tab = createTab(name, content)
-        return { tabs: [tab], activeTabId: tab.id }
+      const storedTabs: StoredTab[] = JSON.parse(stored)
+      const restoredTabs: Tab[] = []
+      
+      for (const storedTab of storedTabs) {
+        if (storedTab.filePath && window.electronAPI) {
+          const result = await window.electronAPI.readFile(storedTab.filePath)
+          if (result.success && result.content !== undefined) {
+            restoredTabs.push(createTab(storedTab.name, result.content, storedTab.filePath))
+          }
+        } else if (storedTab.content) {
+          restoredTabs.push(createTab(storedTab.name, storedTab.content, storedTab.filePath))
+        }
+      }
+      
+      if (restoredTabs.length > 0) {
+        const activeTabId = localStorage.getItem(SESSION_ACTIVE_TAB_KEY)
+        const validActiveId = activeTabId && restoredTabs.some(t => t.id === activeTabId)
+        return {
+          tabs: restoredTabs,
+          activeTabId: validActiveId ? activeTabId! : restoredTabs[0].id
+        }
       }
     } catch {}
   }
@@ -62,9 +115,9 @@ function getInitialTabs(): { tabs: Tab[]; activeTabId: string } {
 }
 
 function App() {
-  const { tabs: initialTabs, activeTabId: initialActiveTabId } = getInitialTabs()
-  const [tabs, setTabs] = useState<Tab[]>(initialTabs)
-  const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId)
+  const [tabs, setTabs] = useState<Tab[]>([])
+  const [activeTabId, setActiveTabId] = useState<string>('')
+  const [isRestoringSession, setIsRestoringSession] = useState(true)
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
   const [showSource, setShowSource] = useState(false)
@@ -74,18 +127,22 @@ function App() {
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
   const [showFileSidebar, setShowFileSidebar] = useState(false)
   const [currentFolderHandle, setCurrentFolderHandle] = useState<FileSystemDirectoryHandle | null>(null)
+  const [electronFolderPath, setElectronFolderPath] = useState<string | null>(null)
   const [currentFolderName, setCurrentFolderName] = useState<string>('')
   const [currentFilePath, setCurrentFilePath] = useState<string>('')
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([])
   const [fontSize, setFontSize] = useState(16)
   const [showFileInfo, setShowFileInfo] = useState(false)
+  const [showFilePreview, setShowFilePreview] = useState(false)
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number; lastModified: number } | null>(null)
   const [showGuide, setShowGuide] = useState(() => {
     const hasSeen = localStorage.getItem(HAS_SEEN_GUIDE_KEY)
-    return !hasSeen && tabs.length === 1 && tabs[0].name === '欢迎使用.md'
+    return !hasSeen
   })
-  const [lastFolderName] = useState<string | null>(() => {
-    return localStorage.getItem(LAST_FOLDER_KEY)
+  const [changedFilePath, setChangedFilePath] = useState<string | null>(null)
+  const [maxTabs] = useState<number>(() => {
+    const stored = localStorage.getItem(MAX_TABS_KEY)
+    return stored ? parseInt(stored, 10) : DEFAULT_MAX_TABS
   })
   const markdownRef = useRef<MarkdownRendererRef>(null)
 
@@ -96,18 +153,80 @@ function App() {
   const { bookmarks, addBookmark, removeBookmark } = useBookmarks(activeTab?.name || '')
 
   useEffect(() => {
-    setRecentFiles(getRecentFiles())
+    if (window.electronAPI) {
+      window.electronAPI.getRecentFiles().then(files => setRecentFiles(files))
+    }
+  }, [])
+
+  useEffect(() => {
+    getInitialTabs().then(({ tabs: restoredTabs, activeTabId: restoredActiveTabId }) => {
+      setTabs(restoredTabs)
+      setActiveTabId(restoredActiveTabId)
+      setIsRestoringSession(false)
+    })
   }, [])
 
   useEffect(() => {
     if (tabs.length === 1 && tabs[0].name === '欢迎使用.md') return
     const tab = activeTab
-    if (!tab) return
-    const recent = getRecentFiles()
-    const exists = recent.some(f => f.name === tab.name)
-    if (!exists) {
-      addRecentFile({ name: tab.name, content: tab.content })
-      setRecentFiles(getRecentFiles())
+    if (!tab || !tab.filePath) return
+    if (window.electronAPI) {
+      window.electronAPI.addRecentFile({ name: tab.name, filePath: tab.filePath })
+      window.electronAPI.getRecentFiles().then(files => setRecentFiles(files))
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (isRestoringSession || tabs.length === 0) return
+    const tabsToSave: StoredTab[] = tabs.map(t => ({
+      id: t.id,
+      name: t.name,
+      content: t.content,
+      filePath: t.filePath
+    }))
+    localStorage.setItem(SESSION_TABS_KEY, JSON.stringify(tabsToSave))
+    if (activeTabId) {
+      localStorage.setItem(SESSION_ACTIVE_TAB_KEY, activeTabId)
+    }
+  }, [tabs, activeTabId, isRestoringSession])
+
+  useEffect(() => {
+    if (!window.electronAPI || isRestoringSession) return
+    tabs.forEach(tab => {
+      if (tab.filePath) {
+        window.electronAPI!.watchFile(tab.filePath)
+      }
+    })
+  }, [tabs, isRestoringSession])
+
+  useEffect(() => {
+    if (!window.electronAPI) return
+    window.electronAPI.onFileChanged(async (filePath: string) => {
+      setChangedFilePath(filePath)
+    })
+  }, [])
+
+  const handleReloadChangedFile = async () => {
+    if (!changedFilePath || !window.electronAPI) return
+    const result = await window.electronAPI.readFile(changedFilePath)
+    if (result.success && result.content !== undefined) {
+      const name = changedFilePath.split('/').pop() || '未知文件.md'
+      setTabs(prevTabs => prevTabs.map(tab =>
+        tab.filePath === changedFilePath
+          ? { ...tab, content: result.content!, name }
+          : tab
+      ))
+    }
+    setChangedFilePath(null)
+  }
+
+  useEffect(() => {
+    if (tabs.length === 1 && tabs[0].name === '欢迎使用.md') return
+    const tab = activeTab
+    if (!tab || !tab.filePath) return
+    if (window.electronAPI) {
+      window.electronAPI.addRecentFile({ name: tab.name, filePath: tab.filePath })
+      window.electronAPI.getRecentFiles().then(files => setRecentFiles(files))
     }
   }, [activeTab])
 
@@ -131,6 +250,7 @@ function App() {
   } = useSearch(activeTab?.content || '')
 
   const handleNewTab = () => {
+    if (tabs.length >= maxTabs) return
     const welcomeTab = getWelcomeTab()
     setTabs(prev => [...prev, welcomeTab])
     setActiveTabId(welcomeTab.id)
@@ -171,114 +291,130 @@ function App() {
     setActiveTabId(welcomeTab.id)
   }
 
-  const handleFileOpen = (fileContent: string, name: string, file?: File) => {
+  const handleTabReorder = (fromIndex: number, toIndex: number) => {
+    const newTabs = [...tabs]
+    const [movedTab] = newTabs.splice(fromIndex, 1)
+    newTabs.splice(toIndex, 0, movedTab)
+    setTabs(newTabs)
+    if (activeTabId === movedTab.id) {
+      setActiveTabId(movedTab.id)
+    }
+  }
+
+  const handleFileOpen = (fileContent: string, name: string, filePath: string = '') => {
     const existingTab = tabs.find(t => 
       t.name === name && 
       !t.isModified && 
-      (!file?.name || t.filePath === file.name)
+      (!filePath || t.filePath === filePath)
     )
     if (existingTab) {
       setActiveTabId(existingTab.id)
       return
     }
 
-    const newTab = createTab(name, fileContent, file?.name, file)
-    if (file) {
-      newTab.file = file
+    let tabsToAdd = [...tabs]
+    while (tabsToAdd.length >= maxTabs) {
+      const oldestNonActive = tabsToAdd.find(t => t.id !== activeTabId)
+      if (oldestNonActive) {
+        tabsToAdd = tabsToAdd.filter(t => t.id !== oldestNonActive.id)
+      } else {
+        break
+      }
     }
-    setTabs(prev => [...prev, newTab])
+
+    const newTab = createTab(name, fileContent, filePath)
+    tabsToAdd.push(newTab)
+    setTabs(tabsToAdd)
     setActiveTabId(newTab.id)
-    addRecentFile({ name, content: fileContent })
-    setRecentFiles(getRecentFiles())
-    localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: fileContent, name }))
     
-    if (file) {
-      setFileInfo({
-        name: file.name,
-        size: file.size,
-        lastModified: file.lastModified
-      })
-    } else {
-      setFileInfo({
-        name,
-        size: new Blob([fileContent]).size,
-        lastModified: Date.now()
-      })
+    if (window.electronAPI && filePath) {
+      window.electronAPI.addRecentFile({ name, filePath })
+      window.electronAPI.getRecentFiles().then(files => setRecentFiles(files))
     }
+    
+    setFileInfo({
+      name,
+      size: new Blob([fileContent]).size,
+      lastModified: Date.now()
+    })
   }
 
-  const handleRecentSelect = (file: RecentFile) => {
-    const existingTab = tabs.find(t => t.name === file.name && !t.isModified && !t.filePath)
+  const handleRecentSelect = async (file: RecentFile) => {
+    const existingTab = tabs.find(t => t.filePath === file.filePath && !t.isModified)
     if (existingTab) {
       setActiveTabId(existingTab.id)
-    } else {
-      const newTab = createTab(file.name, file.content)
-      setTabs(prev => [...prev, newTab])
-      setActiveTabId(newTab.id)
+      setShowRecent(false)
+      return
+    }
+    
+    if (window.electronAPI) {
+      const result = await window.electronAPI.readFile(file.filePath)
+      if (result.success && result.content) {
+        let tabsToUse = [...tabs]
+        while (tabsToUse.length >= maxTabs) {
+          const oldestNonActive = tabsToUse.find(t => t.id !== activeTabId)
+          if (oldestNonActive) {
+            tabsToUse = tabsToUse.filter(t => t.id !== oldestNonActive.id)
+          } else {
+            break
+          }
+        }
+        const newTab = createTab(file.name, result.content, file.filePath)
+        tabsToUse.push(newTab)
+        setTabs(tabsToUse)
+        setActiveTabId(newTab.id)
+      }
     }
     setShowRecent(false)
-    localStorage.setItem(LAST_FILE_KEY, JSON.stringify({ content: file.content, name: file.name }))
   }
 
-  const handleRemoveRecent = (name: string) => {
-    removeRecentFile(name)
-    setRecentFiles(getRecentFiles())
+  const handleRemoveRecent = async (filePath: string) => {
+    if (window.electronAPI) {
+      await window.electronAPI.removeRecentFile(filePath)
+      const files = await window.electronAPI.getRecentFiles()
+      setRecentFiles(files)
+    }
   }
 
-  const handleClearRecent = () => {
-    clearRecentFiles()
-    setRecentFiles([])
+  const handleClearRecent = async () => {
+    if (window.electronAPI) {
+      await window.electronAPI.clearRecentFiles()
+      setRecentFiles([])
+    }
   }
 
   const handleOpenFolder = async () => {
-    if (!window.showDirectoryPicker) {
-      alert('您的浏览器不支持打开文件夹功能，请使用 Chrome 或 Edge 浏览器')
-      return
-    }
+    if (!window.electronAPI) return
     try {
-      const handle = await window.showDirectoryPicker()
-      const { addFolderBookmark, getFilesInFolder } = await import('./utils/folderBookmarks')
-      await addFolderBookmark(handle.name, handle as unknown as FileSystemDirectoryHandle)
+      const folderPath = await window.electronAPI.openFolderDialog()
+      if (!folderPath) return
       
-      const files = await getFilesInFolder(handle as unknown as FileSystemDirectoryHandle)
-      if (files.length > 0) {
-        const firstFile = files[0]
-        const content = await firstFile.file.text()
-        handleFileOpen(content, firstFile.name, firstFile.file)
-        setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
-        setCurrentFolderName(handle.name)
-        localStorage.setItem(LAST_FOLDER_KEY, handle.name)
+      const result = await window.electronAPI.readFolder(folderPath)
+      if (!result.success || !result.files || result.files.length === 0) return
+      
+      const firstFile = result.files[0]
+      const fileResult = await window.electronAPI.readFile(firstFile.filePath)
+      if (fileResult.success && fileResult.content) {
+        handleFileOpen(fileResult.content, firstFile.name, firstFile.filePath)
+        setCurrentFolderName(folderPath.split('/').pop() || folderPath)
+        setElectronFolderPath(folderPath)
+        await window.electronAPI.setLastFolder(folderPath)
         setShowFileSidebar(true)
       }
-    } catch {}
-  }
-
-  const handleRestoreFolder = async () => {
-    if (!window.showDirectoryPicker) return
-    try {
-      const handle = await window.showDirectoryPicker()
-      const { getFilesInFolder } = await import('./utils/folderBookmarks')
-      const files = await getFilesInFolder(handle as unknown as FileSystemDirectoryHandle)
-      if (files.length > 0) {
-        const firstFile = files[0]
-        const content = await firstFile.file.text()
-        handleFileOpen(content, firstFile.name, firstFile.file)
-        setCurrentFolderHandle(handle as unknown as FileSystemDirectoryHandle)
-        setCurrentFolderName(handle.name)
-        localStorage.setItem(LAST_FOLDER_KEY, handle.name)
-        setShowFileSidebar(true)
-      }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to open folder:', err)
+    }
   }
 
   const handleFolderFileSelect = (fileContent: string, fileName: string, filePath: string) => {
-    handleFileOpen(fileContent, fileName)
+    handleFileOpen(fileContent, fileName, filePath)
     setCurrentFilePath(filePath)
   }
 
   const handleCloseFileSidebar = () => {
     setShowFileSidebar(false)
     setCurrentFolderHandle(null)
+    setElectronFolderPath(null)
     setCurrentFolderName('')
     setCurrentFilePath('')
   }
@@ -314,7 +450,7 @@ function App() {
         const result = await window.electronAPI!.readFile(filePath)
         if (result.success && result.content !== undefined) {
           const name = filePath.split('/').pop() || '未知文件.md'
-          handleFileOpen(result.content, name)
+          handleFileOpen(result.content, name, filePath)
         }
       } catch (err) {
         console.error('[App] Failed to open file:', err)
@@ -340,8 +476,15 @@ function App() {
         return
       }
 
-      const fileContent = await file.text()
-      handleFileOpen(fileContent, file.name, file)
+      if (window.electronAPI && (file as any).path) {
+        const result = await window.electronAPI.readFile((file as any).path)
+        if (result.success && result.content !== undefined) {
+          handleFileOpen(result.content, file.name, (file as any).path)
+        }
+      } else {
+        const fileContent = await file.text()
+        handleFileOpen(fileContent, file.name, '')
+      }
     }
 
     document.addEventListener('dragover', handleDragOver)
@@ -445,27 +588,29 @@ function App() {
   return (
     <ThemeProvider>
       <ProgressBar />
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={handleTabSelect}
-        onTabClose={handleTabClose}
-        onTabCloseOthers={handleTabCloseOthers}
-        onTabCloseAll={handleTabCloseAll}
-        onNewTab={handleNewTab}
-      />
-      <div className="app">
-        <header style={{ 
-          padding: '8px 12px', 
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          backgroundColor: 'var(--bg-primary)'
-        }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+      {!showFocusMode && (
+        <>
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabSelect={handleTabSelect}
+            onTabClose={handleTabClose}
+            onTabCloseOthers={handleTabCloseOthers}
+            onTabCloseAll={handleTabCloseAll}
+            onNewTab={handleNewTab}
+            onTabReorder={handleTabReorder}
+          />
+          <header style={{
+            padding: '8px 12px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: 'var(--bg-primary)'
+          }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
             <FileOpener onFileOpen={handleFileOpen} />
             <button 
               onClick={() => setShowRecent(!showRecent)}
@@ -498,24 +643,7 @@ function App() {
             >
               📂
             </button>
-            {lastFolderName && !currentFolderHandle && (
-              <button 
-                onClick={handleRestoreFolder}
-                style={{
-                  background: 'var(--accent)',
-                  color: 'white',
-                  border: '1px solid var(--accent)',
-                  borderRadius: '4px',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-                data-tooltip={`恢复上次文件夹: ${lastFolderName}`}
-              >
-                恢复 {lastFolderName.slice(0, 8)}...
-              </button>
-            )}
-            {currentFolderHandle && (
+            {(currentFolderHandle || electronFolderPath) && (
               <button 
                 onClick={() => setShowFileSidebar(!showFileSidebar)}
                 style={{
@@ -540,10 +668,19 @@ function App() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button 
-              onClick={() => setShowOutline(!showOutline)}
+              onClick={() => {
+                if (!showOutline) {
+                  setShowOutline(true)
+                  setShowFilePreview(false)
+                } else if (showFilePreview) {
+                  setShowFilePreview(false)
+                } else {
+                  setShowFilePreview(true)
+                }
+              }}
               data-guide="outline"
               style={{
-                background: showOutline ? 'var(--accent)' : 'transparent',
+                background: showOutline ? (showFilePreview ? 'var(--accent)' : 'var(--accent)') : 'transparent',
                 color: showOutline ? 'white' : 'var(--text-primary)',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
@@ -551,9 +688,9 @@ function App() {
                 cursor: 'pointer',
                 fontSize: '13px'
               }}
-              data-tooltip="目录"
+              data-tooltip={showFilePreview ? '显示目录' : '文件预览'}
             >
-              📑
+              {showFilePreview ? '📋' : '📑'}
             </button>
             <button 
               onClick={() => setShowSearch(true)}
@@ -678,8 +815,20 @@ function App() {
             <ThemeToggle />
           </div>
         </header>
+        </>
+      )}
+      <div className="app">
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {showFileSidebar && currentFolderHandle && (
+          {!showFocusMode && showFileSidebar && electronFolderPath && (
+            <ElectronFolderExplorer
+              folderPath={electronFolderPath}
+              folderName={currentFolderName}
+              currentFilePath={currentFilePath}
+              onFileSelect={handleFolderFileSelect}
+              onClose={handleCloseFileSidebar}
+            />
+          )}
+          {!showFocusMode && showFileSidebar && currentFolderHandle && !electronFolderPath && (
             <SidebarFileExplorer
               folderName={currentFolderName}
               handle={currentFolderHandle}
@@ -714,18 +863,32 @@ function App() {
               />
             )}
           </main>
-          {showOutline && !showSource && (
-            <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
+          {!showFocusMode && showOutline && !showSource && (
+            showFilePreview ? (
+              <FilePreviewPanel
+                fileName={activeTab?.name || ''}
+                filePath={activeTab?.filePath || ''}
+                fileSize={activeTab?.content ? new Blob([activeTab.content]).size : 0}
+                lastModified={fileInfo?.lastModified}
+                outlineItems={outlineItems}
+                bookmarks={bookmarks}
+                onNavigate={handleOutlineClick}
+                onBookmarkNavigate={handleBookmarkNavigate}
+              />
+            ) : (
+              <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
+            )
           )}
         </div>
         <StatusBar content={activeTab?.content || ''} />
         {showRecent && (
-          <RecentFiles 
+          <RecentFilesPage
             files={recentFiles}
             onSelect={handleRecentSelect}
             onRemove={handleRemoveRecent}
             onClearAll={handleClearRecent}
             onClose={() => setShowRecent(false)}
+            onOpenFolder={handleOpenFolder}
           />
         )}
         {showSearch && (
@@ -744,7 +907,7 @@ function App() {
         {showKeyboardShortcuts && (
           <KeyboardShortcuts onClose={() => setShowKeyboardShortcuts(false)} />
         )}
-        {showGuide && (
+        {showGuide && !isRestoringSession && tabs.length === 1 && tabs[0].name === '欢迎使用.md' && (
           <FirstUseGuide 
             onComplete={() => {
               localStorage.setItem(HAS_SEEN_GUIDE_KEY, 'true')
@@ -759,10 +922,12 @@ function App() {
         {showQuickSwitcher && (
           <QuickSwitcher
             recentFiles={recentFiles}
-            onFileSelect={(content, name) => {
-              handleFileOpen(content, name)
+            onFileSelect={(content, name, filePath) => {
+              handleFileOpen(content, name, filePath)
               setShowQuickSwitcher(false)
             }}
+            onRemoveRecent={handleRemoveRecent}
+            onClearRecent={handleClearRecent}
             onClose={() => setShowQuickSwitcher(false)}
           />
         )}
@@ -771,6 +936,62 @@ function App() {
             fileInfo={fileInfo}
             onClose={() => setShowFileInfo(false)}
           />
+        )}
+        {changedFilePath && (
+          <div style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#2d2d2d',
+            color: 'white',
+            padding: '14px 20px',
+            borderRadius: '10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            fontSize: '14px',
+            animation: 'slideUp 0.3s ease-out'
+          }}>
+            <span style={{ fontSize: '18px' }}>📄</span>
+            <div>
+              <div style={{ fontWeight: 500, marginBottom: '2px' }}>文件已在外被修改</div>
+              <div style={{ opacity: 0.7, fontSize: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={changedFilePath}>
+                {changedFilePath.split('/').pop()}
+              </div>
+            </div>
+            <button
+              onClick={handleReloadChangedFile}
+              style={{
+                background: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: '13px'
+              }}
+            >
+              重新加载
+            </button>
+            <button
+              onClick={() => setChangedFilePath(null)}
+              style={{
+                background: 'transparent',
+                color: '#999',
+                border: '1px solid #555',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              忽略
+            </button>
+          </div>
         )}
       </div>
     </ThemeProvider>

@@ -72,40 +72,15 @@ body {
   overflow: hidden;
 }
 
-body.focus-mode .app > header {
-  opacity: 0;
-  transform: translateY(-100%);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  position: absolute;
-  pointer-events: none;
-}
-
-body.focus-mode .app:hover > header,
-body.focus-mode .app > header:focus-within {
-  opacity: 1;
-  transform: translateY(0);
-  position: sticky;
-  pointer-events: auto;
-}
-
-body.focus-mode .outline {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-body.focus-mode .outline:hover {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-body.focus-mode .status-bar {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-body.focus-mode:hover .status-bar {
-  opacity: 1;
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .search-highlight {

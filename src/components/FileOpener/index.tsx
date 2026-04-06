@@ -1,37 +1,22 @@
-import { useRef } from 'react'
 import styles from './FileOpener.module.css'
 
 interface Props {
-  onFileOpen: (content: string, filename: string) => void
+  onFileOpen: (content: string, filename: string, filePath: string) => void
 }
 
 export function FileOpener({ onFileOpen }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleClick = () => {
-    inputRef.current?.click()
-  }
-
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleClick = async () => {
+    if (!window.electronAPI) return
     
-    const content = await file.text()
-    onFileOpen(content, file.name)
-    
-    e.target.value = ''
+    const result = await window.electronAPI.openFileDialog()
+    if (result) {
+      onFileOpen(result.content, result.filePath.split('/').pop() || '未命名.md', result.filePath)
+    }
   }
 
   return (
     <button className={styles.button} onClick={handleClick} data-guide="file-opener">
       📂 打开文件
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".md,.markdown,text/markdown"
-        onChange={handleChange}
-        style={{ display: 'none' }}
-      />
     </button>
   )
 }

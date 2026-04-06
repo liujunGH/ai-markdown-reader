@@ -1,45 +1,100 @@
-import { RecentFile } from '../../utils/recentFiles'
+import { useState, useMemo } from 'react'
 import styles from './RecentFiles.module.css'
+
+interface RecentFile {
+  name: string
+  filePath: string
+  openedAt: number
+}
 
 interface Props {
   files: RecentFile[]
   onSelect: (file: RecentFile) => void
-  onRemove: (name: string) => void
+  onRemove: (filePath: string) => void
   onClearAll: () => void
   onClose: () => void
 }
 
+type SortType = 'time' | 'name' | 'path'
+
 export function RecentFiles({ files, onSelect, onRemove, onClearAll, onClose }: Props) {
-  if (files.length === 0) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <span>最近打开</span>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
-        </div>
-        <div className={styles.empty}>暂无最近文件</div>
-      </div>
-    )
-  }
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortType>('time')
+
+  const filteredAndSortedFiles = useMemo(() => {
+    let result = [...files]
+    
+    if (search.trim()) {
+      const lower = search.toLowerCase()
+      result = result.filter(f => 
+        f.name.toLowerCase().includes(lower) ||
+        f.filePath.toLowerCase().includes(lower)
+      )
+    }
+    
+    result.sort((a, b) => {
+      if (sortBy === 'time') return b.openedAt - a.openedAt
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return a.filePath.localeCompare(b.filePath)
+    })
+    
+    return result
+  }, [files, search, sortBy])
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <span>最近打开</span>
+        <span>最近文件</span>
         <div className={styles.actions}>
-          <button className={styles.clearBtn} onClick={onClearAll}>清空</button>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+          <select 
+            className={styles.sortSelect}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortType)}
+          >
+            <option value="time">按时间</option>
+            <option value="name">按名称</option>
+            <option value="path">按路径</option>
+          </select>
+          {files.length > 0 && (
+            <button className={styles.clearBtn} onClick={onClearAll} title="清空历史">清空</button>
+          )}
+          <button className={styles.closeBtn} onClick={onClose} title="关闭">✕</button>
         </div>
       </div>
+      
+      <div className={styles.searchWrapper}>
+        <span className={styles.searchIcon}>🔍</span>
+        <input
+          type="text"
+          className={styles.searchInput}
+          placeholder="搜索文件名或路径..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      
+      {filteredAndSortedFiles.length === 0 ? (
+        <div className={styles.empty}>
+          {files.length === 0 ? '暂无最近文件' : '未找到匹配的文件'}
+        </div>
+      ) : (
+        <div className={styles.stats}>
+          共 {filteredAndSortedFiles.length} 个文件
+        </div>
+      )}
+      
       <ul className={styles.list}>
-        {files.map((file, index) => (
+        {filteredAndSortedFiles.map((file, index) => (
           <li key={index} className={styles.itemWrapper}>
             <button 
               className={styles.item}
               onClick={() => onSelect(file)}
             >
               <span className={styles.icon}>📄</span>
-              <span className={styles.name}>{file.name}</span>
+              <div className={styles.fileInfo}>
+                <span className={styles.name}>{file.name}</span>
+                <span className={styles.path} title={file.filePath}>{file.filePath}</span>
+              </div>
               <span 
                 className={styles.time}
                 title={formatFullTime(file.openedAt)}
@@ -51,7 +106,7 @@ export function RecentFiles({ files, onSelect, onRemove, onClearAll, onClose }: 
               className={styles.removeBtn}
               onClick={(e) => {
                 e.stopPropagation()
-                onRemove(file.name)
+                onRemove(file.filePath)
               }}
               title="删除"
             >

@@ -45,6 +45,7 @@ export function BookmarkPanel({ bookmarks, onAdd, onRemove, onNavigate, currentH
               className={styles.addBtn}
               onClick={handleAddBookmark}
               disabled={!currentHeading}
+              title={currentHeading ? '添加书签' : '请先选择一个标题'}
             >
               + 添加书签
             </button>

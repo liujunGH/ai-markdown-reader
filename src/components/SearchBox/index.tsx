@@ -62,7 +62,7 @@ export function SearchBox({
             {matches > 0 ? `${currentMatch + 1}/${matches}` : '无结果'}
           </span>
         )}
-        <button className={styles.closeButton} onClick={onClose}>✕</button>
+        <button className={styles.closeButton} onClick={onClose} title="关闭">✕</button>
       </div>
       <div className={styles.options}>
         <label className={styles.regexLabel}>
@@ -75,8 +75,8 @@ export function SearchBox({
         </label>
         {matches > 0 && (
           <div className={styles.navButtons}>
-            <button onClick={onPrev} className={styles.navBtn}>↑</button>
-            <button onClick={onNext} className={styles.navBtn}>↓</button>
+            <button onClick={onPrev} className={styles.navBtn} title="上一个匹配">↑</button>
+            <button onClick={onNext} className={styles.navBtn} title="下一个匹配">↓</button>
           </div>
         )}
       </div>

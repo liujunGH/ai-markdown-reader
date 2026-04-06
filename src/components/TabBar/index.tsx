@@ -10,6 +10,7 @@ interface TabBarProps {
   onTabCloseOthers: (tabId: string) => void
   onTabCloseAll: () => void
   onNewTab: () => void
+  onTabReorder: (fromIndex: number, toIndex: number) => void
 }
 
 interface ContextMenuState {
@@ -26,7 +27,8 @@ export function TabBar({
   onTabClose,
   onTabCloseOthers,
   onTabCloseAll,
-  onNewTab
+  onNewTab,
+  onTabReorder
 }: TabBarProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -34,6 +36,8 @@ export function TabBar({
     y: 0,
     tabId: null
   })
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,6 +70,22 @@ export function TabBar({
     setContextMenu(prev => ({ ...prev, visible: false }))
   }
 
+  const handleCopyFilePath = () => {
+    const tab = tabs.find(t => t.id === contextMenu.tabId)
+    if (tab?.filePath) {
+      navigator.clipboard.writeText(tab.filePath)
+    }
+    setContextMenu(prev => ({ ...prev, visible: false }))
+  }
+
+  const handleShowInFinder = () => {
+    const tab = tabs.find(t => t.id === contextMenu.tabId)
+    if (tab?.filePath && window.electronAPI) {
+      window.electronAPI.showInFolder(tab.filePath)
+    }
+    setContextMenu(prev => ({ ...prev, visible: false }))
+  }
+
   const handleCloseTab = () => {
     if (contextMenu.tabId) {
       onTabClose(contextMenu.tabId)
@@ -87,6 +107,8 @@ export function TabBar({
 
   const contextMenuItems = [
     { label: '复制文件名称', onClick: handleCopyFileName },
+    { label: '复制文件路径', onClick: handleCopyFilePath, disabled: !tabs.find(t => t.id === contextMenu.tabId)?.filePath },
+    { label: '在 Finder 中显示', onClick: handleShowInFinder, disabled: !tabs.find(t => t.id === contextMenu.tabId)?.filePath },
     { type: 'separator' as const },
     { label: '关闭该标签', onClick: handleCloseTab },
     { label: '关闭其他标签', onClick: handleCloseOtherTabs, disabled: tabs.length <= 1 },
@@ -96,12 +118,39 @@ export function TabBar({
   return (
     <div className={styles.tabBar}>
       <div className={styles.tabs}>
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <div
             key={tab.id}
-            className={`${styles.tab} ${tab.id === activeTabId ? styles.active : ''}`}
+            className={`${styles.tab} ${tab.id === activeTabId ? styles.active : ''} ${draggedIndex === index ? styles.dragging : ''} ${dropTargetIndex === index ? styles.dropTarget : ''}`}
             onClick={() => onTabSelect(tab.id)}
             onContextMenu={(e) => handleContextMenu(e, tab.id)}
+            draggable
+            onDragStart={(e) => {
+              setDraggedIndex(index)
+              e.dataTransfer.effectAllowed = 'move'
+            }}
+            onDragEnd={() => {
+              setDraggedIndex(null)
+              setDropTargetIndex(null)
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              if (draggedIndex !== null && draggedIndex !== index) {
+                e.dataTransfer.dropEffect = 'move'
+                setDropTargetIndex(index)
+              }
+            }}
+            onDragLeave={() => {
+              setDropTargetIndex(null)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (draggedIndex !== null && draggedIndex !== index) {
+                onTabReorder(draggedIndex, index)
+              }
+              setDraggedIndex(null)
+              setDropTargetIndex(null)
+            }}
             title={tab.filePath ? `${tab.name}\n${tab.filePath}` : tab.name}
           >
             <span className={styles.tabName}>

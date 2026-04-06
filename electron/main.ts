@@ -2,6 +2,41 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOp
 import path from 'path'
 import fs from 'fs'
 
+const watchers = new Set<string>()
+
+interface RecentFile {
+  name: string
+  filePath: string
+  openedAt: number
+}
+
+interface StoreData {
+  recentFiles: RecentFile[]
+  lastFolder: string | null
+  maxRecentFiles: number
+}
+
+const DEFAULT_MAX_RECENT_FILES = 100
+
+const storePath = path.join(app.getPath('userData'), 'config.json')
+
+function loadStore(): StoreData {
+  try {
+    if (fs.existsSync(storePath)) {
+      return JSON.parse(fs.readFileSync(storePath, 'utf-8'))
+    }
+  } catch {}
+  return { recentFiles: [], lastFolder: null, maxRecentFiles: DEFAULT_MAX_RECENT_FILES }
+}
+
+function saveStore(data: StoreData): void {
+  try {
+    fs.writeFileSync(storePath, JSON.stringify(data, null, 2))
+  } catch (err) {
+    console.error('Failed to save store:', err)
+  }
+}
+
 app.disableHardwareAcceleration()
 
 function createMenu() {
@@ -98,14 +133,20 @@ function createMenu() {
               message: 'AI Markdown Reader',
               detail: `一款沉浸式的 Markdown 阅读器
 
-版本: 1.0.0
+版本: 1.2.0
 
 功能特性:
-• 多标签页支持
-• 深色/浅色/护眼主题
-• Mermaid 图表
+• 多标签页支持，标签拖拽重排序
+• 深色/浅色/护眼主题，多种代码主题
+• Mermaid 图表，支持导出 SVG/PNG
 • KaTeX 数学公式
-• 代码高亮
+• 代码高亮，Emoji 支持
+• 文件夹树形目录浏览
+• 最近文件管理（保存100条历史）
+• 快速切换器，路径搜索
+• 专注模式，会话恢复
+• 外部文件变更检测
+• 原生文件拖拽支持
 
 开源协议: MIT License
 
@@ -316,6 +357,35 @@ ipcMain.handle('open-folder-dialog', async () => {
   return null
 })
 
+ipcMain.handle('read-folder', async (_event, folderPath: string) => {
+  try {
+    const entries = fs.readdirSync(folderPath, { withFileTypes: true })
+    const items = entries
+      .filter(f => f.isDirectory() || f.name.endsWith('.md') || f.name.endsWith('.markdown'))
+      .map(f => {
+        const filePath = path.join(folderPath, f.name)
+        if (f.isDirectory()) {
+          return {
+            name: f.name,
+            filePath,
+            isDirectory: true
+          }
+        }
+        const stats = fs.statSync(filePath)
+        return {
+          name: f.name,
+          filePath,
+          size: stats.size,
+          lastModified: stats.mtimeMs,
+          isDirectory: false
+        }
+      })
+    return { success: true, files: items }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8')
@@ -344,4 +414,81 @@ ipcMain.handle('get-file-info', async (_event, filePath: string) => {
 
 ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
   shell.showItemInFolder(filePath)
+})
+
+ipcMain.handle('get-recent-files', async () => {
+  return loadStore().recentFiles
+})
+
+ipcMain.handle('add-recent-file', async (_event, file: { name: string, filePath: string }) => {
+  const store = loadStore()
+  const existing = store.recentFiles.findIndex(f => f.filePath === file.filePath)
+  if (existing !== -1) {
+    store.recentFiles.splice(existing, 1)
+  }
+  store.recentFiles.unshift({
+    ...file,
+    openedAt: Date.now()
+  })
+  const maxFiles = store.maxRecentFiles || DEFAULT_MAX_RECENT_FILES
+  if (store.recentFiles.length > maxFiles) {
+    store.recentFiles.pop()
+  }
+  saveStore(store)
+})
+
+ipcMain.handle('remove-recent-file', async (_event, filePath: string) => {
+  const store = loadStore()
+  store.recentFiles = store.recentFiles.filter(f => f.filePath !== filePath)
+  saveStore(store)
+})
+
+ipcMain.handle('clear-recent-files', async () => {
+  const store = loadStore()
+  store.recentFiles = []
+  saveStore(store)
+})
+
+ipcMain.handle('get-last-folder', async () => {
+  return loadStore().lastFolder
+})
+
+ipcMain.handle('set-last-folder', async (_event, folderPath: string) => {
+  const store = loadStore()
+  store.lastFolder = folderPath
+  saveStore(store)
+})
+
+ipcMain.handle('get-max-recent-files', async () => {
+  return loadStore().maxRecentFiles || DEFAULT_MAX_RECENT_FILES
+})
+
+ipcMain.handle('set-max-recent-files', async (_event, max: number) => {
+  const store = loadStore()
+  store.maxRecentFiles = max
+  if (store.recentFiles.length > max) {
+    store.recentFiles = store.recentFiles.slice(0, max)
+  }
+  saveStore(store)
+})
+
+ipcMain.handle('watch-file', async (event, filePath: string) => {
+  if (watchers.has(filePath)) {
+    return { success: true, message: 'Already watching' }
+  }
+  try {
+    fs.watch(filePath, (eventType) => {
+      if (eventType === 'change') {
+        event.sender.send('file-changed', filePath)
+      }
+    })
+    watchers.add(filePath)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
+ipcMain.handle('unwatch-file', async (_event, filePath: string) => {
+  watchers.delete(filePath)
 })

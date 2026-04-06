@@ -1,12 +1,19 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { RecentFile } from '../../utils/recentFiles'
 import { FolderBookmark, getFolderBookmarks, addFolderBookmark, removeFolderBookmark } from '../../utils/folderBookmarks'
 import styles from './QuickSwitcher.module.css'
 
+interface RecentFile {
+  name: string
+  filePath: string
+  openedAt: number
+}
+
 interface QuickSwitcherProps {
   recentFiles: RecentFile[]
-  onFileSelect: (content: string, name: string) => void
+  onFileSelect: (content: string, name: string, filePath: string) => void
   onClose: () => void
+  onRemoveRecent: (filePath: string) => void
+  onClearRecent: () => void
 }
 
 type Tab = 'recent' | 'folders'
@@ -32,7 +39,7 @@ declare global {
   }
 }
 
-export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: QuickSwitcherProps) {
+export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRemoveRecent, onClearRecent }: QuickSwitcherProps) {
   const [query, setQuery] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('recent')
   const [folderBookmarks, setFolderBookmarks] = useState<FolderBookmark[]>([])
@@ -54,7 +61,10 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
   const filteredRecentFiles = useMemo(() => {
     if (!query.trim()) return recentFiles.slice(0, 20)
     const lower = query.toLowerCase()
-    return recentFiles.filter(f => f.name.toLowerCase().includes(lower)).slice(0, 20)
+    return recentFiles.filter(f =>
+      f.name.toLowerCase().includes(lower) ||
+      f.filePath.toLowerCase().includes(lower)
+    ).slice(0, 20)
   }, [query, recentFiles])
 
   const filteredFolders = useMemo(() => {
@@ -65,7 +75,7 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
 
   const allItems = useMemo((): FolderEntry[] => {
     if (activeTab === 'recent') {
-      return filteredRecentFiles.map(f => ({ name: f.name, path: f.name, isFolder: false }))
+      return filteredRecentFiles.map(f => ({ name: f.name, path: f.filePath, isFolder: false }))
     }
     const items: FolderEntry[] = []
     filteredFolders.forEach(folder => {
@@ -110,9 +120,12 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
       }
     } else {
       if (activeTab === 'recent') {
-        const file = recentFiles.find(f => f.name === item.name)
-        if (file) {
-          onFileSelect(file.content, file.name)
+        const file = recentFiles.find(f => f.filePath === item.path)
+        if (file && window.electronAPI) {
+          const result = await window.electronAPI.readFile(file.filePath)
+          if (result.success && result.content !== undefined) {
+            onFileSelect(result.content, file.name, file.filePath)
+          }
         }
       } else {
         const folderName = item.path.split('/')[0]
@@ -121,7 +134,8 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
         const fileData = files?.find(f => f.name === fileName)
         if (fileData) {
           const content = await fileData.file.text()
-          onFileSelect(content, fileData.name)
+          // Folder tab files don't have real paths (browser FileSystemHandle API limitation)
+          onFileSelect(content, fileData.name, '')
         }
       }
     }
@@ -215,6 +229,18 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
           >
             文件夹
           </button>
+          {activeTab === 'recent' && recentFiles.length > 0 && (
+            <button 
+              className={styles.openFolderBtn} 
+              onClick={() => {
+                if (confirm('确定要清空所有最近文件吗？')) {
+                  onClearRecent()
+                }
+              }}
+            >
+              🗑️ 清空
+            </button>
+          )}
           {activeTab === 'folders' && (
             <button className={styles.openFolderBtn} onClick={handleOpenFolder}>
               📂 打开文件夹
@@ -242,7 +268,24 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose }: Qu
                     '📄'
                   )}
                 </span>
-                <span className={styles.itemName}>{item.name}</span>
+                <div className={styles.itemContent}>
+                  <span className={styles.itemName}>{item.name}</span>
+                  {activeTab === 'recent' && item.path && (
+                    <span className={styles.itemPath}>{item.path}</span>
+                  )}
+                </div>
+                {activeTab === 'recent' && (
+                  <button
+                    className={styles.removeBtn}
+                    onClick={e => {
+                      e.stopPropagation()
+                      onRemoveRecent(item.path)
+                    }}
+                    title="从最近文件移除"
+                  >
+                    ×
+                  </button>
+                )}
                 {item.isFolder && folderBookmarks.some(b => b.name === item.name) && (
                   <button
                     className={styles.removeBtn}

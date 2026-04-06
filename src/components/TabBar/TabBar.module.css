@@ -9,7 +9,7 @@
   user-select: none;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;
 }
 
 .tabs {
@@ -82,6 +82,16 @@
 
 .tab:hover .closeBtn {
   opacity: 1;
+}
+
+.tab.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.tab.dropTarget {
+  border-left: 2px solid var(--accent);
+  padding-left: calc(12px - 2px);
 }
 
 .closeBtn:hover {

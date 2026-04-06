@@ -1,6 +1,6 @@
 appId: com.markdownreader.app
 productName: Markdown Reader
-copyright: Copyright © 2026
+copyright: Copyright © 2026 liujun
 
 directories:
   output: release
