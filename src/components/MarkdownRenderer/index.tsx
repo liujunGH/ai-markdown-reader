@@ -91,6 +91,32 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         setPreviewImage({ src: img.src, alt: img.alt })
       })
     })
+
+    const preElements = container.querySelectorAll('pre')
+    preElements.forEach((pre) => {
+      const codeEl = pre.querySelector('code')
+      if (!codeEl) return
+
+      const code = codeEl.textContent || ''
+      const copyBtn = document.createElement('button')
+      copyBtn.className = 'copy-button'
+      copyBtn.innerHTML = '📋'
+      copyBtn.title = '复制代码'
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(code)
+          copyBtn.innerHTML = '✓'
+          setTimeout(() => {
+            copyBtn.innerHTML = '📋'
+          }, 2000)
+        } catch {
+          copyBtn.innerHTML = '✕'
+        }
+      })
+
+      pre.style.position = 'relative'
+      pre.appendChild(copyBtn)
+    })
   }, [content])
 
   useEffect(() => {
