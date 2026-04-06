@@ -82,6 +82,7 @@ function App() {
   const [filename, setFilename] = useState('欢迎阅读.md')
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
+  const [fontSize, setFontSize] = useState(16)
   const markdownRef = useRef<MarkdownRendererRef>(null)
 
   const outlineItems = useOutline(content)
@@ -119,6 +120,14 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
         setShowSearch(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        setFontSize(prev => Math.min(prev + 2, 32))
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault()
+        setFontSize(prev => Math.max(prev - 2, 12))
       }
       if (e.key === 'Escape' && showSearch) {
         handleCloseSearch()
@@ -181,6 +190,39 @@ function App() {
             >
               🔍 搜索
             </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button 
+                onClick={() => setFontSize(prev => Math.max(prev - 2, 12))}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                A-
+              </button>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', minWidth: '30px', textAlign: 'center' }}>
+                {fontSize}
+              </span>
+              <button 
+                onClick={() => setFontSize(prev => Math.min(prev + 2, 32))}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                A+
+              </button>
+            </div>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               {filename}
             </span>
@@ -191,7 +233,8 @@ function App() {
           <main style={{ 
             flex: 1, 
             overflowY: 'auto',
-            background: 'var(--bg-primary)'
+            background: 'var(--bg-primary)',
+            fontSize: `${fontSize}px`
           }}>
             <MarkdownRenderer 
               ref={markdownRef}
