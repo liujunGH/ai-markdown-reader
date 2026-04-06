@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
+import { FileOpener } from './components/FileOpener'
 
 const testContent = `
 # Markdown Reader
@@ -59,13 +61,33 @@ function greet(name) {
 `
 
 function App() {
+  const [content, setContent] = useState(testContent)
+  const [filename, setFilename] = useState('欢迎阅读.md')
+
+  const handleFileOpen = (fileContent: string, name: string) => {
+    setContent(fileContent)
+    setFilename(name)
+  }
+
   return (
     <ThemeProvider>
       <div className="app">
-        <header style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
-          <ThemeToggle />
+        <header style={{ 
+          padding: '16px', 
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <FileOpener onFileOpen={handleFileOpen} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              {filename}
+            </span>
+            <ThemeToggle />
+          </div>
         </header>
-        <MarkdownRenderer content={testContent} />
+        <MarkdownRenderer content={content} />
       </div>
     </ThemeProvider>
   )
