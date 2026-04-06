@@ -172,7 +172,11 @@ function App() {
   }
 
   const handleFileOpen = (fileContent: string, name: string, file?: File) => {
-    const existingTab = tabs.find(t => t.name === name && !t.isModified)
+    const existingTab = tabs.find(t => 
+      t.name === name && 
+      !t.isModified && 
+      (!file?.name || t.filePath === file.name)
+    )
     if (existingTab) {
       setActiveTabId(existingTab.id)
       return
@@ -204,7 +208,7 @@ function App() {
   }
 
   const handleRecentSelect = (file: RecentFile) => {
-    const existingTab = tabs.find(t => t.name === file.name && !t.isModified)
+    const existingTab = tabs.find(t => t.name === file.name && !t.isModified && !t.filePath)
     if (existingTab) {
       setActiveTabId(existingTab.id)
     } else {
