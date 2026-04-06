@@ -20,11 +20,10 @@ extraMetadata:
 
 win:
   target:
-    - target: nsis
+    - target: portable
       arch:
         - x64
-  artifactName: ${productName}-${version}-Setup.${ext}
-  sign: false
+  artifactName: ${productName}-${version}.${ext}
 
 nsis:
   oneClick: false
