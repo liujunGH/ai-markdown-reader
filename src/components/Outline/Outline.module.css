@@ -1,0 +1,51 @@
+.outline {
+  width: 240px;
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  background: var(--bg-secondary);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item {
+  margin: 4px 0;
+}
+
+.link {
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 100%;
+  display: block;
+}
+
+.link:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+}
+
+.empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 16px;
+  text-align: center;
+}

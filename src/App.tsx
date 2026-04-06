@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { FileOpener } from './components/FileOpener'
+import { Outline } from './components/Outline'
+import { SearchBox } from './components/SearchBox'
+import { ProgressBar } from './components/ProgressBar'
+import { StatusBar } from './components/StatusBar'
+import { MermaidRenderer } from './components/MermaidDiagram/MermaidRenderer'
+import { useOutline } from './hooks/useOutline'
 
 const testContent = `
 # Markdown Reader
@@ -18,6 +24,17 @@ console.log(hello);
 function greet(name) {
   return \`Hello, \${name}!\`;
 }
+\`\`\`
+
+## Mermaid 流程图
+
+\`\`\`mermaid
+graph TD
+    A[开始] --> B{判断}
+    B -->|是| C[操作1]
+    B -->|否| D[操作2]
+    C --> E[结束]
+    D --> E
 \`\`\`
 
 ## 列表
@@ -49,7 +66,7 @@ function greet(name) {
 - [ ] 未完成任务
 - [ ] 另一个任务
 
-## 链接和图片
+## 链接
 
 [访问 Google](https://www.google.com)
 
@@ -63,14 +80,53 @@ function greet(name) {
 function App() {
   const [content, setContent] = useState(testContent)
   const [filename, setFilename] = useState('欢迎阅读.md')
+  const [showOutline, setShowOutline] = useState(true)
+  const [showSearch, setShowSearch] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const outlineItems = useOutline(content)
 
   const handleFileOpen = (fileContent: string, name: string) => {
     setContent(fileContent)
     setFilename(name)
   }
 
+  const handleOutlineClick = (id: string) => {
+    const element = document.getElementById(id)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const handleSearch = useCallback((query: string, isRegex: boolean) => {
+    console.log('Searching:', query, isRegex)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false)
+      }
+      if (e.key === 'F11') {
+        e.preventDefault()
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen()
+        } else {
+          document.exitFullscreen()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showSearch])
+
   return (
     <ThemeProvider>
+      <ProgressBar />
       <div className="app">
         <header style={{ 
           padding: '16px', 
@@ -81,13 +137,63 @@ function App() {
         }}>
           <FileOpener onFileOpen={handleFileOpen} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button 
+              onClick={() => setShowOutline(!showOutline)}
+              style={{
+                background: showOutline ? 'var(--accent)' : 'transparent',
+                color: showOutline ? 'white' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              📑 目录
+            </button>
+            <button 
+              onClick={() => setShowSearch(true)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: 'var(--text-secondary)'
+              }}
+            >
+              🔍 搜索
+            </button>
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
               {filename}
             </span>
             <ThemeToggle />
           </div>
         </header>
-        <MarkdownRenderer content={content} />
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <main 
+            ref={contentRef}
+            style={{ 
+              flex: 1, 
+              overflowY: 'auto',
+              background: 'var(--bg-primary)'
+            }}
+          >
+            <MarkdownRenderer content={content} />
+            <MermaidRenderer />
+          </main>
+          {showOutline && (
+            <Outline items={outlineItems} onItemClick={handleOutlineClick} />
+          )}
+        </div>
+        <StatusBar content={content} />
+        {showSearch && (
+          <SearchBox 
+            onSearch={handleSearch} 
+            onClose={() => setShowSearch(false)} 
+          />
+        )}
       </div>
     </ThemeProvider>
   )

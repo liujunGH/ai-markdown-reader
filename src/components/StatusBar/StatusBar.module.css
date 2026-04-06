@@ -1,0 +1,15 @@
+.statusBar {
+  display: flex;
+  gap: 24px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.statusBar span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

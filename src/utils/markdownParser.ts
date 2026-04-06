@@ -46,7 +46,16 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;')
 }
 
+function encodeBase64(str: string): string {
+  return btoa(unescape(encodeURIComponent(str)))
+}
+
 function highlightCode(str: string, lang: string): string {
+  if (lang === 'mermaid') {
+    const encoded = encodeBase64(str)
+    return `<div class="mermaid-code" data-content="${encoded}"></div>`
+  }
+  
   if (lang && Prism.languages[lang]) {
     try {
       const highlighted = Prism.highlight(str, Prism.languages[lang], lang)
