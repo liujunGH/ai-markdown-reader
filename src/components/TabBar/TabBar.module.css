@@ -7,6 +7,9 @@
   padding: 0 8px;
   height: 36px;
   user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .tabs {
