@@ -705,6 +705,8 @@ function App() {
                 content={activeTab?.content || ''}
                 searchQuery={query}
                 searchRegex={isRegex}
+                currentMatch={currentMatch}
+                matchCount={matches.length}
               />
             )}
           </main>

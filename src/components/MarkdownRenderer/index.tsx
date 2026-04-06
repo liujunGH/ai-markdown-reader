@@ -11,6 +11,8 @@ interface Props {
   content: string
   searchQuery?: string
   searchRegex?: boolean
+  currentMatch?: number
+  matchCount?: number
 }
 
 function decodeBase64(str: string): string {
@@ -49,7 +51,7 @@ function dataToBlob(data: string, mimeType: string): Blob {
   return new Blob([ab], { type: mimeType })
 }
 
-export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false }, ref) => {
+export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
 
@@ -202,9 +204,27 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
   }, [content])
 
   useEffect(() => {
-    if (!containerRef.current || !searchQuery) return
+    if (!containerRef.current) return
 
     const container = containerRef.current
+
+    // Clear existing highlights first
+    const existingMarks = container.querySelectorAll('.search-highlight')
+    existingMarks.forEach(mark => {
+      const parent = mark.parentNode
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent || ''), mark)
+        parent.normalize()
+      }
+    })
+
+    if (!searchQuery) return
+
+    // Also clear search-active class
+    const activeMarks = container.querySelectorAll('.current')
+    activeMarks.forEach(mark => {
+      mark.classList.remove('search-highlight-active')
+    })
 
     const walker = document.createTreeWalker(
       container,
@@ -222,6 +242,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       const parent = textNode.parentElement
       if (!parent || parent.closest('.search-box')) return
       if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return
+      if (parent.classList.contains('search-highlight')) return
 
       let nodeHtml = textNode.textContent
       let hasMatch = false
@@ -245,7 +266,16 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         textNode.parentNode?.replaceChild(span, textNode)
       }
     })
-  }, [searchQuery, searchRegex])
+
+    // Mark the current active match
+    if (matchCount > 0 && containerRef.current) {
+      const allMarks = containerRef.current.querySelectorAll('.search-highlight')
+      if (allMarks[currentMatch]) {
+        allMarks[currentMatch].classList.add('search-highlight-active')
+        allMarks[currentMatch].scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+  }, [searchQuery, searchRegex, currentMatch, matchCount])
 
   const handleClosePreview = () => {
     setPreviewImage(null)
