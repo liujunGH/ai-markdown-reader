@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { parseMarkdown } from '../../utils/markdownParser'
 import styles from './MarkdownRenderer.module.css'
 
@@ -19,13 +19,8 @@ function slugify(text: string): string {
 
 export function MarkdownRenderer({ content }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [rendered, setRendered] = useState(false)
 
-  const html = useMemo(() => {
-    let parsed = parseMarkdown(content)
-    parsed = parsed.replace(/id="([^"]+)"/g, (match) => match)
-    return parsed
-  }, [content])
+  const html = parseMarkdown(content)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -45,25 +40,26 @@ export function MarkdownRenderer({ content }: Props) {
       const wrapper = document.createElement('div')
       wrapper.className = 'mermaid-wrapper'
       wrapper.id = `mermaid-${index}`
-      wrapper.innerHTML = `<div class="mermaid" data-code="${encodeURIComponent(code)}">${el.outerHTML}</div>`
+      wrapper.innerHTML = `<div class="mermaid" data-code="${encodeURIComponent(code)}"></div>`
       el.parentNode?.replaceChild(wrapper, el)
     })
 
-    if (container.querySelectorAll('.mermaid').length > 0) {
-      import('mermaid').then((mermaid) => {
-        mermaid.default.initialize({
+    const mermaidEls = container.querySelectorAll('.mermaid[data-code]')
+    if (mermaidEls.length > 0) {
+      import('mermaid').then((mermaidModule) => {
+        const mermaid = mermaidModule.default
+        mermaid.initialize({
           startOnLoad: false,
           theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
           securityLevel: 'loose',
         })
 
-        const mermaidEls = container.querySelectorAll('.mermaid[data-code]')
         mermaidEls.forEach(async (el) => {
           const code = decodeURIComponent(el.getAttribute('data-code') || '')
           const wrapper = el.parentElement
           try {
             const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
-            const { svg } = await mermaid.default.render(id, code)
+            const { svg } = await mermaid.render(id, code)
             if (wrapper) {
               wrapper.innerHTML = svg
             }
@@ -75,15 +71,13 @@ export function MarkdownRenderer({ content }: Props) {
         })
       })
     }
-
-    setRendered(true)
-  }, [html])
+  }, [content])
 
   return (
     <div 
       ref={containerRef}
       className={styles.renderer}
-      dangerouslySetInnerHTML={{ __html: rendered ? '' : html }}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   )
 }
