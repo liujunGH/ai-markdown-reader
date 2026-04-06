@@ -1,6 +1,7 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react'
 import { parseMarkdown } from '../../utils/markdownParser'
 import styles from './MarkdownRenderer.module.css'
+import previewStyles from './ImagePreview.module.css'
 
 export interface MarkdownRendererRef {
   getContainer: () => HTMLDivElement | null
@@ -25,6 +26,7 @@ function slugify(text: string): string {
 
 export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
 
   useImperativeHandle(ref, () => ({
     getContainer: () => containerRef.current
@@ -81,6 +83,14 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         })
       })
     }
+
+    const images = container.querySelectorAll('img')
+    images.forEach((img) => {
+      img.classList.add('clickable-image')
+      img.addEventListener('click', () => {
+        setPreviewImage({ src: img.src, alt: img.alt })
+      })
+    })
   }, [content])
 
   useEffect(() => {
@@ -129,12 +139,45 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     })
   }, [searchQuery, searchRegex])
 
+  const handleClosePreview = () => {
+    setPreviewImage(null)
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && previewImage) {
+        handleClosePreview()
+      }
+    }
+    if (previewImage) {
+      document.body.style.overflow = 'hidden'
+      window.addEventListener('keydown', handleKeyDown)
+    }
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [previewImage])
+
   return (
-    <div 
-      ref={containerRef}
-      className={styles.renderer}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <>
+      <div 
+        ref={containerRef}
+        className={styles.renderer}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {previewImage && (
+        <div className={previewStyles.overlay} onClick={handleClosePreview}>
+          <button className={previewStyles.closeButton} onClick={handleClosePreview}>✕</button>
+          <img 
+            src={previewImage.src} 
+            alt={previewImage.alt} 
+            className={previewStyles.fullImage}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
   )
 })
 
