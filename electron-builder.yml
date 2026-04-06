@@ -24,6 +24,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-Setup.${ext}
+  sign: false
 
 nsis:
   oneClick: false
