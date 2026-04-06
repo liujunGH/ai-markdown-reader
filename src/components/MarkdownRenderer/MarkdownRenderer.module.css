@@ -1,0 +1,135 @@
+.renderer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.renderer h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3em;
+}
+
+.renderer h2 {
+  font-size: 1.5em;
+  margin: 0.83em 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3em;
+}
+
+.renderer h3 {
+  font-size: 1.25em;
+  margin: 1em 0;
+}
+
+.renderer h4 {
+  font-size: 1em;
+  margin: 1em 0;
+}
+
+.renderer h5 {
+  font-size: 0.875em;
+  margin: 1em 0;
+}
+
+.renderer h6 {
+  font-size: 0.85em;
+  margin: 1em 0;
+  color: var(--text-secondary);
+}
+
+.renderer p {
+  margin: 1em 0;
+}
+
+.renderer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.renderer a:hover {
+  text-decoration: underline;
+}
+
+.renderer code {
+  background: var(--bg-tertiary);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.renderer pre {
+  background: var(--bg-tertiary);
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.renderer pre code {
+  background: none;
+  padding: 0;
+}
+
+.renderer blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 0 4px 4px 0;
+}
+
+.renderer ul,
+.renderer ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.renderer li {
+  margin: 0.5em 0;
+}
+
+.renderer li > ul,
+.renderer li > ol {
+  margin: 0.25em 0;
+}
+
+.renderer table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.renderer th,
+.renderer td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+.renderer th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.renderer tr:nth-child(even) {
+  background: var(--bg-secondary);
+}
+
+.renderer img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.renderer hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+.renderer input[type="checkbox"] {
+  margin-right: 0.5em;
+}
