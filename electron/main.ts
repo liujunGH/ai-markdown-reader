@@ -1,8 +1,112 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOptions } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
 app.disableHardwareAcceleration()
+
+function createMenu() {
+  const isMac = process.platform === 'darwin'
+  
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{
+      label: 'AI Markdown Reader',
+      submenu: [
+        { role: 'about' as const, label: '关于' },
+        { type: 'separator' as const },
+        { role: 'services' as const, label: '服务' },
+        { type: 'separator' as const },
+        { role: 'hide' as const, label: '隐藏' },
+        { role: 'hideOthers' as const, label: '隐藏其他' },
+        { role: 'unhide' as const, label: '显示全部' },
+        { type: 'separator' as const },
+        { role: 'quit' as const, label: '退出' }
+      ]
+    }] : []),
+    {
+      label: '文件',
+      submenu: [
+        {
+          label: '打开文件',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => mainWindow?.webContents.send('menu-open-file')
+        },
+        {
+          label: '打开文件夹',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow?.webContents.send('menu-open-folder')
+        },
+        { type: 'separator' },
+        {
+          label: '打印',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => mainWindow?.webContents.print()
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' as const, label: '关闭' } : { role: 'quit' as const, label: '退出' }
+      ]
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo' as const, label: '撤销' },
+        { role: 'redo' as const, label: '重做' },
+        { type: 'separator' as const },
+        { role: 'cut' as const, label: '剪切' },
+        { role: 'copy' as const, label: '复制' },
+        { role: 'paste' as const, label: '粘贴' },
+        { role: 'selectAll' as const, label: '全选' }
+      ]
+    },
+    {
+      label: '视图',
+      submenu: [
+        { role: 'reload' as const, label: '重新加载' },
+        { role: 'forceReload' as const, label: '强制重新加载' },
+        { role: 'toggleDevTools' as const, label: '开发者工具' },
+        { type: 'separator' as const },
+        { role: 'resetZoom' as const, label: '实际大小' },
+        { role: 'zoomIn' as const, label: '放大' },
+        { role: 'zoomOut' as const, label: '缩小' },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const, label: '全屏' }
+      ]
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { role: 'minimize' as const, label: '最小化' },
+        { role: 'zoom' as const, label: '缩放' },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const, label: '前置全部窗口' },
+          { type: 'separator' as const },
+          { role: 'window' as const, label: '窗口' }
+        ] : [
+          { role: 'close' as const, label: '关闭' }
+        ])
+      ]
+    },
+    {
+      label: '帮助',
+      submenu: [
+        {
+          label: '关于 AI Markdown Reader',
+          click: () => {
+            dialog.showMessageBox({
+              type: 'info',
+              title: '关于',
+              message: 'AI Markdown Reader',
+              detail: '一款沉浸式的 Markdown 阅读器\n版本 1.1.3'
+            })
+          }
+        }
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 console.log('[MAIN] App starting...')
 console.log('[MAIN] Is packaged:', app.isPackaged)
@@ -120,6 +224,7 @@ if (!gotTheLock) {
 
 app.whenReady().then(() => {
   log('App ready')
+  createMenu()
 
   app.on('open-file', (event, filePath) => {
     log('open-file event:', filePath)
