@@ -56,11 +56,14 @@ jobs:
 
       - name: Create Release
         run: |
+          gh release create ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
           cd release
-          for f in $(find . -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage"); do
-            echo "Uploading $f..."
-            gh release upload ${{ github.ref_name }} "$f" --clobber
+          for f in *.exe; do
+            if [ -f "$f" ]; then
+              echo "Uploading $f..."
+              gh release upload ${{ github.ref_name }} "$f" --clobber
+            fi
           done
-          gh release view ${{ github.ref_name }} --json uploadUrl,browserDownloadUrl -q '.assets[] | select(.name | contains("exe")) | .browserDownloadUrl'
+          gh release view ${{ github.ref_name }} --json browserDownloadUrl -q '.assets[0].browserDownloadUrl'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
