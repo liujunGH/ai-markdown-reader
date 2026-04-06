@@ -46,6 +46,15 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       heading.id = id
     })
 
+    const links = container.querySelectorAll('a')
+    links.forEach((link) => {
+      const href = link.getAttribute('href')
+      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+        link.setAttribute('target', '_blank')
+        link.setAttribute('rel', 'noopener noreferrer')
+      }
+    })
+
     const mermaidElements = container.querySelectorAll('.mermaid-code')
     mermaidElements.forEach((el, index) => {
       const code = decodeBase64(el.getAttribute('data-content') || '')
