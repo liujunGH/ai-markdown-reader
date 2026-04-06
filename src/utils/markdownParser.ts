@@ -35,6 +35,7 @@ import 'prismjs/components/prism-haskell'
 import 'prismjs/components/prism-lua'
 import 'prismjs/components/prism-perl'
 import 'prismjs/components/prism-r'
+import mk from 'markdown-it-katex'
 
 function escapeHtml(str: string): string {
   return str
@@ -73,6 +74,8 @@ const md: MarkdownIt = new MarkdownIt({
   typographer: true,
   highlight: highlightCode
 })
+
+md.use(mk)
 
 export function parseMarkdown(content: string): string {
   return md.render(content)
