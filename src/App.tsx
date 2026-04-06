@@ -82,6 +82,7 @@ function App() {
   const [filename, setFilename] = useState('欢迎阅读.md')
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
+  const [showSource, setShowSource] = useState(false)
   const [fontSize, setFontSize] = useState(16)
   const markdownRef = useRef<MarkdownRendererRef>(null)
 
@@ -160,6 +161,10 @@ function App() {
         e.preventDefault()
         setFontSize(prev => Math.max(prev - 2, 12))
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        setShowSource(prev => !prev)
+      }
       if (e.key === 'Escape' && showSearch) {
         handleCloseSearch()
       }
@@ -221,6 +226,20 @@ function App() {
             >
               🔍 搜索
             </button>
+            <button 
+              onClick={() => setShowSource(!showSource)}
+              style={{
+                background: showSource ? 'var(--accent)' : 'transparent',
+                color: showSource ? 'white' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              📄 源码
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <button 
                 onClick={() => setFontSize(prev => Math.max(prev - 2, 12))}
@@ -267,14 +286,25 @@ function App() {
             background: 'var(--bg-primary)',
             fontSize: `${fontSize}px`
           }}>
-            <MarkdownRenderer 
-              ref={markdownRef}
-              content={content}
-              searchQuery={query}
-              searchRegex={isRegex}
-            />
+            {showSource ? (
+              <pre style={{ 
+                padding: '20px', 
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace',
+                fontSize: '14px'
+              }}>
+                {content}
+              </pre>
+            ) : (
+              <MarkdownRenderer 
+                ref={markdownRef}
+                content={content}
+                searchQuery={query}
+                searchRegex={isRegex}
+              />
+            )}
           </main>
-          {showOutline && (
+          {showOutline && !showSource && (
             <Outline items={outlineItems} onItemClick={handleOutlineClick} />
           )}
         </div>
