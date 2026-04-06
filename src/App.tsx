@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ThemeProvider } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
@@ -7,7 +7,6 @@ import { Outline } from './components/Outline'
 import { SearchBox } from './components/SearchBox'
 import { ProgressBar } from './components/ProgressBar'
 import { StatusBar } from './components/StatusBar'
-import { MermaidRenderer } from './components/MermaidDiagram/MermaidRenderer'
 import { useOutline } from './hooks/useOutline'
 
 const testContent = `
@@ -82,7 +81,6 @@ function App() {
   const [filename, setFilename] = useState('欢迎阅读.md')
   const [showOutline, setShowOutline] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
 
   const outlineItems = useOutline(content)
 
@@ -172,16 +170,12 @@ function App() {
           </div>
         </header>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <main 
-            ref={contentRef}
-            style={{ 
-              flex: 1, 
-              overflowY: 'auto',
-              background: 'var(--bg-primary)'
-            }}
-          >
+          <main style={{ 
+            flex: 1, 
+            overflowY: 'auto',
+            background: 'var(--bg-primary)'
+          }}>
             <MarkdownRenderer content={content} />
-            <MermaidRenderer />
           </main>
           {showOutline && (
             <Outline items={outlineItems} onItemClick={handleOutlineClick} />

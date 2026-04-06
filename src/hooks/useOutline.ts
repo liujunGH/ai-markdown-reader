@@ -15,7 +15,7 @@ export function useOutline(content: string): OutlineItem[] {
     while ((match = headingRegex.exec(content)) !== null) {
       const level = match[1].length
       const text = match[2].trim()
-      const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+      const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '')
       items.push({ level, text, id })
     }
 
