@@ -133,3 +133,27 @@
 .renderer input[type="checkbox"] {
   margin-right: 0.5em;
 }
+
+.renderer :global(.mermaid-wrapper) {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.renderer :global(.mermaid-wrapper svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.renderer :global(.mermaid-error) {
+  background: #fff0f0;
+  border: 1px solid #ffcccc;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 1em 0;
+  color: #cc0000;
+  font-size: 14px;
+}
