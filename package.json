@@ -1,7 +1,7 @@
 {
   "name": "markdown-reader",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A Markdown Reader",
   "author": "liujun",
   "main": "electron/main.js",
