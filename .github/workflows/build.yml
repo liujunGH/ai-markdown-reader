@@ -58,7 +58,14 @@ jobs:
 
       - name: Upload to Release
         run: |
-          gh release create ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
+          # Check if release exists, create if not, edit if it does
+          if gh release view ${{ github.ref_name }} >/dev/null 2>&1; then
+            echo "Release exists, updating..."
+            gh release edit ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
+          else
+            echo "Creating new release..."
+            gh release create ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
+          fi
           cd release
           for f in *.exe; do
             echo "Uploading $f..."
