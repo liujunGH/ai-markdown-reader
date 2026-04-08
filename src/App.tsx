@@ -820,22 +820,26 @@ function App() {
       <div className="app">
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {!showFocusMode && showFileSidebar && electronFolderPath && (
-            <ElectronFolderExplorer
-              folderPath={electronFolderPath}
-              folderName={currentFolderName}
-              currentFilePath={currentFilePath}
-              onFileSelect={handleFolderFileSelect}
-              onClose={handleCloseFileSidebar}
-            />
+            <div style={{ position: 'sticky', top: 81, height: 'calc(100vh - 81px - 32px)', alignSelf: 'flex-start', flexShrink: 0 }}>
+              <ElectronFolderExplorer
+                folderPath={electronFolderPath}
+                folderName={currentFolderName}
+                currentFilePath={currentFilePath}
+                onFileSelect={handleFolderFileSelect}
+                onClose={handleCloseFileSidebar}
+              />
+            </div>
           )}
           {!showFocusMode && showFileSidebar && currentFolderHandle && !electronFolderPath && (
-            <SidebarFileExplorer
-              folderName={currentFolderName}
-              handle={currentFolderHandle}
-              currentFilePath={currentFilePath}
-              onFileSelect={handleFolderFileSelect}
-              onClose={handleCloseFileSidebar}
-            />
+            <div style={{ position: 'sticky', top: 81, height: 'calc(100vh - 81px - 32px)', alignSelf: 'flex-start', flexShrink: 0 }}>
+              <SidebarFileExplorer
+                folderName={currentFolderName}
+                handle={currentFolderHandle}
+                currentFilePath={currentFilePath}
+                onFileSelect={handleFolderFileSelect}
+                onClose={handleCloseFileSidebar}
+              />
+            </div>
           )}
           <main style={{ 
             flex: 1, 
@@ -864,20 +868,22 @@ function App() {
             )}
           </main>
           {!showFocusMode && showOutline && !showSource && (
-            showFilePreview ? (
-              <FilePreviewPanel
-                fileName={activeTab?.name || ''}
-                filePath={activeTab?.filePath || ''}
-                fileSize={activeTab?.content ? new Blob([activeTab.content]).size : 0}
-                lastModified={fileInfo?.lastModified}
-                outlineItems={outlineItems}
-                bookmarks={bookmarks}
-                onNavigate={handleOutlineClick}
-                onBookmarkNavigate={handleBookmarkNavigate}
-              />
-            ) : (
-              <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
-            )
+            <div style={{ position: 'sticky', top: 81, height: 'calc(100vh - 81px - 32px)', alignSelf: 'flex-start', flexShrink: 0 }}>
+              {showFilePreview ? (
+                <FilePreviewPanel
+                  fileName={activeTab?.name || ''}
+                  filePath={activeTab?.filePath || ''}
+                  fileSize={activeTab?.content ? new Blob([activeTab.content]).size : 0}
+                  lastModified={fileInfo?.lastModified}
+                  outlineItems={outlineItems}
+                  bookmarks={bookmarks}
+                  onNavigate={handleOutlineClick}
+                  onBookmarkNavigate={handleBookmarkNavigate}
+                />
+              ) : (
+                <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} />
+              )}
+            </div>
           )}
         </div>
         <StatusBar content={activeTab?.content || ''} />
