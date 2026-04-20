@@ -13,10 +13,7 @@ on:
 
 jobs:
   release:
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     permissions:
       contents: write
 
@@ -37,22 +34,17 @@ jobs:
           npm run electron:compile
           npm run build
 
-      - name: Build & Publish
-        run: npx electron-builder --publish always
+      - name: Build & Publish (Windows only)
+        run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS code signing (optional — uncomment and configure if you have an Apple Developer ID)
-          # CSC_LINK: ${{ secrets.CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload artifacts to Release
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         run: |
           cd release
-          for f in *; do
+          for f in *.exe; do
             if [ -f "$f" ]; then
               echo "Uploading $f..."
               gh release upload ${{ github.ref_name }} "$f" --clobber || true
