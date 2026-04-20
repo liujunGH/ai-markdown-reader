@@ -23,6 +23,7 @@
   z-index: 10000;
   cursor: zoom-out;
   animation: fadeIn 0.2s ease-out;
+  overflow: hidden;
 }
 
 @keyframes fadeIn {
@@ -50,6 +51,7 @@
   align-items: center;
   justify-content: center;
   transition: background 0.2s;
+  z-index: 10002;
 }
 
 .closeButton:hover {
@@ -61,8 +63,52 @@
   max-height: 90vh;
   object-fit: contain;
   border-radius: 4px;
-  cursor: default;
-  animation: scaleIn 0.2s ease-out;
+  user-select: none;
+  transition: none;
+}
+
+.controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  padding: 8px 16px;
+  border-radius: 8px;
+  z-index: 10001;
+}
+
+.controls button {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.controls button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.scaleText {
+  color: white;
+  font-size: 14px;
+  min-width: 48px;
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  user-select: none;
 }
 
 @keyframes scaleIn {

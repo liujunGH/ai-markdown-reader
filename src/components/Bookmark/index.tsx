@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getStorageItem, setStorageItem } from '../../utils/storage'
 import styles from './Bookmark.module.css'
 
 export interface Bookmark {
@@ -35,10 +36,10 @@ export function BookmarkPanel({ bookmarks, onAdd, onRemove, onNavigate, currentH
         🔖
       </button>
       {showPanel && (
-        <div className={styles.panel}>
+        <div className={styles.panel} aria-label="书签面板">
           <div className={styles.header}>
             <h3>🔖 书签</h3>
-            <button className={styles.closeBtn} onClick={() => setShowPanel(false)}>×</button>
+            <button className={styles.closeBtn} onClick={() => setShowPanel(false)} aria-label="关闭书签面板">×</button>
           </div>
           <div className={styles.actions}>
             <button
@@ -46,6 +47,7 @@ export function BookmarkPanel({ bookmarks, onAdd, onRemove, onNavigate, currentH
               onClick={handleAddBookmark}
               disabled={!currentHeading}
               title={currentHeading ? '添加书签' : '请先选择一个标题'}
+              aria-label={currentHeading ? `添加书签：${currentHeading}` : '添加书签（请先选择一个标题）'}
             >
               + 添加书签
             </button>
@@ -55,15 +57,20 @@ export function BookmarkPanel({ bookmarks, onAdd, onRemove, onNavigate, currentH
               当前: {currentHeading}
             </div>
           )}
-          <div className={styles.list}>
+          <ul className={styles.list} role="list" aria-label="书签列表">
             {bookmarks.length === 0 ? (
-              <div className={styles.empty}>暂无书签</div>
+              <li className={styles.emptyState} role="listitem">
+                <div className={styles.emptyIcon}>🔖</div>
+                <div className={styles.emptyTitle}>暂无书签</div>
+                <div className={styles.emptySubtitle}>阅读时点击 🔖 按钮为当前位置添加书签</div>
+              </li>
             ) : (
               bookmarks.map(bookmark => (
-                <div key={bookmark.id} className={styles.item}>
+                <li key={bookmark.id} className={styles.item} role="listitem">
                   <button
                     className={styles.itemContent}
                     onClick={() => onNavigate(bookmark.heading)}
+                    aria-label={`跳转到书签：${bookmark.title}`}
                   >
                     <span className={styles.title}>{bookmark.title}</span>
                     <span className={styles.heading}>{bookmark.heading}</span>
@@ -72,13 +79,14 @@ export function BookmarkPanel({ bookmarks, onAdd, onRemove, onNavigate, currentH
                     className={styles.removeBtn}
                     onClick={() => onRemove(bookmark.id)}
                     title="删除"
+                    aria-label={`删除书签：${bookmark.title}`}
                   >
                     ×
                   </button>
-                </div>
+                </li>
               ))
             )}
-          </div>
+          </ul>
         </div>
       )}
     </div>
@@ -90,7 +98,7 @@ export function useBookmarks(filename: string) {
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
+      const stored = getStorageItem(STORAGE_KEY as `bookmarks-${string}`)
       return stored ? JSON.parse(stored) : []
     } catch {
       return []
@@ -98,7 +106,7 @@ export function useBookmarks(filename: string) {
   })
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks))
+    setStorageItem(STORAGE_KEY as `bookmarks-${string}`, JSON.stringify(bookmarks))
   }, [bookmarks, STORAGE_KEY])
 
   const addBookmark = (heading: string) => {

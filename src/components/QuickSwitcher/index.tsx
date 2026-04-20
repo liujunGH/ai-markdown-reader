@@ -201,7 +201,7 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="命令面板">
         <div className={styles.inputWrapper}>
           <span className={styles.searchIcon}>🔍</span>
           <input
@@ -209,6 +209,9 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
             type="text"
             className={styles.input}
             placeholder="搜索文件..."
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="command-list"
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -248,7 +251,7 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
           )}
         </div>
 
-        <div className={styles.list} ref={listRef}>
+        <div id="command-list" className={styles.list} ref={listRef} role="listbox">
           {allItems.length === 0 ? (
             <div className={styles.empty}>
               {activeTab === 'recent' ? '暂无最近文件' : '暂无文件夹'}
@@ -260,6 +263,8 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
                 className={`${styles.item} ${index === selectedIndex ? styles.selected : ''}`}
                 onClick={() => handleSelect(item)}
                 onMouseEnter={() => setSelectedIndex(index)}
+                role="option"
+                aria-selected={index === selectedIndex}
               >
                 <span className={styles.itemIcon}>
                   {item.isFolder ? (
@@ -282,6 +287,7 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
                       onRemoveRecent(item.path)
                     }}
                     title="从最近文件移除"
+                    aria-label={`从最近文件移除 ${item.name}`}
                   >
                     ×
                   </button>
@@ -291,6 +297,7 @@ export default function QuickSwitcher({ recentFiles, onFileSelect, onClose, onRe
                     className={styles.removeBtn}
                     onClick={e => handleRemoveBookmark(item.name, e)}
                     title="移除书签"
+                    aria-label={`移除文件夹书签 ${item.name}`}
                   >
                     ×
                   </button>

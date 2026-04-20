@@ -1,3 +1,5 @@
+import { getStorageItem, setStorageItem } from './storage'
+
 const FOLDER_BOOKMARKS_KEY = 'folder-bookmarks'
 
 export interface FolderBookmark {
@@ -8,7 +10,7 @@ export interface FolderBookmark {
 
 export function getFolderBookmarks(): FolderBookmark[] {
   try {
-    const data = localStorage.getItem(FOLDER_BOOKMARKS_KEY)
+    const data = getStorageItem(FOLDER_BOOKMARKS_KEY)
     if (!data) return []
     const bookmarks = JSON.parse(data)
     return bookmarks.map((b: FolderBookmark) => ({
@@ -38,13 +40,13 @@ export async function addFolderBookmark(name: string, handle: FileSystemDirector
     name: b.name,
     addedAt: b.addedAt
   }))
-  localStorage.setItem(FOLDER_BOOKMARKS_KEY, JSON.stringify(serializable))
+  setStorageItem(FOLDER_BOOKMARKS_KEY, JSON.stringify(serializable))
 }
 
 export async function removeFolderBookmark(name: string): Promise<void> {
   const bookmarks = getFolderBookmarks()
   const filtered = bookmarks.filter(b => b.name !== name)
-  localStorage.setItem(FOLDER_BOOKMARKS_KEY, JSON.stringify(filtered))
+  setStorageItem(FOLDER_BOOKMARKS_KEY, JSON.stringify(filtered))
 }
 
 export async function getFilesInFolder(handle: FileSystemDirectoryHandle): Promise<{ name: string; file: File }[]> {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { OutlineItem } from '../../hooks/useOutline'
 import { Bookmark } from '../Bookmark'
 import styles from './FilePreviewPanel.module.css'
@@ -8,6 +8,7 @@ interface Props {
   filePath: string
   fileSize?: number
   lastModified?: number
+  content: string
   outlineItems: OutlineItem[]
   bookmarks: Bookmark[]
   onNavigate: (id: string) => void
@@ -21,6 +22,7 @@ export function FilePreviewPanel({
   filePath,
   fileSize,
   lastModified,
+  content,
   outlineItems,
   bookmarks,
   onNavigate,
@@ -46,8 +48,25 @@ export function FilePreviewPanel({
     })
   }
 
+  const stats = useMemo(() => {
+    return {
+      headings: (content.match(/^#{1,6}\s/gm) || []).length,
+      paragraphs: (content.match(/\n\n|^[^#\n].+/gm) || []).length,
+      codeBlocks: (content.match(/^```/gm) || []).length / 2,
+      images: (content.match(/!\[/g) || []).length,
+      links: (content.match(/(?<!!)\[/g) || []).length,
+      tables: (content.match(/\|.*\|/g) || []).length,
+      tasks: {
+        total: (content.match(/^\s*[-*]\s*\[[ x]\]/gim) || []).length,
+        completed: (content.match(/^\s*[-*]\s*\[x\]/gim) || []).length
+      },
+      wordCount: content.replace(/\s/g, '').length,
+      readingTime: Math.ceil(content.replace(/\s/g, '').length / 300)
+    }
+  }, [content])
+
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} role="tabpanel" aria-label="文件预览">
       <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${activeTab === 'outline' ? styles.active : ''}`}
@@ -136,6 +155,56 @@ export function FilePreviewPanel({
               <div className={styles.infoItem}>
                 <span className={styles.infoLabel}>修改时间</span>
                 <span className={styles.infoValue}>{formatDate(lastModified)}</span>
+              </div>
+            </div>
+
+            <div className={styles.statsDivider} />
+
+            <div className={styles.statsGrid}>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>📌</span>
+                <span className={styles.statNumber}>{stats.headings}</span>
+                <span className={styles.statLabel}>标题</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>📝</span>
+                <span className={styles.statNumber}>{stats.paragraphs}</span>
+                <span className={styles.statLabel}>段落</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>💻</span>
+                <span className={styles.statNumber}>{Math.floor(stats.codeBlocks)}</span>
+                <span className={styles.statLabel}>代码块</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>🖼️</span>
+                <span className={styles.statNumber}>{stats.images}</span>
+                <span className={styles.statLabel}>图片</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>🔗</span>
+                <span className={styles.statNumber}>{stats.links}</span>
+                <span className={styles.statLabel}>链接</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>📊</span>
+                <span className={styles.statNumber}>{stats.tables}</span>
+                <span className={styles.statLabel}>表格</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>✅</span>
+                <span className={styles.statNumber}>{stats.tasks.completed}/{stats.tasks.total}</span>
+                <span className={styles.statLabel}>任务</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>📖</span>
+                <span className={styles.statNumber}>{stats.wordCount}</span>
+                <span className={styles.statLabel}>字数</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}>⏱️</span>
+                <span className={styles.statNumber}>{stats.readingTime}</span>
+                <span className={styles.statLabel}>分钟阅读</span>
               </div>
             </div>
           </div>

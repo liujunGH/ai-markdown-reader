@@ -119,6 +119,11 @@ export function useSearch(content: string) {
     setCurrentMatch(prev => (prev - 1 + matches.length) % matches.length)
   }, [matches.length])
 
+  const goToMatch = useCallback((index: number) => {
+    if (matches.length === 0) return
+    setCurrentMatch(index % matches.length)
+  }, [matches.length])
+
   useEffect(() => {
     if (matches.length > 0) {
       scrollToMatch(currentMatch)
@@ -140,6 +145,7 @@ export function useSearch(content: string) {
     currentMatch,
     nextMatch,
     prevMatch,
+    goToMatch,
     clearSearch,
     highlightMatches,
     search

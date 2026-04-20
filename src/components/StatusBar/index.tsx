@@ -7,19 +7,25 @@ interface Props {
 
 export function StatusBar({ content }: Props) {
   const stats = useMemo(() => {
-    const chars = content.length
-    const words = content.trim().split(/\s+/).filter(Boolean).length
-    const lines = content.split('\n').length
-    const readingTime = Math.ceil(words / 200)
-    return { chars, words, lines, readingTime }
+    const wordCount = content.trim().split(/\s+/).filter(Boolean).length
+    const readingTime = Math.ceil(wordCount / 300)
+
+    const crlfCount = (content.match(/\r\n/g) || []).length
+    const lfOnlyCount = (content.replace(/\r\n/g, '').match(/\n/g) || []).length
+    const lineEnding = crlfCount > lfOnlyCount ? 'CRLF' : 'LF'
+
+    return { wordCount, readingTime, lineEnding }
   }, [content])
 
   return (
     <footer className={styles.statusBar}>
-      <span>{stats.chars} 字符</span>
-      <span>{stats.words} 字</span>
-      <span>{stats.lines} 行</span>
-      <span>约 {stats.readingTime} 分钟阅读</span>
+      <span>{stats.wordCount} 字</span>
+      <span className={styles.separator}>|</span>
+      <span>约 {stats.readingTime} 分钟</span>
+      <span className={styles.separator}>|</span>
+      <span>{stats.lineEnding}</span>
+      <span className={styles.separator}>|</span>
+      <span>UTF-8</span>
     </footer>
   )
 }

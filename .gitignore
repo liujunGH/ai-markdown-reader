@@ -7,3 +7,18 @@ electron/preload.js
 .superpowers/
 *.log
 *.local
+
+# OS
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+npm-debug.log*
+
+# Electron
+out/

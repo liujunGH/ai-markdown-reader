@@ -4,6 +4,7 @@ export interface OutlineItem {
   level: number
   text: string
   id: string
+  position: number
 }
 
 export function useOutline(content: string): OutlineItem[] {
@@ -16,7 +17,7 @@ export function useOutline(content: string): OutlineItem[] {
       const level = match[1].length
       const text = match[2].trim()
       const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '')
-      items.push({ level, text, id })
+      items.push({ level, text, id, position: match.index })
     }
 
     return items

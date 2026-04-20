@@ -1,0 +1,221 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.panel {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 85vh;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: panelSlideUp 0.25s ease-out;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  line-height: 1;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+}
+
+.content {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.overviewCard {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.overviewValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.overviewLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.heatmap {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.day {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.intensity-0 {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.intensity-1 {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.intensity-2 {
+  background: rgba(var(--accent-rgb), 0.4);
+}
+
+.intensity-3 {
+  background: rgba(var(--accent-rgb), 0.6);
+}
+
+.intensity-4 {
+  background: rgba(var(--accent-rgb), 0.9);
+}
+
+.heatmapLegend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.legendLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.legendDay {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.todayTime {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fileItem {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topFilesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topFileItem {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.topFileName {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topFileTime {
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topFileLast {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}

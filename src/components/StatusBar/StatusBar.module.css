@@ -1,6 +1,6 @@
 .statusBar {
   display: flex;
-  gap: 24px;
+  gap: 8px;
   padding: 8px 16px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
@@ -15,4 +15,9 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.separator {
+  color: var(--border);
+  user-select: none;
 }

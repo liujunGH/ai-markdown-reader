@@ -93,40 +93,41 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
             {files.length === 0 ? (
               <>
                 <div className={styles.emptyIcon}>📂</div>
-                <div className={styles.emptyText}>暂无最近文件</div>
-                <button className={styles.emptyBtn} onClick={onOpenFolder} title="打开文件夹">
-                  打开文件夹
-                </button>
+                <div className={styles.emptyTitle}>暂无最近文件</div>
+                <div className={styles.emptySubtitle}>打开一个 Markdown 文件开始阅读</div>
               </>
             ) : (
               <div className={styles.emptyText}>未找到匹配的文件</div>
             )}
           </div>
         ) : (
-          <div className={styles.grid}>
+          <div className={styles.grid} role="list" aria-label="最近文件列表">
             {filteredAndSortedFiles.map((file) => (
-              <button
-                key={file.filePath}
-                className={styles.fileCard}
-                onClick={() => onSelect(file)}
-              >
-                <div className={styles.fileIcon}>📄</div>
-                <div className={styles.fileInfo}>
-                  <div className={styles.fileName} title={file.name}>{file.name}</div>
-                  <div className={styles.filePath} title={file.filePath}>{file.filePath}</div>
-                  <div className={styles.fileTime}>{formatTime(file.openedAt)}</div>
-                </div>
-                <button 
-                  className={styles.removeBtn}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onRemove(file.filePath)
-                  }}
-                  title="删除"
+              <div key={file.filePath} role="listitem">
+                <button
+                  className={styles.fileCard}
+                  onClick={() => onSelect(file)}
+                  aria-label={`打开 ${file.name}`}
                 >
-                  ×
+                  <div className={styles.fileIcon}>📄</div>
+                  <div className={styles.fileInfo}>
+                    <div className={styles.fileName} title={file.name}>{file.name}</div>
+                    <div className={styles.filePath} title={file.filePath}>{file.filePath}</div>
+                    <div className={styles.fileTime}>{formatTime(file.openedAt)}</div>
+                  </div>
+                  <button 
+                    className={styles.removeBtn}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemove(file.filePath)
+                    }}
+                    title="删除"
+                    aria-label={`从最近文件中删除 ${file.name}`}
+                  >
+                    ×
+                  </button>
                 </button>
-              </button>
+              </div>
             ))}
           </div>
         )}

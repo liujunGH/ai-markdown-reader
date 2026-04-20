@@ -23,6 +23,39 @@
 
 .item {
   margin: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-height: 60px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.25s ease, margin 0.25s ease;
+}
+
+.item.hidden {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.toggleBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggleBtn:hover {
+  color: var(--accent);
 }
 
 .link {
@@ -34,7 +67,8 @@
   color: var(--text-primary);
   padding: 4px 8px;
   border-radius: 4px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: block;
 }
 
@@ -49,9 +83,29 @@
   font-weight: 500;
 }
 
-.empty {
-  font-size: 13px;
-  color: var(--text-secondary);
-  padding: 16px;
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 8px;
   text-align: center;
+}
+
+.emptyIcon {
+  font-size: 40px;
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.emptySubtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.8;
 }

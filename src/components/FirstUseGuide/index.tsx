@@ -129,7 +129,7 @@ export function FirstUseGuide({ onComplete, onSkip }: Props) {
   const step = GUIDE_STEPS[currentStep]
 
   return (
-    <div className={styles.overlay} ref={overlayRef}>
+    <div className={styles.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="新手引导">
       <div className={styles.header}>
         <h3 className={styles.title}>欢迎使用 AI Markdown Reader</h3>
         <div className={styles.actions}>

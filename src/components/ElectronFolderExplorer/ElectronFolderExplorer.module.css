@@ -63,18 +63,80 @@
   color: var(--text-primary);
 }
 
+.filterWrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.filterIcon {
+  font-size: 12px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.filterInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.filterInput::placeholder {
+  color: var(--text-secondary);
+}
+
+.filterClear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.filterClear:hover {
+  color: var(--text-primary);
+}
+
 .fileList {
   flex: 1;
   overflow-y: auto;
   padding: 8px 0;
 }
 
-.loading,
-.empty {
+.loading {
   padding: 20px;
   text-align: center;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 8px;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 40px;
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .fileItem {
@@ -141,4 +203,11 @@
 
 .children {
   margin: 0;
+}
+
+.highlight {
+  background-color: var(--accent);
+  color: white;
+  border-radius: 2px;
+  padding: 0 1px;
 }

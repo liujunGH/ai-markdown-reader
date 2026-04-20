@@ -32,7 +32,9 @@ export async function exportMermaidToPng(code: string): Promise<string> {
       resolve(canvas.toDataURL('image/png'))
     }
     img.onerror = reject
-    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)))
+    const svgBytes = new TextEncoder().encode(svg)
+    const svgBinString = Array.from(svgBytes, (b) => String.fromCharCode(b)).join('')
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgBinString)
   })
 }
 

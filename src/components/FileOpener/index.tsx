@@ -1,4 +1,5 @@
 import styles from './FileOpener.module.css'
+import { basename } from '../../utils/path'
 
 interface Props {
   onFileOpen: (content: string, filename: string, filePath: string) => void
@@ -10,7 +11,7 @@ export function FileOpener({ onFileOpen }: Props) {
     
     const result = await window.electronAPI.openFileDialog()
     if (result) {
-      onFileOpen(result.content, result.filePath.split('/').pop() || '未命名.md', result.filePath)
+      onFileOpen(result.content, basename(result.filePath) || '未命名.md', result.filePath)
     }
   }
 

@@ -219,3 +219,137 @@
 .renderer :global(.mermaid-export-btn:hover) {
   background: var(--bg-primary);
 }
+
+/* Code folding */
+.renderer :global(pre) {
+  position: relative;
+}
+
+.renderer :global(.code-fold-btn) {
+  position: absolute;
+  top: 8px;
+  right: 44px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  z-index: 10;
+}
+
+.renderer :global(pre:hover .code-fold-btn) {
+  opacity: 1;
+}
+
+.renderer :global(.code-fold-btn:hover) {
+  background: var(--bg-tertiary);
+}
+
+.renderer :global(pre.code-folded) {
+  max-height: calc(5 * 1.5em + 32px);
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.renderer :global(pre.code-folded .code-fold-fade) {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, var(--bg-tertiary));
+  pointer-events: none;
+  z-index: 5;
+}
+
+.renderer :global(pre:not(.code-folded) .code-fold-fade) {
+  display: none;
+}
+
+/* Task list */
+.renderer :global(.task-list-item) {
+  list-style: none;
+  padding-left: 0;
+}
+
+.renderer :global(.task-list-item input[type="checkbox"]) {
+  margin-right: 0.5em;
+  cursor: pointer;
+}
+
+/* TTS floating button */
+:global(.tts-float-btn) {
+  position: fixed;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+:global(.tts-float-btn:hover) {
+  transform: scale(1.1);
+}
+
+:global(.tts-float-btn.speaking) {
+  background: #ef4444;
+}
+
+/* Diff highlighting */
+.renderer :global(.diff-add) {
+  background-color: rgba(0, 200, 0, 0.1);
+  color: #2ea043;
+  display: block;
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+
+.renderer :global(.diff-del) {
+  background-color: rgba(200, 0, 0, 0.1);
+  color: #f85149;
+  display: block;
+  margin: 0 -12px;
+  padding: 0 12px;
+}
+
+.renderer :global(.diff-meta) {
+  color: var(--accent);
+  font-weight: 500;
+  display: block;
+}
+
+/* KaTeX tooltip */
+.renderer :global(.katex-tooltip) {
+  cursor: help;
+  position: relative;
+}
+
+.renderer :global(.katex-tooltip:hover::after) {
+  content: attr(data-latex);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}

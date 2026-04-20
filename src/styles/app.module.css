@@ -1,0 +1,235 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--bg-primary);
+}
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.toolbarBtn {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.toolbarBtnActive {
+  background: var(--accent);
+  color: white;
+}
+
+.toolbarBtnSecondary {
+  color: var(--text-secondary);
+}
+
+.toolbarBtnSmall {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.titleWrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.title {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main {
+  overflow-y: auto;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.sidebar {
+  position: sticky;
+  top: 81px;
+  height: calc(100vh - 81px - 32px);
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.toastContainer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.toastItem {
+  position: absolute;
+  right: 16px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  animation: toastIn 0.3s ease-out;
+  transition: opacity 0.3s ease-out;
+  pointer-events: auto;
+}
+
+.toastError {
+  background-color: #ef4444;
+}
+
+.toastSuccess {
+  background-color: #22c55e;
+}
+
+.dragOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dragOverlayContent {
+  color: white;
+  font-size: 24px;
+  font-weight: 500;
+  padding: 24px 48px;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.fileChangeBanner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d2d2d;
+  color: white;
+  padding: 14px 20px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.fileChangeBannerIcon {
+  font-size: 18px;
+}
+
+.fileChangeBannerTitle {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.fileChangeBannerPath {
+  opacity: 0.7;
+  font-size: 12px;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileChangeBannerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.fileChangeBannerBtnPrimary {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.fileChangeBannerBtnSecondary {
+  background: transparent;
+  color: #999;
+  border: 1px solid #555;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.splitView {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.splitPane {
+  flex: 1;
+  border-left: 1px solid var(--border);
+}
+
+.splitDivider {
+  width: 1px;
+  background: var(--border);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fontSizeControls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.fontSizeDisplay {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 24px;
+  text-align: center;
+}
+
+

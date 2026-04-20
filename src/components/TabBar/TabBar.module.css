@@ -43,6 +43,11 @@
   min-width: 80px;
   max-width: 180px;
   transition: background-color 0.15s;
+  position: relative;
+}
+
+.tab.hasColor {
+  padding-left: 15px;
 }
 
 .tab:hover {
@@ -53,6 +58,39 @@
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bg-primary);
   margin-bottom: -1px;
+}
+
+.tab.pinned {
+  min-width: 48px;
+  max-width: 80px;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.tab.pinned.active {
+  border-bottom: 2px solid var(--accent);
+}
+
+.tabColor {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.tabColorRed { background-color: #f85149; }
+.tabColorOrange { background-color: #f0883e; }
+.tabColorYellow { background-color: #d29922; }
+.tabColorGreen { background-color: #3fb950; }
+.tabColorBlue { background-color: #58a6ff; }
+.tabColorPurple { background-color: #a371f7; }
+
+.pinIcon {
+  font-size: 10px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .tabName {
@@ -78,6 +116,7 @@
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background-color 0.15s;
+  flex-shrink: 0;
 }
 
 .tab:hover .closeBtn {
@@ -92,6 +131,10 @@
 .tab.dropTarget {
   border-left: 2px solid var(--accent);
   padding-left: calc(12px - 2px);
+}
+
+.tab.pinned.dropTarget {
+  padding-left: calc(8px - 2px);
 }
 
 .closeBtn:hover {
@@ -160,4 +203,120 @@
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+.tooltip {
+  position: fixed;
+  width: 280px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.tooltipName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.tooltipPath {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.tooltipMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.tooltipPreview {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 72px;
+  overflow: hidden;
+}
+
+.colorPicker {
+  position: fixed;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 140px;
+  padding: 8px;
+  z-index: 1000;
+}
+
+.colorPickerTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.colorGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.colorOption {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+.colorOption:hover {
+  transform: scale(1.15);
+  border-color: var(--text-secondary);
+}
+
+.colorRed { background-color: #f85149; }
+.colorOrange { background-color: #f0883e; }
+.colorYellow { background-color: #d29922; }
+.colorGreen { background-color: #3fb950; }
+.colorBlue { background-color: #58a6ff; }
+.colorPurple { background-color: #a371f7; }
+
+.clearColorBtn {
+  width: 100%;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: center;
+}
+
+.clearColorBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }

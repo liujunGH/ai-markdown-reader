@@ -10,6 +10,19 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   min-width: 400px;
+  max-width: 560px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .inputWrapper {
@@ -57,7 +70,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
   font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -71,6 +83,7 @@
   font-size: 12px;
   color: var(--text-secondary);
   padding: 0 8px;
+  white-space: nowrap;
 }
 
 .options {
@@ -78,6 +91,41 @@
   justify-content: space-between;
   align-items: center;
   margin-top: 8px;
+}
+
+.leftOptions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scopeToggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.scopeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.scopeBtn:hover {
+  color: var(--text-primary);
+}
+
+.scopeBtn.scopeActive {
+  background: var(--accent);
+  color: white;
 }
 
 .navButtons {
@@ -96,4 +144,110 @@
 
 .navBtn:hover {
   background: var(--bg-primary);
+}
+
+.historyDropdown {
+  margin-top: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.historyItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.historyItem.highlighted {
+  background-color: var(--accent);
+  color: white;
+}
+
+.historyIcon {
+  font-size: 12px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.historyText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crossTabResults {
+  margin-top: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.noResults {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.resultGroup {
+  padding: 6px 0;
+}
+
+.resultGroup:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.resultGroupTitle {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 12px 5px 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.resultItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.resultBullet {
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.resultText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
 }

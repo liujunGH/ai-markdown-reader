@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOptions, Tray, nativeImage, nativeTheme } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
-const watchers = new Set<string>()
+const watchers = new Map<string, fs.FSWatcher>()
 
 interface RecentFile {
   name: string
@@ -10,10 +10,20 @@ interface RecentFile {
   openedAt: number
 }
 
+interface WindowState {
+  width: number
+  height: number
+  x?: number
+  y?: number
+  isMaximized?: boolean
+  isFullScreen?: boolean
+}
+
 interface StoreData {
   recentFiles: RecentFile[]
   lastFolder: string | null
   maxRecentFiles: number
+  windowStates?: WindowState[]
 }
 
 const DEFAULT_MAX_RECENT_FILES = 100
@@ -39,9 +49,166 @@ function saveStore(data: StoreData): void {
 
 app.disableHardwareAcceleration()
 
+const windows = new Map<number, BrowserWindow>()
+const windowIds = new WeakMap<BrowserWindow, number>()
+const windowOpenFiles = new Map<number, Set<string>>()
+let windowIdCounter = 0
+let lastFocusedWindowId = 0
+let tray: Tray | null = null
+let isQuiting = false
+let openFileFromEvent = false
+
+const isDev = !app.isPackaged
+
+function log(message: string, ...args: unknown[]) {
+  const timestamp = new Date().toISOString()
+  console.log(`[MAIN ${timestamp}] ${message}`, ...args)
+}
+
+function getWindowId(win: BrowserWindow): number {
+  return windowIds.get(win) || 0
+}
+
+function getFocusedOrLastWindow(): BrowserWindow | undefined {
+  for (const win of windows.values()) {
+    if (win.isFocused() && !win.isDestroyed()) {
+      return win
+    }
+  }
+  const lastWin = windows.get(lastFocusedWindowId)
+  if (lastWin && !lastWin.isDestroyed()) {
+    return lastWin
+  }
+  for (const win of windows.values()) {
+    if (!win.isDestroyed()) {
+      return win
+    }
+  }
+  return undefined
+}
+
+function saveWindowState() {
+  const states: WindowState[] = []
+  for (const win of windows.values()) {
+    if (win.isDestroyed()) continue
+    const bounds = win.getBounds()
+    states.push({
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      isMaximized: win.isMaximized(),
+      isFullScreen: win.isFullScreen(),
+    })
+  }
+  const store = loadStore()
+  store.windowStates = states
+  saveStore(store)
+}
+
+function createWindow(filePath?: string, windowState?: WindowState) {
+  log('Creating window...')
+
+  const win = new BrowserWindow({
+    width: windowState?.width || 1200,
+    height: windowState?.height || 800,
+    minWidth: 800,
+    minHeight: 600,
+    x: windowState?.x,
+    y: windowState?.y,
+    title: 'AI Markdown Reader',
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  })
+
+  if (windowState?.isMaximized) {
+    win.maximize()
+  }
+  if (windowState?.isFullScreen) {
+    win.setFullScreen(true)
+  }
+  win.show()
+
+  const id = ++windowIdCounter
+  windows.set(id, win)
+  windowIds.set(win, id)
+
+  win.on('focus', () => {
+    lastFocusedWindowId = id
+  })
+
+  win.on('closed', () => {
+    log('Window closed:', id)
+    windowOpenFiles.delete(id)
+    windows.delete(id)
+    if (lastFocusedWindowId === id) {
+      lastFocusedWindowId = 0
+    }
+  })
+
+  win.on('close', (event) => {
+    if (!isQuiting) {
+      event.preventDefault()
+      win.hide()
+    }
+  })
+
+  const htmlPath = isDev 
+    ? 'http://localhost:5173'
+    : path.join(__dirname, '../dist/index.html')
+
+  log('Loading HTML:', htmlPath)
+
+  if (isDev) {
+    win.loadURL('http://localhost:5173')
+    win.webContents.openDevTools()
+  } else {
+    const loaded = win.loadFile(htmlPath)
+    log('loadFile returned:', loaded)
+  }
+
+  win.webContents.on('did-finish-load', () => {
+    log('Page finished loading for window:', id)
+  })
+
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    log('Page failed to load:', errorCode, errorDescription)
+  })
+
+  win.webContents.on('console-message', (_event, level, message) => {
+    if (level >= 0) {
+      log('[RENDERER]', message)
+    }
+  })
+
+  if (filePath && !openFileFromEvent) {
+    log('File to open via did-finish-load:', filePath)
+    const loadHandler = () => {
+      if (openFileFromEvent) {
+        log('Skipping did-finish-load send, open-file event already handled')
+        return
+      }
+      win.webContents.send('open-file', filePath)
+    }
+    win.webContents.once('did-finish-load', loadHandler)
+  }
+
+  return win
+}
+
 function createMenu() {
   const isMac = process.platform === 'darwin'
   
+  const getTargetWindow = (): BrowserWindow | undefined => {
+    const focused = BrowserWindow.getFocusedWindow()
+    if (focused && !focused.isDestroyed()) return focused
+    return getFocusedOrLastWindow()
+  }
+
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{
       label: 'AI Markdown Reader',
@@ -61,20 +228,26 @@ function createMenu() {
       label: '文件',
       submenu: [
         {
+          label: '新建窗口',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: () => createWindow()
+        },
+        { type: 'separator' },
+        {
           label: '打开文件',
           accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow?.webContents.send('menu-open-file')
+          click: () => getTargetWindow()?.webContents.send('menu-open-file')
         },
         {
           label: '打开文件夹',
           accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => mainWindow?.webContents.send('menu-open-folder')
+          click: () => getTargetWindow()?.webContents.send('menu-open-folder')
         },
         { type: 'separator' },
         {
           label: '打印',
           accelerator: 'CmdOrCtrl+P',
-          click: () => mainWindow?.webContents.print()
+          click: () => getTargetWindow()?.webContents.print()
         },
         { type: 'separator' },
         isMac ? { role: 'close' as const, label: '关闭' } : { role: 'quit' as const, label: '退出' }
@@ -133,7 +306,7 @@ function createMenu() {
               message: 'AI Markdown Reader',
               detail: `一款沉浸式的 Markdown 阅读器
 
-版本: 1.2.0
+版本: 1.3.0
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -147,6 +320,7 @@ function createMenu() {
 • 专注模式，会话恢复
 • 外部文件变更检测
 • 原生文件拖拽支持
+• 多窗口支持，窗口状态持久化
 
 开源协议: MIT License
 
@@ -164,84 +338,6 @@ function createMenu() {
   Menu.setApplicationMenu(menu)
 }
 
-console.log('[MAIN] App starting...')
-console.log('[MAIN] Is packaged:', app.isPackaged)
-console.log('[MAIN] __dirname:', __dirname)
-console.log('[MAIN] App path:', app.getAppPath())
-
-let mainWindow: BrowserWindow | null = null
-let pendingFilePath: string | null = null
-let openFileFromEvent = false
-
-const isDev = !app.isPackaged
-
-function log(message: string, ...args: unknown[]) {
-  const timestamp = new Date().toISOString()
-  console.log(`[MAIN ${timestamp}] ${message}`, ...args)
-}
-
-function createWindow(filePath?: string) {
-  log('Creating window...')
-
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    title: 'AI Markdown Reader',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
-  })
-
-  const htmlPath = isDev 
-    ? 'http://localhost:5173'
-    : path.join(__dirname, '../dist/index.html')
-
-  log('Loading HTML:', htmlPath)
-
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
-  } else {
-    const loaded = mainWindow.loadFile(htmlPath)
-    log('loadFile returned:', loaded)
-  }
-
-  mainWindow.webContents.on('did-finish-load', () => {
-    log('Page finished loading')
-  })
-
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-    log('Page failed to load:', errorCode, errorDescription)
-  })
-
-  mainWindow.webContents.on('console-message', (_event, level, message) => {
-    if (level >= 0) {
-      log('[RENDERER]', message)
-    }
-  })
-
-  mainWindow.on('closed', () => {
-    log('Window closed')
-    mainWindow = null
-  })
-
-  if (filePath && !openFileFromEvent) {
-    log('File to open via did-finish-load:', filePath)
-    mainWindow.webContents.on('did-finish-load', () => {
-      if (openFileFromEvent) {
-        log('Skipping did-finish-load send, open-file event already handled')
-        return
-      }
-      mainWindow?.webContents.send('open-file', filePath)
-      openFileFromEvent = false
-    })
-  }
-}
-
 function handleFileOpen(filePath: string) {
   log('handleFileOpen called:', filePath)
   
@@ -253,13 +349,26 @@ function handleFileOpen(filePath: string) {
     return
   }
 
-  if (mainWindow) {
-    mainWindow.webContents.send('open-file', filePath)
-    pendingFilePath = null
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+  // If any window already has this file open, focus that window
+  for (const [id, files] of windowOpenFiles.entries()) {
+    if (files.has(filePath)) {
+      const win = windows.get(id)
+      if (win && !win.isDestroyed()) {
+        if (win.isMinimized()) win.restore()
+        win.show()
+        win.focus()
+        return
+      }
+    }
+  }
+
+  const win = getFocusedOrLastWindow()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('open-file', filePath)
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
   } else {
-    pendingFilePath = filePath
     createWindow(filePath)
   }
 }
@@ -280,9 +389,11 @@ if (!gotTheLock) {
       handleFileOpen(filePath)
     }
     
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
+    const win = getFocusedOrLastWindow()
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
     }
   })
 }
@@ -290,6 +401,58 @@ if (!gotTheLock) {
 app.whenReady().then(() => {
   log('App ready')
   createMenu()
+
+  if (process.platform === 'darwin') {
+    const dockIconPath = path.join(__dirname, '../assets/icon.png')
+    if (fs.existsSync(dockIconPath)) {
+      app.dock.setIcon(dockIconPath)
+    }
+    app.dock.setMenu(Menu.buildFromTemplate([
+      { label: '打开文件', click: () => getFocusedOrLastWindow()?.webContents.send('menu-open-file') }
+    ]))
+  }
+
+  // System tray
+  const trayIconPath = path.join(__dirname, '../assets/icon.png')
+  let trayIcon: Electron.NativeImage
+  if (fs.existsSync(trayIconPath)) {
+    trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
+  } else {
+    trayIcon = nativeImage.createEmpty()
+  }
+  tray = new Tray(trayIcon)
+  tray.setToolTip('AI Markdown Reader')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: '打开文件', click: () => getFocusedOrLastWindow()?.webContents.send('menu-open-file') },
+    { label: '显示窗口', click: () => { 
+      const win = getFocusedOrLastWindow()
+      win?.show(); win?.focus() 
+    } },
+    { type: 'separator' },
+    { label: '退出', click: () => { isQuiting = true; app.quit() } }
+  ]))
+
+  tray.on('click', () => {
+    const win = getFocusedOrLastWindow()
+    if (win) {
+      if (win.isVisible()) {
+        win.hide()
+      } else {
+        win.show()
+        win.focus()
+      }
+    }
+  })
+
+  // System theme
+  nativeTheme.on('updated', () => {
+    const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+    windows.forEach(win => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('system-theme-changed', theme)
+      }
+    })
+  })
 
   app.on('open-file', (event, filePath) => {
     log('open-file event:', filePath)
@@ -304,11 +467,22 @@ app.whenReady().then(() => {
   log('File from argv:', filePath)
   log('Full argv:', process.argv)
 
-  createWindow(filePath)
+  const store = loadStore()
+  if (filePath) {
+    handleFileOpen(filePath)
+  } else if (store.windowStates && store.windowStates.length > 0) {
+    store.windowStates.forEach((state) => {
+      createWindow(undefined, state)
+    })
+  } else {
+    createWindow()
+  }
 })
 
 app.on('window-all-closed', () => {
   log('All windows closed')
+  watchers.forEach(watcher => watcher.close())
+  watchers.clear()
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -318,7 +492,16 @@ app.on('activate', () => {
   log('App activated')
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  } else {
+    const win = getFocusedOrLastWindow()
+    win?.show()
+    win?.focus()
   }
+})
+
+app.on('before-quit', () => {
+  isQuiting = true
+  saveWindowState()
 })
 
 process.on('uncaughtException', (error: Error) => {
@@ -477,12 +660,12 @@ ipcMain.handle('watch-file', async (event, filePath: string) => {
     return { success: true, message: 'Already watching' }
   }
   try {
-    fs.watch(filePath, (eventType) => {
+    const watcher = fs.watch(filePath, (eventType) => {
       if (eventType === 'change') {
         event.sender.send('file-changed', filePath)
       }
     })
-    watchers.add(filePath)
+    watchers.set(filePath, watcher)
     return { success: true }
   } catch (error) {
     return { success: false, error: String(error) }
@@ -490,5 +673,71 @@ ipcMain.handle('watch-file', async (event, filePath: string) => {
 })
 
 ipcMain.handle('unwatch-file', async (_event, filePath: string) => {
-  watchers.delete(filePath)
+  const watcher = watchers.get(filePath)
+  if (watcher) {
+    watcher.close()
+    watchers.delete(filePath)
+  }
+})
+
+ipcMain.handle('set-progress-bar', (event, progress: number) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win && !win.isDestroyed()) {
+    win.setProgressBar(progress)
+  }
+})
+
+ipcMain.handle('clear-progress-bar', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win && !win.isDestroyed()) {
+    win.setProgressBar(-1)
+  }
+})
+
+ipcMain.handle('set-title', (event, title: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win && !win.isDestroyed()) {
+    win.setTitle(title ? `${title} - AI Markdown Reader` : 'AI Markdown Reader')
+  }
+})
+
+// Multi-window IPC handlers
+ipcMain.handle('get-window-id', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return 0
+  return getWindowId(win)
+})
+
+ipcMain.handle('focus-window', (_event, id: number) => {
+  const win = windows.get(id)
+  if (win && !win.isDestroyed()) {
+    win.show()
+    win.focus()
+  }
+})
+
+ipcMain.handle('get-window-states', () => {
+  const states: WindowState[] = []
+  for (const win of windows.values()) {
+    if (win.isDestroyed()) continue
+    const bounds = win.getBounds()
+    states.push({
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      isMaximized: win.isMaximized(),
+      isFullScreen: win.isFullScreen(),
+    })
+  }
+  return states
+})
+
+ipcMain.handle('register-window-files', (event, filePaths: string[]) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return
+  const id = getWindowId(win)
+  if (id) {
+    windowOpenFiles.set(id, new Set(filePaths))
+  }
 })

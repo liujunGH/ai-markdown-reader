@@ -162,3 +162,49 @@
   word-break: break-all;
   overflow-wrap: break-word;
 }
+
+.statsDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 12px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 4px;
+  gap: 2px;
+  transition: background 0.2s;
+}
+
+.statCard:hover {
+  background: var(--bg-primary);
+}
+
+.statIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.statNumber {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+}

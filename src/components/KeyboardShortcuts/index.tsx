@@ -11,6 +11,7 @@ const shortcuts = [
     items: [
       { keys: ['Ctrl', 'F'], description: '搜索' },
       { keys: ['Ctrl', 'S'], description: '切换源码视图' },
+      { keys: ['Ctrl', 'G'], description: '快速跳转' },
       { keys: ['↑', '↓'], description: '搜索结果导航' },
       { keys: ['Enter'], description: '下一个搜索结果' },
       { keys: ['Shift', 'Enter'], description: '上一个搜索结果' },
@@ -83,10 +84,10 @@ function KeyboardShortcuts({ onClose }: KeyboardShortcutsProps) {
 
   return (
     <div className={styles.overlay}>
-      <div ref={modalRef} className={styles.modal}>
+      <div ref={modalRef} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
         <div className={styles.header}>
-          <h2 className={styles.title}>键盘快捷键</h2>
-          <button className={styles.closeBtn} onClick={onClose}>×</button>
+          <h2 id="shortcuts-title" className={styles.title}>键盘快捷键</h2>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="关闭快捷键面板">×</button>
         </div>
         <div className={styles.content}>
           {shortcuts.map((section) => (

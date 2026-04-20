@@ -98,11 +98,31 @@
   overflow-y: auto;
 }
 
-.empty {
-  padding: 24px;
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 8px;
   text-align: center;
+}
+
+.emptyIcon {
+  font-size: 40px;
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-secondary);
-  font-size: 13px;
+}
+
+.emptySubtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 .item {
