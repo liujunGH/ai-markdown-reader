@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.3.1-blue)
+![Version](https://img.shields.io/badge/Version-1.3.2-blue)
 
 ## 功能特性
 
@@ -204,6 +204,16 @@ markdown-reader/
 ```
 
 ## 更新日志
+
+### v1.3.2
+
+**修复:**
+- 修复 macOS 打包后 `preload.js` 中 `require("path")` 在 sandbox 模式下报错，导致 `window.electronAPI` 不可用
+- 修复 `open-file-dialog` / `read-file` / `handleFileOpen` 在路径为目录时抛出 `EISDIR` 错误
+- 修复打开文件夹时若第一个条目是子目录导致失败的问题
+- 修复 `pathBasename` 对以 `/` 结尾路径的处理
+- 修复右侧 Minimap 宽度（48px → 32px）
+- 包含 v1.3.1 的所有修复
 
 ### v1.3.1
 

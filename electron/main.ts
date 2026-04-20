@@ -354,7 +354,7 @@ function createMenu() {
             const win = getTargetWindow()
             const detail = `一款沉浸式的 Markdown 阅读器
 
-版本: 1.3.1
+版本: 1.3.2
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -394,6 +394,17 @@ function handleFileOpen(filePath: string) {
   log('handleFileOpen called:', filePath)
   
   if (!filePath) return
+
+  try {
+    const stat = fs.statSync(filePath)
+    if (stat.isDirectory()) {
+      log('Path is a directory, not a file:', filePath)
+      return
+    }
+  } catch {
+    log('Cannot access file:', filePath)
+    return
+  }
   
   const ext = path.extname(filePath).toLowerCase()
   if (ext !== '.md' && ext !== '.markdown') {
@@ -620,6 +631,20 @@ ipcMain.handle('open-file-dialog', async () => {
     if (!result.canceled && result.filePaths.length > 0) {
       const filePath = result.filePaths[0]
       try {
+        const stat = fs.statSync(filePath)
+        if (stat.isDirectory()) {
+          log('Selected path is a directory, reading first file inside:', filePath)
+          const entries = fs.readdirSync(filePath, { withFileTypes: true })
+          const firstFile = entries.find(e =>
+            !e.isDirectory() && (e.name.endsWith('.md') || e.name.endsWith('.markdown'))
+          )
+          if (firstFile) {
+            const fullPath = path.join(filePath, firstFile.name)
+            const content = fs.readFileSync(fullPath, 'utf-8')
+            return { filePath: fullPath, content }
+          }
+          return null
+        }
         const content = fs.readFileSync(filePath, 'utf-8')
         return { filePath, content }
       } catch (readErr) {
@@ -688,6 +713,10 @@ ipcMain.handle('read-folder', async (_event, folderPath: string) => {
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
+    const stat = fs.statSync(filePath)
+    if (stat.isDirectory()) {
+      return { success: false, error: '路径是一个目录，不是文件' }
+    }
     const content = fs.readFileSync(filePath, 'utf-8')
     return { success: true, content }
   } catch (error) {

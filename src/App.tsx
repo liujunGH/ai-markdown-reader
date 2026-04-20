@@ -217,7 +217,11 @@ function AppInner() {
         return
       }
 
-      const firstFile = result.files[0]
+      const firstFile = result.files.find(f => !f.isDirectory)
+      if (!firstFile) {
+        showToast('该目录中没有 Markdown 文件', 'error')
+        return
+      }
       const fileResult = await window.electronAPI.readFile(firstFile.filePath)
       if (fileResult.success && fileResult.content) {
         handleFileOpen(fileResult.content, firstFile.name, firstFile.filePath)

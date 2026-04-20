@@ -8,7 +8,7 @@ interface RecentFile {
 
 // Simple path utilities (avoid importing 'path' which fails in sandbox preload)
 function pathBasename(filePath: string): string {
-  const normalized = filePath.replace(/\\/g, '/')
+  const normalized = filePath.replace(/\\/g, '/').replace(/\/$/, '')
   const lastSlash = normalized.lastIndexOf('/')
   return lastSlash === -1 ? normalized : normalized.slice(lastSlash + 1) || normalized
 }
