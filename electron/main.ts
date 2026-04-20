@@ -236,12 +236,36 @@ function createMenu() {
         {
           label: '打开文件',
           accelerator: 'CmdOrCtrl+O',
-          click: () => getTargetWindow()?.webContents.send('menu-open-file')
+          click: async () => {
+            const win = getTargetWindow()
+            if (!win) return
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openFile'],
+              filters: [
+                { name: 'Markdown', extensions: ['md', 'markdown'] },
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            })
+            if (!result.canceled && result.filePaths.length > 0) {
+              const filePath = result.filePaths[0]
+              const content = fs.readFileSync(filePath, 'utf-8')
+              win.webContents.send('open-file', filePath)
+            }
+          }
         },
         {
           label: '打开文件夹',
           accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => getTargetWindow()?.webContents.send('menu-open-folder')
+          click: async () => {
+            const win = getTargetWindow()
+            if (!win) return
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openDirectory']
+            })
+            if (!result.canceled && result.filePaths.length > 0) {
+              win.webContents.send('open-folder', result.filePaths[0])
+            }
+          }
         },
         { type: 'separator' },
         {
@@ -306,7 +330,7 @@ function createMenu() {
               message: 'AI Markdown Reader',
               detail: `一款沉浸式的 Markdown 阅读器
 
-版本: 1.3.0
+版本: 1.3.1
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -513,13 +537,22 @@ process.on('unhandledRejection', (reason: unknown) => {
 })
 
 ipcMain.handle('open-file-dialog', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: 'Markdown', extensions: ['md', 'markdown'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  })
+  const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
+  const result = win
+    ? await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown', extensions: ['md', 'markdown'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
+    : await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown', extensions: ['md', 'markdown'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
   
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0]
@@ -530,9 +563,14 @@ ipcMain.handle('open-file-dialog', async () => {
 })
 
 ipcMain.handle('open-folder-dialog', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
-  })
+  const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
+  const result = win
+    ? await dialog.showOpenDialog(win, {
+        properties: ['openDirectory']
+      })
+    : await dialog.showOpenDialog({
+        properties: ['openDirectory']
+      })
   
   if (!result.canceled && result.filePaths.length > 0) {
     return result.filePaths[0]

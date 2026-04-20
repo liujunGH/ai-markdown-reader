@@ -66,6 +66,7 @@
 }
 
 .main {
+  flex: 1;
   overflow-y: auto;
   background: var(--bg-primary);
   position: relative;

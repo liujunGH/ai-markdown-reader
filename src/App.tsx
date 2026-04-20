@@ -383,6 +383,44 @@ function AppInner() {
   }, [showToast])
 
   useEffect(() => {
+    if (!window.electronAPI) return
+    const listener = async (folderPath: string) => {
+      try {
+        const result = await window.electronAPI!.readFolder(folderPath)
+        if (!result.success || !result.files || result.files.length === 0) {
+          if (!result.success) {
+            showToast(result.error || '读取文件夹失败', 'error')
+          }
+          return
+        }
+        const firstFile = result.files[0]
+        const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
+        if (fileResult.success && fileResult.content) {
+          handleFileOpenRef.current(fileResult.content, firstFile.name, firstFile.filePath)
+          setCurrentFolderName(basename(folderPath) || folderPath)
+          setElectronFolderPath(folderPath)
+          await window.electronAPI!.setLastFolder(folderPath)
+          setShowFileSidebar(true)
+          try {
+            const allFiles = await getAllMarkdownFiles(folderPath)
+            await indexFolder(folderPath, allFiles)
+          } catch (err) {
+            console.error('Failed to index folder:', err)
+          }
+        } else {
+          showToast(fileResult.error || '读取文件失败', 'error')
+        }
+      } catch {
+        showToast('打开文件夹失败', 'error')
+      }
+    }
+    window.electronAPI.onOpenFolder(listener)
+    return () => {
+      window.electronAPI!.offOpenFolder(listener)
+    }
+  }, [showToast])
+
+  useEffect(() => {
     if (showFocusMode) {
       document.body.classList.add('focus-mode')
     } else {

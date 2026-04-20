@@ -8,11 +8,16 @@ interface RecentFile {
 }
 
 const openFileCallbacks = new Set<(filePath: string) => void>()
+const openFolderCallbacks = new Set<(folderPath: string) => void>()
 const fileChangedCallbacks = new Set<(filePath: string) => void>()
 const systemThemeCallbacks = new Set<(theme: 'light' | 'dark') => void>()
 
 ipcRenderer.on('open-file', (_event, filePath: string) => {
   openFileCallbacks.forEach(cb => cb(filePath))
+})
+
+ipcRenderer.on('open-folder', (_event, folderPath: string) => {
+  openFolderCallbacks.forEach(cb => cb(folderPath))
 })
 
 ipcRenderer.on('file-changed', (_event, filePath: string) => {
@@ -35,6 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   offOpenFile: (callback: (filePath: string) => void) => {
     openFileCallbacks.delete(callback)
+  },
+  onOpenFolder: (callback: (folderPath: string) => void) => {
+    openFolderCallbacks.add(callback)
+  },
+  offOpenFolder: (callback: (folderPath: string) => void) => {
+    openFolderCallbacks.delete(callback)
   },
   onFileChanged: (callback: (filePath: string) => void) => {
     fileChangedCallbacks.add(callback)
