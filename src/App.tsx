@@ -35,6 +35,7 @@ import { useFileWatcher } from './hooks/useFileWatcher'
 import { useDragAndDrop } from './hooks/useDragAndDrop'
 import { useScrollHistory } from './hooks/useScrollHistory'
 import { useReadingStats } from './hooks/useReadingStats'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { basename, dirname, join } from './utils/path'
 import { RecentFile } from './types/electron'
 import { getStorageItem, setStorageItem, getSessionItem, setSessionItem } from './utils/storage'
@@ -408,7 +409,11 @@ function AppInner() {
           }
           return
         }
-        const firstFile = result.files[0]
+        const firstFile = result.files.find(f => !f.isDirectory)
+        if (!firstFile) {
+          showToast('该目录中没有 Markdown 文件', 'error')
+          return
+        }
         const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
         if (fileResult.success && fileResult.content) {
           handleFileOpenRef.current(fileResult.content, firstFile.name, firstFile.filePath)
@@ -448,158 +453,44 @@ function AppInner() {
     setHighlightedLine(undefined)
   }, [activeTabId, showSource])
 
-  // Use ref to avoid rebuilding keyboard listener on every state change
-  const keyboardRef = useRef({
-    activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode,
-    showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
-    showGlobalSearch, showReadingStats, showCustomStyle, fontSize, showSource,
+  useKeyboardShortcuts({
+    activeTabId,
+    tabs,
+    fontSize,
+    showSource,
     activeTabFilePath: activeTab?.filePath,
-    handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch,
-    toggleSplitView, updateFileSetting, scrollHistory
+    showSearch,
+    showKeyboardShortcuts,
+    showFocusMode,
+    showQuickSwitcher,
+    showExportPanel,
+    showCommandPalette,
+    showQuickJump,
+    showGlobalSearch,
+    showReadingStats,
+    showCustomStyle,
+    handleNewTab,
+    handleTabClose,
+    handleTabSelect,
+    handleCloseSearch,
+    toggleSplitView,
+    updateFileSetting: updateFileSetting as (key: string, value: unknown) => void,
+    scrollHistory,
+    setters: {
+      setShowSearch,
+      setShowGlobalSearch,
+      setShowExportPanel,
+      setShowQuickSwitcher,
+      setShowFocusMode,
+      setShowKeyboardShortcuts,
+      setShowQuickJump,
+      setShowCommandPalette,
+      setShowReadingStats,
+      setShowCustomStyle,
+      setFontSize,
+      setShowSource,
+    },
   })
-  keyboardRef.current = {
-    activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode,
-    showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
-    showGlobalSearch, showReadingStats, showCustomStyle, fontSize, showSource,
-    activeTabFilePath: activeTab?.filePath,
-    handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch,
-    toggleSplitView, updateFileSetting, scrollHistory
-  }
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const k = keyboardRef.current
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
-        e.preventDefault()
-        k.handleNewTab()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
-        e.preventDefault()
-        if (k.activeTabId) k.handleTabClose(k.activeTabId)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Tab') {
-        e.preventDefault()
-        const currentIndex = k.tabs.findIndex(t => t.id === k.activeTabId)
-        if (currentIndex !== -1) {
-          const nextIndex = e.shiftKey
-            ? (currentIndex - 1 + k.tabs.length) % k.tabs.length
-            : (currentIndex + 1) % k.tabs.length
-          k.handleTabSelect(k.tabs[nextIndex].id)
-        }
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault()
-        setShowSearch(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
-        e.preventDefault()
-        setShowGlobalSearch(prev => !prev)
-      }
-      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault()
-        const newSize = Math.min(k.fontSize + 2, 32)
-        setFontSize(newSize)
-        if (k.activeTabFilePath) k.updateFileSetting('fontSize', newSize)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
-        e.preventDefault()
-        const newSize = Math.max(k.fontSize - 2, 12)
-        setFontSize(newSize)
-        if (k.activeTabFilePath) k.updateFileSetting('fontSize', newSize)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        const next = !k.showSource
-        setShowSource(next)
-        if (k.activeTabFilePath) k.updateFileSetting('showSource', next)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
-        e.preventDefault()
-        setShowExportPanel(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
-        e.preventDefault()
-        k.toggleSplitView()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-        e.preventDefault()
-        window.print()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-        e.preventDefault()
-        setShowQuickSwitcher(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '.') {
-        e.preventDefault()
-        setShowFocusMode(prev => !prev)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-        e.preventDefault()
-        setShowKeyboardShortcuts(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
-        e.preventDefault()
-        setShowQuickJump(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
-        e.preventDefault()
-        setShowCommandPalette(true)
-      }
-      if (e.key === 'F1') {
-        e.preventDefault()
-        setShowKeyboardShortcuts(true)
-      }
-      if (e.key === 'F11') {
-        e.preventDefault()
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen()
-        } else {
-          document.exitFullscreen()
-        }
-      }
-      if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault()
-        const pos = k.scrollHistory.back()
-        if (pos !== null) {
-          const main = document.querySelector('main')
-          if (main) main.scrollTop = pos
-        }
-      }
-      if (e.altKey && e.key === 'ArrowRight') {
-        e.preventDefault()
-        const pos = k.scrollHistory.forward()
-        if (pos !== null) {
-          const main = document.querySelector('main')
-          if (main) main.scrollTop = pos
-        }
-      }
-      if (e.key === 'Escape') {
-        if (k.showCommandPalette) {
-          setShowCommandPalette(false)
-        } else if (k.showReadingStats) {
-          setShowReadingStats(false)
-        } else if (k.showCustomStyle) {
-          setShowCustomStyle(false)
-        } else if (k.showQuickJump) {
-          setShowQuickJump(false)
-        } else if (k.showGlobalSearch) {
-          setShowGlobalSearch(false)
-        } else if (k.showSearch) {
-          k.handleCloseSearch()
-        } else if (k.showKeyboardShortcuts) {
-          setShowKeyboardShortcuts(false)
-        } else if (k.showFocusMode) {
-          setShowFocusMode(false)
-        } else if (k.showQuickSwitcher) {
-          setShowQuickSwitcher(false)
-        } else if (k.showExportPanel) {
-          setShowExportPanel(false)
-        }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
   return (
     <>

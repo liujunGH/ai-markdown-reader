@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOptions, Tray, nativeImage, nativeTheme } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
 
@@ -70,7 +71,23 @@ function saveStore(data: StoreData): void {
   }
 }
 
-app.disableHardwareAcceleration()
+function isPathSafe(filePath: string): boolean {
+  if (!filePath || typeof filePath !== 'string') return false
+  // Reject paths with parent directory traversal
+  if (filePath.includes('..')) return false
+  // Resolve and ensure it's absolute
+  const resolved = path.resolve(filePath)
+  if (!path.isAbsolute(resolved)) return false
+  // Allow common safe base directories only
+  const homeDir = app.getPath('home')
+  const userDataDir = app.getPath('userData')
+  const tempDir = app.getPath('temp')
+  const desktopDir = app.getPath('desktop')
+  const documentsDir = app.getPath('documents')
+  const downloadsDir = app.getPath('downloads')
+  const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir, '/tmp']
+  return safeRoots.some(root => resolved.startsWith(root))
+}
 
 const windows = new Map<number, BrowserWindow>()
 const windowIds = new WeakMap<BrowserWindow, number>()
@@ -201,6 +218,11 @@ function createWindow(filePath?: string, windowState?: WindowState) {
 
   win.webContents.on('did-finish-load', () => {
     log('Page finished loading for window:', id)
+  })
+
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levelName = ['verbose', 'info', 'warning', 'error'][level] || String(level)
+    log(`[RENDERER ${levelName}] ${message} (${sourceId}:${line})`)
   })
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
@@ -466,10 +488,6 @@ app.whenReady().then(() => {
   createMenu()
 
   if (process.platform === 'darwin') {
-    const dockIconPath = path.join(__dirname, '../assets/icon.png')
-    if (fs.existsSync(dockIconPath)) {
-      app.dock.setIcon(dockIconPath)
-    }
     app.dock.setMenu(Menu.buildFromTemplate([
       { label: '打开文件', click: async () => {
         const win = getFocusedOrLastWindow()
@@ -491,14 +509,7 @@ app.whenReady().then(() => {
   }
 
   // System tray
-  const trayIconPath = path.join(__dirname, '../assets/icon.png')
-  let trayIcon: Electron.NativeImage
-  if (fs.existsSync(trayIconPath)) {
-    trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-  } else {
-    trayIcon = nativeImage.createEmpty()
-  }
-  tray = new Tray(trayIcon)
+  tray = new Tray(nativeImage.createEmpty())
   tray.setToolTip('AI Markdown Reader')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开文件', click: async () => {
@@ -524,6 +535,13 @@ app.whenReady().then(() => {
     { type: 'separator' },
     { label: '退出', click: () => { isQuiting = true; app.quit() } }
   ]))
+
+  // Auto-updater (only in packaged builds)
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      log('Auto-updater check failed:', err)
+    })
+  }
 
   tray.on('click', () => {
     const win = getFocusedOrLastWindow()
@@ -683,6 +701,9 @@ ipcMain.handle('open-folder-dialog', async () => {
 })
 
 ipcMain.handle('read-folder', async (_event, folderPath: string) => {
+  if (!isPathSafe(folderPath)) {
+    return { success: false, error: '非法路径' }
+  }
   try {
     const entries = fs.readdirSync(folderPath, { withFileTypes: true })
     const items = entries
@@ -712,6 +733,9 @@ ipcMain.handle('read-folder', async (_event, folderPath: string) => {
 })
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
   try {
     const stat = fs.statSync(filePath)
     if (stat.isDirectory()) {
@@ -725,6 +749,9 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
 })
 
 ipcMain.handle('get-file-info', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
   try {
     const stats = fs.statSync(filePath)
     return {
@@ -742,6 +769,7 @@ ipcMain.handle('get-file-info', async (_event, filePath: string) => {
 })
 
 ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) return
   shell.showItemInFolder(filePath)
 })
 
@@ -802,6 +830,9 @@ ipcMain.handle('set-max-recent-files', async (_event, max: number) => {
 })
 
 ipcMain.handle('watch-file', async (event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
   if (watchers.has(filePath)) {
     return { success: true, message: 'Already watching' }
   }
@@ -823,6 +854,7 @@ ipcMain.handle('watch-file', async (event, filePath: string) => {
 })
 
 ipcMain.handle('unwatch-file', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) return
   const watcher = watchers.get(filePath)
   if (watcher) {
     watcher.close()

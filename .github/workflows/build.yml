@@ -13,7 +13,10 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
 
@@ -26,15 +29,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Wine
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y wine32 wine64 xvfb
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1024x768x24 &
-          sleep 3
-
       - name: Install dependencies
         run: npm ci
 
@@ -43,33 +37,26 @@ jobs:
           npm run electron:compile
           npm run build
 
-      - name: Build Windows
-        run: npx electron-builder --win --config.asar=false --publish never
+      - name: Build & Publish
+        run: npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code signing (optional — uncomment and configure if you have an Apple Developer ID)
+          # CSC_LINK: ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS
-        if: false  # Skip macOS on Ubuntu
-        run: npx electron-builder --mac --config.asar=false
-
-      - name: Build Linux
-        if: false  # Skip Linux on Ubuntu
-        run: npx electron-builder --linux --config.asar=false
-
-      - name: Upload to Release
+      - name: Upload artifacts to Release
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          # Check if release exists, create if not, edit if it does
-          if gh release view ${{ github.ref_name }} >/dev/null 2>&1; then
-            echo "Release exists, updating..."
-            gh release edit ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
-          else
-            echo "Creating new release..."
-            gh release create ${{ github.ref_name }} --title "AI Markdown Reader ${{ github.ref_name }}" --notes "Windows portable build"
-          fi
           cd release
-          for f in *.exe; do
-            echo "Uploading $f..."
-            gh release upload ${{ github.ref_name }} "$f" --clobber
+          for f in *; do
+            if [ -f "$f" ]; then
+              echo "Uploading $f..."
+              gh release upload ${{ github.ref_name }} "$f" --clobber || true
+            fi
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

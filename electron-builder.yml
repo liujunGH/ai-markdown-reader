@@ -1,6 +1,9 @@
 appId: com.markdownreader.app
 productName: Markdown Reader
 copyright: Copyright © 2026 liujun
+# Icon: place a 1024x1024 PNG at build/icon.png (or .icns for mac, .ico for win)
+# electron-builder will auto-detect platform-specific formats from build/icon.*
+# If no icon is provided, the default Electron icon is used.
 
 directories:
   output: release
@@ -42,8 +45,13 @@ mac:
     - target: dmg
       arch:
         - x64
-  artifactName: ${productName}-${version}.${ext}
+        - arm64
+  artifactName: ${productName}-${version}-${arch}.${ext}
   category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 
 linux:
   target:
@@ -63,3 +71,8 @@ fileAssociations:
     description: Markdown Document
     mimeType: text/markdown
     role: Editor
+
+publish:
+  provider: github
+  owner: liujunGH
+  repo: ai-markdown-reader

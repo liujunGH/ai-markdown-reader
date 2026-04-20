@@ -11,7 +11,6 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-markdown': ['markdown-it', 'markdown-it-emoji', 'markdown-it-katex'],
-          'mermaid': ['mermaid'],
           'katex': ['katex'],
           'prism': ['prismjs'],
         }

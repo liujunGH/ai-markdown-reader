@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from 'react'
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback, useMemo } from 'react'
 import { parseMarkdown } from '../../utils/markdownParser'
 import { getStorageItem, setStorageItem } from '../../utils/storage'
 import styles from './MarkdownRenderer.module.css'
@@ -138,7 +138,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     getContainer: () => containerRef.current
   }))
 
-  const html = parseMarkdown(content)
+  const html = useMemo(() => parseMarkdown(content), [content])
 
   const renderMermaidDiagrams = useCallback(async () => {
     if (!containerRef.current) return
@@ -156,7 +156,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     mermaid.initialize({
       startOnLoad: false,
       theme,
-      securityLevel: 'loose',
+      securityLevel: 'strict',
     })
 
     mermaidEls.forEach(async (el) => {
@@ -188,7 +188,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     mermaid.initialize({
       startOnLoad: false,
       theme,
-      securityLevel: 'loose',
+      securityLevel: 'strict',
     })
 
     const wrappers = container.querySelectorAll('.mermaid-wrapper')

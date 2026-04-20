@@ -6,7 +6,7 @@ import { getStorageItem, setStorageItem } from '../utils/storage'
 interface StoredTab {
   id: string
   name: string
-  content: string
+  content?: string
   filePath?: string
   isPinned?: boolean
   size?: number
@@ -45,7 +45,7 @@ async function getInitialTabs(): Promise<{ tabs: Tab[]; activeTabId: string; fai
             failedRestores.push(storedTab.filePath)
             continue
           }
-        } else if (storedTab.content) {
+        } else if (storedTab.content !== undefined) {
           restoredTabs.push(createTab(
             storedTab.name,
             storedTab.content,
@@ -130,7 +130,7 @@ export function useTabs(): UseTabsReturn {
     const tabsToSave: StoredTab[] = tabs.map(t => ({
       id: t.id,
       name: t.name,
-      content: t.content,
+      content: t.filePath ? undefined : t.content,
       filePath: t.filePath,
       isPinned: t.isPinned,
       size: t.size,

@@ -5,39 +5,29 @@ import 'prismjs/components/prism-javascript'
 import 'prismjs/components/prism-typescript'
 import 'prismjs/components/prism-python'
 import 'prismjs/components/prism-java'
-import 'prismjs/components/prism-c'
-import 'prismjs/components/prism-cpp'
-import 'prismjs/components/prism-csharp'
-import 'prismjs/components/prism-go'
-import 'prismjs/components/prism-rust'
-import 'prismjs/components/prism-swift'
-import 'prismjs/components/prism-kotlin'
-import 'prismjs/components/prism-php'
-import 'prismjs/components/prism-ruby'
-import 'prismjs/components/prism-sql'
 import 'prismjs/components/prism-bash'
-import 'prismjs/components/prism-shell-session'
 import 'prismjs/components/prism-json'
-import 'prismjs/components/prism-yaml'
-import 'prismjs/components/prism-toml'
 import 'prismjs/components/prism-css'
-import 'prismjs/components/prism-scss'
-import 'prismjs/components/prism-less'
 import 'prismjs/components/prism-markup'
-import 'prismjs/components/prism-xml-doc'
 import 'prismjs/components/prism-markdown'
-import 'prismjs/components/prism-diff'
 import 'prismjs/components/prism-jsx'
 import 'prismjs/components/prism-tsx'
-import 'prismjs/components/prism-regex'
-import 'prismjs/components/prism-objectivec'
-import 'prismjs/components/prism-scala'
-import 'prismjs/components/prism-haskell'
-import 'prismjs/components/prism-lua'
-import 'prismjs/components/prism-perl'
-import 'prismjs/components/prism-r'
 import mk from 'markdown-it-katex'
 import { full } from 'markdown-it-emoji'
+
+const loadedLanguages = new Set<string>()
+loadedLanguages.add('markup') // prism-markup is base
+
+async function loadPrismLanguage(lang: string): Promise<void> {
+  if (loadedLanguages.has(lang)) return
+  if (!lang || Prism.languages[lang]) return
+  try {
+    await import(`prismjs/components/prism-${lang}`)
+    loadedLanguages.add(lang)
+  } catch {
+    // Language not available, fall back to plain text
+  }
+}
 
 function escapeHtml(str: string): string {
   return str
@@ -97,7 +87,7 @@ function highlightCode(str: string, lang: string): string {
 }
 
 const md: MarkdownIt = new MarkdownIt({
-  html: true,
+  html: false,
   linkify: true,
   typographer: true,
   highlight: highlightCode
@@ -106,8 +96,7 @@ const md: MarkdownIt = new MarkdownIt({
 md.use(mk)
 md.use(full)
 
-export function parseMarkdown(content: string): string {
-  let rawHtml = md.render(content)
+function postProcessHtml(rawHtml: string): string {
   // WikiLink: [[filename]] 或 [[display|filename]]
   rawHtml = rawHtml.replace(
     /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
@@ -127,21 +116,29 @@ export function parseMarkdown(content: string): string {
       'code', 'pre', 'blockquote',
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
       'sup', 'sub',
-      // Mermaid 和自定义容器
-      'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
-      'text', 'tspan', 'defs', 'marker', 'use', 'foreignObject',
     ],
     ALLOWED_ATTR: [
       'href', 'title', 'target', 'rel',
       'src', 'alt', 'width', 'height',
-      'class', 'id', 'style',
+      'class', 'id',
       'data-content', 'data-code', 'data-lines', 'data-code-hash',
-      'xmlns', 'viewBox', 'fill', 'stroke', 'stroke-width',
-      'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',
-      'points', 'transform', 'marker-end', 'marker-start',
-      'font-size', 'font-family', 'text-anchor', 'dominant-baseline',
     ],
   })
+}
+
+export function parseMarkdown(content: string): string {
+  let rawHtml = md.render(content)
+  return postProcessHtml(rawHtml)
+}
+
+export async function parseMarkdownAsync(content: string): Promise<string> {
+  const langMatches = content.match(/```([a-zA-Z0-9_-]+)/g)
+  if (langMatches) {
+    const langs = [...new Set(langMatches.map(m => m.slice(3)))]
+    await Promise.all(langs.map(loadPrismLanguage))
+  }
+  let rawHtml = md.render(content)
+  return postProcessHtml(rawHtml)
 }
 
 export { md }
