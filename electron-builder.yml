@@ -25,6 +25,11 @@ extraResources:
 extraMetadata:
   main: electron/main.js
 
+# Ad-hoc signing when no real Apple Developer ID certificate is available.
+# This allows the app to run on macOS with right-click > Open.
+# To enable proper code signing, add CSC_LINK / CSC_KEY_PASSWORD secrets to GitHub.
+afterSign: build/afterSign.js
+
 win:
   target:
     - target: nsis
@@ -48,10 +53,6 @@ mac:
         - arm64
   artifactName: ${productName}-${version}-${arch}.${ext}
   category: public.app-category.productivity
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
 
 linux:
   target:
