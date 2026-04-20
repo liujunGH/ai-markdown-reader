@@ -31,17 +31,40 @@ const DEFAULT_MAX_RECENT_FILES = 100
 const storePath = path.join(app.getPath('userData'), 'config.json')
 
 function loadStore(): StoreData {
-  try {
-    if (fs.existsSync(storePath)) {
-      return JSON.parse(fs.readFileSync(storePath, 'utf-8'))
+  // Try main file first, fallback to backup if corrupted
+  const paths = [storePath, `${storePath}.bak`]
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, 'utf-8'))
+        if (data && typeof data === 'object') {
+          return {
+            recentFiles: data.recentFiles || [],
+            lastFolder: data.lastFolder ?? null,
+            maxRecentFiles: data.maxRecentFiles || DEFAULT_MAX_RECENT_FILES,
+            windowStates: data.windowStates
+          }
+        }
+      }
+    } catch {
+      // Continue to next path
     }
-  } catch {}
+  }
   return { recentFiles: [], lastFolder: null, maxRecentFiles: DEFAULT_MAX_RECENT_FILES }
 }
 
 function saveStore(data: StoreData): void {
   try {
-    fs.writeFileSync(storePath, JSON.stringify(data, null, 2))
+    const dir = path.dirname(storePath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    const tmpPath = `${storePath}.tmp`
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2))
+    // Atomic rename on POSIX; best-effort on Windows
+    fs.renameSync(tmpPath, storePath)
+    // Also write backup
+    fs.writeFileSync(`${storePath}.bak`, JSON.stringify(data, null, 2))
   } catch (err) {
     console.error('Failed to save store:', err)
   }
@@ -56,7 +79,7 @@ let windowIdCounter = 0
 let lastFocusedWindowId = 0
 let tray: Tray | null = null
 let isQuiting = false
-let openFileFromEvent = false
+const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
 
@@ -71,7 +94,7 @@ function getWindowId(win: BrowserWindow): number {
 
 function getFocusedOrLastWindow(): BrowserWindow | undefined {
   for (const win of windows.values()) {
-    if (win.isFocused() && !win.isDestroyed()) {
+    if (!win.isDestroyed() && win.isFocused()) {
       return win
     }
   }
@@ -109,6 +132,11 @@ function saveWindowState() {
 function createWindow(filePath?: string, windowState?: WindowState) {
   log('Creating window...')
 
+  const preloadPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'electron', 'preload.js')
+    : path.join(__dirname, 'preload.js')
+  log('Preload path:', preloadPath, 'exists:', fs.existsSync(preloadPath))
+
   const win = new BrowserWindow({
     width: windowState?.width || 1200,
     height: windowState?.height || 800,
@@ -121,7 +149,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: preloadPath
     }
   })
 
@@ -151,7 +179,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
   })
 
   win.on('close', (event) => {
-    if (!isQuiting) {
+    if (!isQuiting && process.platform === 'darwin') {
       event.preventDefault()
       win.hide()
     }
@@ -185,13 +213,9 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     }
   })
 
-  if (filePath && !openFileFromEvent) {
+  if (filePath) {
     log('File to open via did-finish-load:', filePath)
     const loadHandler = () => {
-      if (openFileFromEvent) {
-        log('Skipping did-finish-load send, open-file event already handled')
-        return
-      }
       win.webContents.send('open-file', filePath)
     }
     win.webContents.once('did-finish-load', loadHandler)
@@ -236,12 +260,39 @@ function createMenu() {
         {
           label: '打开文件',
           accelerator: 'CmdOrCtrl+O',
-          click: () => getTargetWindow()?.webContents.send('menu-open-file')
+          click: async () => {
+            const win = getTargetWindow()
+            if (!win || win.isDestroyed()) return
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openFile'],
+              filters: [
+                { name: 'Markdown', extensions: ['md', 'markdown'] },
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            })
+            if (!result.canceled && result.filePaths.length > 0) {
+              const filePath = result.filePaths[0]
+              if (!win.isDestroyed()) {
+                win.webContents.send('open-file', filePath)
+              }
+            }
+          }
         },
         {
           label: '打开文件夹',
           accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => getTargetWindow()?.webContents.send('menu-open-folder')
+          click: async () => {
+            const win = getTargetWindow()
+            if (!win || win.isDestroyed()) return
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openDirectory']
+            })
+            if (!result.canceled && result.filePaths.length > 0) {
+              if (!win.isDestroyed()) {
+                win.webContents.send('open-folder', result.filePaths[0])
+              }
+            }
+          }
         },
         { type: 'separator' },
         {
@@ -300,13 +351,10 @@ function createMenu() {
         {
           label: '关于 AI Markdown Reader',
           click: () => {
-            dialog.showMessageBox({
-              type: 'info',
-              title: '关于 AI Markdown Reader',
-              message: 'AI Markdown Reader',
-              detail: `一款沉浸式的 Markdown 阅读器
+            const win = getTargetWindow()
+            const detail = `一款沉浸式的 Markdown 阅读器
 
-版本: 1.3.0
+版本: 1.3.1
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -327,7 +375,11 @@ function createMenu() {
 仓库地址: https://github.com/liujunGH/ai-markdown-reader
 
 作者: liujun`
-            })
+            if (win && !win.isDestroyed()) {
+              dialog.showMessageBox(win, { type: 'info', title: '关于 AI Markdown Reader', message: 'AI Markdown Reader', detail })
+            } else {
+              dialog.showMessageBox({ type: 'info', title: '关于 AI Markdown Reader', message: 'AI Markdown Reader', detail })
+            }
           }
         }
       ]
@@ -390,7 +442,7 @@ if (!gotTheLock) {
     }
     
     const win = getFocusedOrLastWindow()
-    if (win) {
+    if (win && !win.isDestroyed()) {
       if (win.isMinimized()) win.restore()
       win.show()
       win.focus()
@@ -408,7 +460,22 @@ app.whenReady().then(() => {
       app.dock.setIcon(dockIconPath)
     }
     app.dock.setMenu(Menu.buildFromTemplate([
-      { label: '打开文件', click: () => getFocusedOrLastWindow()?.webContents.send('menu-open-file') }
+      { label: '打开文件', click: async () => {
+        const win = getFocusedOrLastWindow()
+        if (!win || win.isDestroyed()) return
+        const result = await dialog.showOpenDialog(win, {
+          properties: ['openFile'],
+          filters: [
+            { name: 'Markdown', extensions: ['md', 'markdown'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        })
+        if (!result.canceled && result.filePaths.length > 0) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('open-file', result.filePaths[0])
+          }
+        }
+      } }
     ]))
   }
 
@@ -423,7 +490,22 @@ app.whenReady().then(() => {
   tray = new Tray(trayIcon)
   tray.setToolTip('AI Markdown Reader')
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开文件', click: () => getFocusedOrLastWindow()?.webContents.send('menu-open-file') },
+    { label: '打开文件', click: async () => {
+      const win = getFocusedOrLastWindow()
+      if (!win || win.isDestroyed()) return
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown', extensions: ['md', 'markdown'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
+      if (!result.canceled && result.filePaths.length > 0) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('open-file', result.filePaths[0])
+        }
+      }
+    } },
     { label: '显示窗口', click: () => { 
       const win = getFocusedOrLastWindow()
       win?.show(); win?.focus() 
@@ -457,8 +539,11 @@ app.whenReady().then(() => {
   app.on('open-file', (event, filePath) => {
     log('open-file event:', filePath)
     event.preventDefault()
-    openFileFromEvent = true
-    handleFileOpen(filePath)
+    if (app.isReady()) {
+      handleFileOpen(filePath)
+    } else {
+      filesToOpenBeforeReady.push(filePath)
+    }
   })
 
   const filePath = process.argv.find(arg => 
@@ -468,6 +553,9 @@ app.whenReady().then(() => {
   log('Full argv:', process.argv)
 
   const store = loadStore()
+  for (const pathToOpen of filesToOpenBeforeReady) {
+    handleFileOpen(pathToOpen)
+  }
   if (filePath) {
     handleFileOpen(filePath)
   } else if (store.windowStates && store.windowStates.length > 0) {
@@ -513,31 +601,60 @@ process.on('unhandledRejection', (reason: unknown) => {
 })
 
 ipcMain.handle('open-file-dialog', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: 'Markdown', extensions: ['md', 'markdown'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  })
-  
-  if (!result.canceled && result.filePaths.length > 0) {
-    const filePath = result.filePaths[0]
-    const content = fs.readFileSync(filePath, 'utf-8')
-    return { filePath, content }
+  try {
+    const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
+    log('open-file-dialog: focusedWindow=', BrowserWindow.getFocusedWindow()?.id, 'fallback=', win?.id)
+    const options: Electron.OpenDialogOptions = {
+      properties: ['openFile'],
+      defaultPath: app.getPath('home'),
+      filters: [
+        { name: 'Markdown', extensions: ['md', 'markdown'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    log('open-file-dialog result:', result.canceled, result.filePaths)
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      const filePath = result.filePaths[0]
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8')
+        return { filePath, content }
+      } catch (readErr) {
+        log('Failed to read file:', filePath, readErr)
+        return null
+      }
+    }
+    return null
+  } catch (err) {
+    log('open-file-dialog error:', err)
+    throw err
   }
-  return null
 })
 
 ipcMain.handle('open-folder-dialog', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
-  })
-  
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0]
+  try {
+    const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
+    log('open-folder-dialog: focusedWindow=', BrowserWindow.getFocusedWindow()?.id, 'fallback=', win?.id)
+    const options: Electron.OpenDialogOptions = {
+      properties: ['openDirectory'],
+      defaultPath: app.getPath('home')
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options)
+    log('open-folder-dialog result:', result.canceled, result.filePaths)
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return null
+  } catch (err) {
+    log('open-folder-dialog error:', err)
+    throw err
   }
-  return null
 })
 
 ipcMain.handle('read-folder', async (_event, folderPath: string) => {
@@ -659,10 +776,14 @@ ipcMain.handle('watch-file', async (event, filePath: string) => {
   if (watchers.has(filePath)) {
     return { success: true, message: 'Already watching' }
   }
+  const sender = event.sender
   try {
     const watcher = fs.watch(filePath, (eventType) => {
-      if (eventType === 'change') {
-        event.sender.send('file-changed', filePath)
+      if (eventType === 'change' || eventType === 'rename') {
+        const win = BrowserWindow.fromWebContents(sender)
+        if (win && !win.isDestroyed()) {
+          sender.send('file-changed', filePath)
+        }
       }
     })
     watchers.set(filePath, watcher)

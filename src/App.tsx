@@ -85,6 +85,7 @@ function AppInner() {
   })
   const scrollHistory = useScrollHistory()
   const [toasts, setToasts] = useState<Toast[]>([])
+  const toastTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const [isSplitView, setIsSplitView] = useState(false)
   const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null)
   const [showExportPanel, setShowExportPanel] = useState(false)
@@ -150,9 +151,18 @@ function AppInner() {
   const showToast = useCallback((message: string, type: 'error' | 'success' = 'error') => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
+      toastTimeoutsRef.current.delete(timeout)
     }, 3000)
+    toastTimeoutsRef.current.add(timeout)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      toastTimeoutsRef.current.forEach(timeout => clearTimeout(timeout))
+      toastTimeoutsRef.current.clear()
+    }
   }, [])
 
   // Watch files when tabs change
@@ -225,8 +235,9 @@ function AppInner() {
       } else {
         showToast(fileResult.error || '读取文件失败', 'error')
       }
-    } catch {
-      showToast('打开文件夹失败', 'error')
+    } catch (err) {
+      console.error('[handleOpenFolder] error:', err)
+      showToast('打开文件夹失败: ' + String(err), 'error')
     }
   }
 
@@ -383,6 +394,44 @@ function AppInner() {
   }, [showToast])
 
   useEffect(() => {
+    if (!window.electronAPI) return
+    const listener = async (folderPath: string) => {
+      try {
+        const result = await window.electronAPI!.readFolder(folderPath)
+        if (!result.success || !result.files || result.files.length === 0) {
+          if (!result.success) {
+            showToast(result.error || '读取文件夹失败', 'error')
+          }
+          return
+        }
+        const firstFile = result.files[0]
+        const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
+        if (fileResult.success && fileResult.content) {
+          handleFileOpenRef.current(fileResult.content, firstFile.name, firstFile.filePath)
+          setCurrentFolderName(basename(folderPath) || folderPath)
+          setElectronFolderPath(folderPath)
+          await window.electronAPI!.setLastFolder(folderPath)
+          setShowFileSidebar(true)
+          try {
+            const allFiles = await getAllMarkdownFiles(folderPath)
+            await indexFolder(folderPath, allFiles)
+          } catch (err) {
+            console.error('Failed to index folder:', err)
+          }
+        } else {
+          showToast(fileResult.error || '读取文件失败', 'error')
+        }
+      } catch {
+        showToast('打开文件夹失败', 'error')
+      }
+    }
+    window.electronAPI.onOpenFolder(listener)
+    return () => {
+      window.electronAPI!.offOpenFolder(listener)
+    }
+  }, [showToast])
+
+  useEffect(() => {
     if (showFocusMode) {
       document.body.classList.add('focus-mode')
     } else {
@@ -395,24 +444,43 @@ function AppInner() {
     setHighlightedLine(undefined)
   }, [activeTabId, showSource])
 
+  // Use ref to avoid rebuilding keyboard listener on every state change
+  const keyboardRef = useRef({
+    activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode,
+    showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
+    showGlobalSearch, showReadingStats, showCustomStyle, fontSize, showSource,
+    activeTabFilePath: activeTab?.filePath,
+    handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch,
+    toggleSplitView, updateFileSetting, scrollHistory
+  })
+  keyboardRef.current = {
+    activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode,
+    showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
+    showGlobalSearch, showReadingStats, showCustomStyle, fontSize, showSource,
+    activeTabFilePath: activeTab?.filePath,
+    handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch,
+    toggleSplitView, updateFileSetting, scrollHistory
+  }
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const k = keyboardRef.current
       if ((e.metaKey || e.ctrlKey) && e.key === 't') {
         e.preventDefault()
-        handleNewTab()
+        k.handleNewTab()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault()
-        if (activeTabId) handleTabClose(activeTabId)
+        if (k.activeTabId) k.handleTabClose(k.activeTabId)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Tab') {
         e.preventDefault()
-        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+        const currentIndex = k.tabs.findIndex(t => t.id === k.activeTabId)
         if (currentIndex !== -1) {
           const nextIndex = e.shiftKey
-            ? (currentIndex - 1 + tabs.length) % tabs.length
-            : (currentIndex + 1) % tabs.length
-          handleTabSelect(tabs[nextIndex].id)
+            ? (currentIndex - 1 + k.tabs.length) % k.tabs.length
+            : (currentIndex + 1) % k.tabs.length
+          k.handleTabSelect(k.tabs[nextIndex].id)
         }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -425,21 +493,21 @@ function AppInner() {
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
-        const newSize = Math.min(fontSize + 2, 32)
+        const newSize = Math.min(k.fontSize + 2, 32)
         setFontSize(newSize)
-        if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
+        if (k.activeTabFilePath) k.updateFileSetting('fontSize', newSize)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '-') {
         e.preventDefault()
-        const newSize = Math.max(fontSize - 2, 12)
+        const newSize = Math.max(k.fontSize - 2, 12)
         setFontSize(newSize)
-        if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
+        if (k.activeTabFilePath) k.updateFileSetting('fontSize', newSize)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
-        const next = !showSource
+        const next = !k.showSource
         setShowSource(next)
-        if (activeTab?.filePath) updateFileSetting('showSource', next)
+        if (k.activeTabFilePath) k.updateFileSetting('showSource', next)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault()
@@ -447,7 +515,7 @@ function AppInner() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault()
-        toggleSplitView()
+        k.toggleSplitView()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault()
@@ -487,7 +555,7 @@ function AppInner() {
       }
       if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault()
-        const pos = scrollHistory.back()
+        const pos = k.scrollHistory.back()
         if (pos !== null) {
           const main = document.querySelector('main')
           if (main) main.scrollTop = pos
@@ -495,39 +563,39 @@ function AppInner() {
       }
       if (e.altKey && e.key === 'ArrowRight') {
         e.preventDefault()
-        const pos = scrollHistory.forward()
+        const pos = k.scrollHistory.forward()
         if (pos !== null) {
           const main = document.querySelector('main')
           if (main) main.scrollTop = pos
         }
       }
       if (e.key === 'Escape') {
-        if (showCommandPalette) {
+        if (k.showCommandPalette) {
           setShowCommandPalette(false)
-        } else if (showReadingStats) {
+        } else if (k.showReadingStats) {
           setShowReadingStats(false)
-        } else if (showCustomStyle) {
+        } else if (k.showCustomStyle) {
           setShowCustomStyle(false)
-        } else if (showQuickJump) {
+        } else if (k.showQuickJump) {
           setShowQuickJump(false)
-        } else if (showGlobalSearch) {
+        } else if (k.showGlobalSearch) {
           setShowGlobalSearch(false)
-        } else if (showSearch) {
-          handleCloseSearch()
-        } else if (showKeyboardShortcuts) {
+        } else if (k.showSearch) {
+          k.handleCloseSearch()
+        } else if (k.showKeyboardShortcuts) {
           setShowKeyboardShortcuts(false)
-        } else if (showFocusMode) {
+        } else if (k.showFocusMode) {
           setShowFocusMode(false)
-        } else if (showQuickSwitcher) {
+        } else if (k.showQuickSwitcher) {
           setShowQuickSwitcher(false)
-        } else if (showExportPanel) {
+        } else if (k.showExportPanel) {
           setShowExportPanel(false)
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTabId, tabs, showSearch, showKeyboardShortcuts, showFocusMode, showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump, showGlobalSearch, showReadingStats, showCustomStyle, fontSize, showSource, handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch, toggleSplitView, activeTab?.filePath, updateFileSetting, scrollHistory])
+  }, [])
 
   return (
     <>

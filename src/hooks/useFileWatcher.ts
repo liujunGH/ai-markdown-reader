@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Tab } from '../types/Tab'
 import { basename } from '../utils/path'
 
@@ -14,13 +14,25 @@ export function useFileWatcher(
 ): UseFileWatcherReturn {
   const [changedFilePath, setChangedFilePath] = useState<string | null>(null)
 
+  const prevTabsRef = useRef<Tab[]>([])
+
   const watchFiles = useCallback((tabs: Tab[]) => {
     if (!window.electronAPI) return
+    const prevPaths = new Set(prevTabsRef.current.map(t => t.filePath).filter((fp): fp is string => !!fp))
+    const currentPaths = new Set(tabs.map(t => t.filePath).filter((fp): fp is string => !!fp))
+    // Unwatch files that are no longer open
+    prevPaths.forEach(filePath => {
+      if (!currentPaths.has(filePath)) {
+        window.electronAPI!.unwatchFile(filePath)
+      }
+    })
+    // Watch new files
     tabs.forEach(tab => {
-      if (tab.filePath) {
+      if (tab.filePath && !prevPaths.has(tab.filePath)) {
         window.electronAPI!.watchFile(tab.filePath)
       }
     })
+    prevTabsRef.current = tabs
   }, [])
 
   const handleReloadChangedFile = useCallback(async () => {

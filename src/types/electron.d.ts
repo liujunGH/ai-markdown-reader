@@ -39,6 +39,8 @@ export interface ElectronAPI {
   showInFolder: (filePath: string) => Promise<void>
   onOpenFile: (callback: (filePath: string) => void) => void
   offOpenFile: (callback: (filePath: string) => void) => void
+  onOpenFolder: (callback: (folderPath: string) => void) => void
+  offOpenFolder: (callback: (folderPath: string) => void) => void
   onFileChanged: (callback: (filePath: string) => void) => void
   offFileChanged: (callback: (filePath: string) => void) => void
   watchFile: (filePath: string) => Promise<{ success: boolean; error?: string }>

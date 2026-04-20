@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 
 export interface UseScrollHistoryReturn {
   push: (position: number) => void
@@ -42,12 +42,12 @@ export function useScrollHistory(maxSize = 50): UseScrollHistoryReturn {
     setCurrentIndex(-1)
   }, [])
 
-  return {
+  return useMemo(() => ({
     push,
     back,
     forward,
     canGoBack: currentIndex > 0,
     canGoForward: currentIndex < history.length - 1,
     clear
-  }
+  }), [push, back, forward, clear, currentIndex, history.length])
 }

@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import path from 'path'
 
 interface RecentFile {
   name: string
@@ -7,12 +6,45 @@ interface RecentFile {
   openedAt: number
 }
 
+// Simple path utilities (avoid importing 'path' which fails in sandbox preload)
+function pathBasename(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/')
+  const lastSlash = normalized.lastIndexOf('/')
+  return lastSlash === -1 ? normalized : normalized.slice(lastSlash + 1) || normalized
+}
+
+function pathDirname(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/')
+  const lastSlash = normalized.lastIndexOf('/')
+  if (lastSlash === -1) return '.'
+  const dir = normalized.slice(0, lastSlash)
+  return dir || '/'
+}
+
+function pathJoin(...paths: string[]): string {
+  let result = ''
+  for (const p of paths) {
+    if (!p) continue
+    if (result) {
+      result = result.replace(/\/$/, '') + '/' + p.replace(/^\//, '')
+    } else {
+      result = p
+    }
+  }
+  return result.replace(/\/+/g, '/')
+}
+
 const openFileCallbacks = new Set<(filePath: string) => void>()
+const openFolderCallbacks = new Set<(folderPath: string) => void>()
 const fileChangedCallbacks = new Set<(filePath: string) => void>()
 const systemThemeCallbacks = new Set<(theme: 'light' | 'dark') => void>()
 
 ipcRenderer.on('open-file', (_event, filePath: string) => {
   openFileCallbacks.forEach(cb => cb(filePath))
+})
+
+ipcRenderer.on('open-folder', (_event, folderPath: string) => {
+  openFolderCallbacks.forEach(cb => cb(folderPath))
 })
 
 ipcRenderer.on('file-changed', (_event, filePath: string) => {
@@ -36,6 +68,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offOpenFile: (callback: (filePath: string) => void) => {
     openFileCallbacks.delete(callback)
   },
+  onOpenFolder: (callback: (folderPath: string) => void) => {
+    openFolderCallbacks.add(callback)
+  },
+  offOpenFolder: (callback: (folderPath: string) => void) => {
+    openFolderCallbacks.delete(callback)
+  },
   onFileChanged: (callback: (filePath: string) => void) => {
     fileChangedCallbacks.add(callback)
   },
@@ -52,9 +90,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setLastFolder: (folderPath: string) => ipcRenderer.invoke('set-last-folder', folderPath),
   getMaxRecentFiles: (): Promise<number> => ipcRenderer.invoke('get-max-recent-files'),
   setMaxRecentFiles: (max: number) => ipcRenderer.invoke('set-max-recent-files', max),
-  pathBasename: (filePath: string) => path.basename(filePath),
-  pathDirname: (filePath: string) => path.dirname(filePath),
-  pathJoin: (...paths: string[]) => path.join(...paths),
+  pathBasename,
+  pathDirname,
+  pathJoin,
   setProgressBar: (progress: number) => ipcRenderer.invoke('set-progress-bar', progress),
   clearProgressBar: () => ipcRenderer.invoke('clear-progress-bar'),
   setTitle: (title: string) => ipcRenderer.invoke('set-title', title),

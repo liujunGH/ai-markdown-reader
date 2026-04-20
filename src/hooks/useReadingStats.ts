@@ -54,7 +54,7 @@ export function useReadingStats(activeFilePath?: string) {
   const [currentSessionTime, setCurrentSessionTime] = useState(0)
   const [isActive, setIsActive] = useState(false)
   const statsRef = useRef<ReadingStats>(loadStats())
-  const sessionAccumulatedRef = useRef(0)
+  const sessionAccumulatedMsRef = useRef(0)
   const prevPathRef = useRef<string | undefined>(undefined)
 
   // Initialize active state based on current visibility and focus
@@ -84,7 +84,7 @@ export function useReadingStats(activeFilePath?: string) {
     saveStats(stats)
 
     // Reset session for new file
-    sessionAccumulatedRef.current = 0
+    sessionAccumulatedMsRef.current = 0
     setCurrentSessionTime(0)
     prevPathRef.current = activeFilePath
   }, [activeFilePath])
@@ -98,13 +98,13 @@ export function useReadingStats(activeFilePath?: string) {
 
     const interval = setInterval(() => {
       const now = Date.now()
-      const elapsed =
-        Math.floor((now - startTime) / 1000) + sessionAccumulatedRef.current
-      setCurrentSessionTime(elapsed)
+      const elapsedMs = (now - startTime) + sessionAccumulatedMsRef.current
+      setCurrentSessionTime(Math.floor(elapsedMs / 1000))
 
       // Save accumulated stats every 5 seconds
       if (now - lastSaveTime >= 5000) {
-        const secondsToAdd = Math.round((now - lastSaveTime) / 1000)
+        const msToAdd = now - lastSaveTime
+        const secondsToAdd = Math.round(msToAdd / 1000)
         const stats = statsRef.current
         const file = stats.files[activeFilePath]
         if (file) {
@@ -129,15 +129,15 @@ export function useReadingStats(activeFilePath?: string) {
     return () => {
       clearInterval(interval)
       const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
-      if (elapsed > 0) {
-        sessionAccumulatedRef.current += elapsed
+      const elapsedMs = now - startTime
+      if (elapsedMs > 0) {
+        sessionAccumulatedMsRef.current += elapsedMs
 
         // Final save of remaining time
         const stats = statsRef.current
         const file = stats.files[activeFilePath]
         if (file) {
-          file.totalTime += elapsed
+          file.totalTime += Math.round(elapsedMs / 1000)
           file.lastReadAt = now
         }
 
@@ -145,7 +145,7 @@ export function useReadingStats(activeFilePath?: string) {
         if (!stats.daily[today]) {
           stats.daily[today] = { date: today, totalTime: 0, filesRead: [] }
         }
-        stats.daily[today].totalTime += elapsed
+        stats.daily[today].totalTime += Math.round(elapsedMs / 1000)
         if (!stats.daily[today].filesRead.includes(activeFilePath)) {
           stats.daily[today].filesRead.push(activeFilePath)
         }

@@ -9,9 +9,14 @@ export function FileOpener({ onFileOpen }: Props) {
   const handleClick = async () => {
     if (!window.electronAPI) return
     
-    const result = await window.electronAPI.openFileDialog()
-    if (result) {
-      onFileOpen(result.content, basename(result.filePath) || '未命名.md', result.filePath)
+    try {
+      const result = await window.electronAPI.openFileDialog()
+      if (result) {
+        onFileOpen(result.content, basename(result.filePath) || '未命名.md', result.filePath)
+      }
+    } catch (err) {
+      console.error('[FileOpener] openFileDialog failed:', err)
+      alert('打开文件对话框失败: ' + String(err))
     }
   }
 

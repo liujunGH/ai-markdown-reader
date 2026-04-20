@@ -15,6 +15,10 @@ files:
   - electron/preload.js
   - package.json
 
+extraResources:
+  - from: electron/preload.js
+    to: electron/preload.js
+
 extraMetadata:
   main: electron/main.js
 

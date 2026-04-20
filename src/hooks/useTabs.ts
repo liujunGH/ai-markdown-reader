@@ -113,12 +113,15 @@ export function useTabs(): UseTabsReturn {
 
   // 会话恢复
   useEffect(() => {
+    let isMounted = true
     getInitialTabs().then(({ tabs: restoredTabs, activeTabId: restoredActiveTabId, failedRestores: failed }) => {
+      if (!isMounted) return
       setTabs(restoredTabs)
       setActiveTabId(restoredActiveTabId)
       setFailedRestores(failed)
       setIsRestoringSession(false)
     })
+    return () => { isMounted = false }
   }, [])
 
   // 保存标签页会话
@@ -168,11 +171,12 @@ export function useTabs(): UseTabsReturn {
 
     // 恢复新标签的滚动位置
     const newTab = tabs.find(t => t.id === activeTabId)
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
     if (newTab && main) {
       const scrollKey = `scroll-position-${newTab.filePath || activeTabId}` as const
       const saved = getStorageItem(scrollKey)
       if (saved != null) {
-        setTimeout(() => {
+        scrollTimeout = setTimeout(() => {
           if (main) main.scrollTop = parseInt(saved, 10)
         }, 100)
       } else {
@@ -181,6 +185,9 @@ export function useTabs(): UseTabsReturn {
     }
 
     prevActiveTabIdRef.current = activeTabId
+    return () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout)
+    }
   }, [activeTabId, tabs, isRestoringSession])
 
   // 自动添加到最近文件
@@ -194,68 +201,81 @@ export function useTabs(): UseTabsReturn {
   }, [activeTab])
 
   const handleNewTab = useCallback(() => {
-    if (tabs.length >= maxTabs) return
-    const welcomeTab = getWelcomeTab()
-    setTabs(prev => [...prev, welcomeTab])
-    setActiveTabId(welcomeTab.id)
-  }, [tabs.length, maxTabs])
+    setTabs(prev => {
+      if (prev.length >= maxTabs) return prev
+      const welcomeTab = getWelcomeTab()
+      return [...prev, welcomeTab]
+    })
+    setActiveTabId(() => {
+      const welcomeTab = getWelcomeTab()
+      return welcomeTab.id
+    })
+  }, [maxTabs])
 
   const handleTabSelect = useCallback((tabId: string) => {
     setActiveTabId(tabId)
   }, [])
 
   const handleTabClose = useCallback((tabId: string) => {
-    const tabIndex = tabs.findIndex(t => t.id === tabId)
-    if (tabIndex === -1) return
+    setTabs(prevTabs => {
+      const tabIndex = prevTabs.findIndex(t => t.id === tabId)
+      if (tabIndex === -1) return prevTabs
 
-    const tabToClose = tabs[tabIndex]
-    if (tabToClose) {
-      setClosedTabs(prev => [tabToClose, ...prev].slice(0, MAX_CLOSED_TABS))
-    }
-
-    const newTabs = tabs.filter(t => t.id !== tabId)
-    if (newTabs.length === 0) {
-      const welcomeTab = getWelcomeTab()
-      setTabs([welcomeTab])
-      setActiveTabId(welcomeTab.id)
-    } else {
-      setTabs(newTabs)
-      if (activeTabId === tabId) {
-        const newIndex = Math.min(tabIndex, newTabs.length - 1)
-        setActiveTabId(newTabs[newIndex].id)
+      const tabToClose = prevTabs[tabIndex]
+      if (tabToClose) {
+        setClosedTabs(prev => [tabToClose, ...prev].slice(0, MAX_CLOSED_TABS))
       }
-    }
-  }, [tabs, activeTabId])
+
+      const newTabs = prevTabs.filter(t => t.id !== tabId)
+      if (newTabs.length === 0) {
+        const welcomeTab = getWelcomeTab()
+        setActiveTabId(welcomeTab.id)
+        return [welcomeTab]
+      } else {
+        setActiveTabId(prevActive => {
+          if (prevActive === tabId) {
+            const newIndex = Math.min(tabIndex, newTabs.length - 1)
+            return newTabs[newIndex].id
+          }
+          return prevActive
+        })
+        return newTabs
+      }
+    })
+  }, [])
 
   const handleTabCloseOthers = useCallback((tabId: string) => {
-    const tab = tabs.find(t => t.id === tabId)
-    if (!tab) return
-    const tabsToClose = tabs.filter(t => t.id !== tabId)
-    setClosedTabs(prev => [...tabsToClose, ...prev].slice(0, MAX_CLOSED_TABS))
-    setTabs([tab])
-    setActiveTabId(tabId)
-  }, [tabs])
+    setTabs(prev => {
+      const tab = prev.find(t => t.id === tabId)
+      if (!tab) return prev
+      const tabsToClose = prev.filter(t => t.id !== tabId)
+      setClosedTabs(prevClosed => [...tabsToClose, ...prevClosed].slice(0, MAX_CLOSED_TABS))
+      setActiveTabId(tabId)
+      return [tab]
+    })
+  }, [])
 
   const handleTabCloseAll = useCallback(() => {
-    const tabsToClose = tabs.filter(t => t.name !== '欢迎使用.md')
-    setClosedTabs(prev => [...tabsToClose, ...prev].slice(0, MAX_CLOSED_TABS))
-    const welcomeTab = getWelcomeTab()
-    setTabs([welcomeTab])
-    setActiveTabId(welcomeTab.id)
-  }, [tabs])
+    setTabs(prev => {
+      const tabsToClose = prev.filter(t => t.name !== '欢迎使用.md')
+      setClosedTabs(prevClosed => [...tabsToClose, ...prevClosed].slice(0, MAX_CLOSED_TABS))
+      const welcomeTab = getWelcomeTab()
+      setActiveTabId(welcomeTab.id)
+      return [welcomeTab]
+    })
+  }, [])
 
   const handleTabReorder = useCallback((fromIndex: number, toIndex: number) => {
-    const newTabs = [...tabs]
-    const [movedTab] = newTabs.splice(fromIndex, 1)
-    newTabs.splice(toIndex, 0, movedTab)
-    // Ensure pinned tabs stay at the front
-    const pinned = newTabs.filter(t => t.isPinned)
-    const unpinned = newTabs.filter(t => !t.isPinned)
-    setTabs([...pinned, ...unpinned])
-    if (activeTabId === movedTab.id) {
-      setActiveTabId(movedTab.id)
-    }
-  }, [tabs, activeTabId])
+    setTabs(prev => {
+      const newTabs = [...prev]
+      const [movedTab] = newTabs.splice(fromIndex, 1)
+      newTabs.splice(toIndex, 0, movedTab)
+      // Ensure pinned tabs stay at the front
+      const pinned = newTabs.filter(t => t.isPinned)
+      const unpinned = newTabs.filter(t => !t.isPinned)
+      return [...pinned, ...unpinned]
+    })
+  }, [])
 
   const handleTabPin = useCallback((tabId: string) => {
     setTabs(prev => {
@@ -290,91 +310,99 @@ export function useTabs(): UseTabsReturn {
       if (prev.length === 0) return prev
       const [tabToRestore, ...rest] = prev
 
-      // 检查是否已存在同名同路径的标签
-      const exists = tabs.find(t =>
-        t.name === tabToRestore.name && t.filePath === tabToRestore.filePath
+      setTabs(prevTabs => {
+        // 检查是否已存在同名同路径的标签
+        const exists = prevTabs.find(t =>
+          t.name === tabToRestore.name && t.filePath === tabToRestore.filePath
+        )
+        if (exists) {
+          setActiveTabId(exists.id)
+          return prevTabs
+        }
+
+        // 如果标签数已达上限，先移除最旧的非固定标签
+        let newTabs = [...prevTabs]
+        while (newTabs.length >= maxTabs) {
+          const oldestNonActive = newTabs.find(t => t.id !== activeTabId && !t.isPinned)
+          if (oldestNonActive) {
+            newTabs = newTabs.filter(t => t.id !== oldestNonActive.id)
+          } else {
+            break
+          }
+        }
+
+        newTabs.push(tabToRestore)
+        setActiveTabId(tabToRestore.id)
+        return newTabs
+      })
+
+      return rest
+    })
+  }, [maxTabs])
+
+  const handleFileOpen = useCallback((fileContent: string, name: string, filePath: string = '', size?: number, lastModified?: number) => {
+    setTabs(prevTabs => {
+      const existingTab = prevTabs.find(t =>
+        t.name === name &&
+        !t.isModified &&
+        (!filePath || t.filePath === filePath)
       )
-      if (exists) {
-        setActiveTabId(exists.id)
-        return rest
+      if (existingTab) {
+        setActiveTabId(existingTab.id)
+        return prevTabs
       }
 
-      // 如果标签数已达上限，先移除最旧的非固定标签
-      let newTabs = [...tabs]
-      while (newTabs.length >= maxTabs) {
-        const oldestNonActive = newTabs.find(t => t.id !== activeTabId && !t.isPinned)
+      let tabsToAdd = [...prevTabs]
+      while (tabsToAdd.length >= maxTabs) {
+        const oldestNonActive = tabsToAdd.find(t => t.id !== activeTabId && !t.isPinned)
         if (oldestNonActive) {
-          newTabs = newTabs.filter(t => t.id !== oldestNonActive.id)
+          tabsToAdd = tabsToAdd.filter(t => t.id !== oldestNonActive.id)
         } else {
           break
         }
       }
 
-      newTabs.push(tabToRestore)
-      setTabs(newTabs)
-      setActiveTabId(tabToRestore.id)
+      const newTab = createTab(name, fileContent, filePath, undefined, size, lastModified)
+      tabsToAdd.push(newTab)
+      setActiveTabId(newTab.id)
 
-      return rest
-    })
-  }, [tabs, activeTabId, maxTabs])
-
-  const handleFileOpen = useCallback((fileContent: string, name: string, filePath: string = '', size?: number, lastModified?: number) => {
-    const existingTab = tabs.find(t =>
-      t.name === name &&
-      !t.isModified &&
-      (!filePath || t.filePath === filePath)
-    )
-    if (existingTab) {
-      setActiveTabId(existingTab.id)
-      return
-    }
-
-    let tabsToAdd = [...tabs]
-    while (tabsToAdd.length >= maxTabs) {
-      const oldestNonActive = tabsToAdd.find(t => t.id !== activeTabId && !t.isPinned)
-      if (oldestNonActive) {
-        tabsToAdd = tabsToAdd.filter(t => t.id !== oldestNonActive.id)
-      } else {
-        break
+      if (window.electronAPI && filePath) {
+        window.electronAPI.addRecentFile({ name, filePath })
       }
-    }
 
-    const newTab = createTab(name, fileContent, filePath, undefined, size, lastModified)
-    tabsToAdd.push(newTab)
-    setTabs(tabsToAdd)
-    setActiveTabId(newTab.id)
-
-    if (window.electronAPI && filePath) {
-      window.electronAPI.addRecentFile({ name, filePath })
-    }
-  }, [tabs, activeTabId, maxTabs])
+      return tabsToAdd
+    })
+  }, [maxTabs])
 
   const handleRecentSelect = useCallback(async (file: RecentFile) => {
-    const existingTab = tabs.find(t => t.filePath === file.filePath && !t.isModified)
-    if (existingTab) {
-      setActiveTabId(existingTab.id)
-      return
-    }
-
     if (window.electronAPI) {
       const result = await window.electronAPI.readFile(file.filePath)
       if (result.success && result.content) {
-        let tabsToUse = [...tabs]
-        while (tabsToUse.length >= maxTabs) {
-          const oldestNonActive = tabsToUse.find(t => t.id !== activeTabId && !t.isPinned)
-          if (oldestNonActive) {
-            tabsToUse = tabsToUse.filter(t => t.id !== oldestNonActive.id)
-          } else {
-            break
+        const content = result.content
+        setTabs(prevTabs => {
+          const existingTab = prevTabs.find(t => t.filePath === file.filePath && !t.isModified)
+          if (existingTab) {
+            setActiveTabId(existingTab.id)
+            return prevTabs
           }
-        }
-        const newTab = createTab(file.name, result.content, file.filePath)
-        tabsToUse.push(newTab)
-        setTabs(tabsToUse)
-        setActiveTabId(newTab.id)
+
+          let tabsToUse = [...prevTabs]
+          while (tabsToUse.length >= maxTabs) {
+            const oldestNonActive = tabsToUse.find(t => t.id !== activeTabId && !t.isPinned)
+            if (oldestNonActive) {
+              tabsToUse = tabsToUse.filter(t => t.id !== oldestNonActive.id)
+            } else {
+              break
+            }
+          }
+          const newTab = createTab(file.name, content, file.filePath)
+          tabsToUse.push(newTab)
+          setActiveTabId(newTab.id)
+          return tabsToUse
+        })
       }
     }
-  }, [tabs, activeTabId, maxTabs])
+  }, [maxTabs])
 
   const updateTabContent = useCallback((filePath: string, content: string, name?: string) => {
     setTabs(prevTabs => prevTabs.map(tab =>

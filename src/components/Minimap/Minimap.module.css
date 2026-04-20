@@ -1,5 +1,5 @@
 .minimap {
-  width: 48px;
+  width: 32px;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border);
   display: flex;
