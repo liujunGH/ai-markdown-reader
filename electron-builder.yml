@@ -14,8 +14,7 @@ electronDownload:
 
 files:
   - dist/**/*
-  - electron/main.js
-  - electron/preload.js
+  - electron/**/*.js
   - package.json
 
 extraResources:

@@ -1,0 +1,122 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background-color: var(--bg-secondary);
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-left {
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-right {
+  border-left: 1px solid var(--border);
+}
+
+.resizing {
+  transition: none;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 50;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.resizer:hover,
+.resizing .resizer {
+  background: var(--accent);
+  opacity: 0.3;
+}
+
+.resizer-left {
+  right: 0;
+}
+
+.resizer-right {
+  left: 0;
+}
+
+.toggleBtn {
+  position: absolute;
+  top: 8px;
+  width: 20px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  z-index: 40;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.15s;
+}
+
+.sidebar:hover .toggleBtn {
+  opacity: 1;
+}
+
+.toggleBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toggleBtn-left {
+  right: 8px;
+}
+
+.toggleBtn-right {
+  left: 8px;
+}
+
+.collapseBtn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  align-self: center;
+  margin: 4px 0;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.collapseBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.collapseBtn-left {
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  margin-right: -1px;
+}
+
+.collapseBtn-right {
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  margin-left: -1px;
+}

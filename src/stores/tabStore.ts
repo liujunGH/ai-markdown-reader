@@ -48,6 +48,7 @@ interface TabActions {
   openRecentFile: (file: RecentFile) => Promise<void>
   updateTabContent: (filePath: string, content: string, name?: string) => void
   restoreSession: () => Promise<void>
+  clearFailedRestores: () => void
 }
 
 export type TabStore = TabState & TabActions
@@ -326,6 +327,10 @@ export const useTabStore = create<TabStore>()(
           isRestoringSession: false,
           failedRestores,
         })
+      },
+
+      clearFailedRestores: () => {
+        set({ failedRestores: [] })
       },
     }),
     {

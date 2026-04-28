@@ -1,5 +1,5 @@
 .outline {
-  width: 240px;
+  width: 100%;
   border-left: 1px solid var(--border);
   padding: 16px;
   background: var(--bg-secondary);

@@ -553,8 +553,13 @@ app.whenReady().then(() => {
     })
 
     autoUpdater.on('error', (err) => {
-      logger.error('Auto-updater error', { error: String(err) })
-      sendToAllWindows('update-error', { error: String(err) })
+      const msg = String(err)
+      logger.error('Auto-updater error', { error: msg })
+      // Silently ignore "latest-mac.yml not found" (no release published yet)
+      if (msg.includes('Cannot find latest-mac.yml') || msg.includes('404')) {
+        return
+      }
+      sendToAllWindows('update-error', { error: msg })
     })
 
     autoUpdater.on('download-progress', (progress) => {

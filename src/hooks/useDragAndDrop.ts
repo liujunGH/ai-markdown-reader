@@ -1,15 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 
 const MAX_DRAG_FILE_SIZE = 5 * 1024 * 1024 // 5MB for drag-and-drop
 
 export interface UseDragAndDropReturn {
   isDraggingOver: boolean
-  dragProps: {
-    onDragEnter: (e: React.DragEvent) => void
-    onDragLeave: (e: React.DragEvent) => void
-    onDragOver: (e: React.DragEvent) => void
-    onDrop: (e: React.DragEvent) => void
-  }
 }
 
 export function useDragAndDrop(
@@ -18,34 +12,42 @@ export function useDragAndDrop(
 ): UseDragAndDropReturn {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
 
-  const onDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer?.types.includes('Files')) {
-      setIsDraggingOver(true)
+  useEffect(() => {
+    let dragCounter = 0
+    let isFileDrag = false
+
+    const onDragEnter = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes('Files')) return
+      isFileDrag = true
+      dragCounter += 1
+      if (dragCounter === 1) {
+        setIsDraggingOver(true)
+      }
     }
-  }, [])
 
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }, [])
-
-  const onDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (
-      (e.relatedTarget as Node) === null ||
-      !document.contains(e.relatedTarget as Node)
-    ) {
-      setIsDraggingOver(false)
-    }
-  }, [])
-
-  const onDrop = useCallback(
-    async (e: React.DragEvent) => {
+    const onDragOver = (e: DragEvent) => {
+      if (!isFileDrag) return
       e.preventDefault()
-      e.stopPropagation()
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy'
+      }
+    }
+
+    const onDragLeave = (_e: DragEvent) => {
+      if (!isFileDrag) return
+      dragCounter -= 1
+      if (dragCounter <= 0) {
+        dragCounter = 0
+        isFileDrag = false
+        setIsDraggingOver(false)
+      }
+    }
+
+    const onDrop = async (e: DragEvent) => {
+      if (!isFileDrag) return
+      e.preventDefault()
+      dragCounter = 0
+      isFileDrag = false
       setIsDraggingOver(false)
 
       const files = e.dataTransfer?.files
@@ -53,10 +55,10 @@ export function useDragAndDrop(
 
       const file = files[0]
       if (!file.name.endsWith('.md') && !file.name.endsWith('.markdown')) {
+        onError?.('仅支持 .md 和 .markdown 文件')
         return
       }
 
-      // Check file size for drag-and-drop (browser-side check before reading)
       if (file.size > MAX_DRAG_FILE_SIZE) {
         onError?.(`文件过大 (${(file.size / 1024 / 1024).toFixed(1)}MB)，建议用其他编辑器打开`)
         return
@@ -73,17 +75,20 @@ export function useDragAndDrop(
         const fileContent = await file.text()
         onFileOpen(fileContent, file.name, '')
       }
-    },
-    [onFileOpen, onError]
-  )
+    }
 
-  return {
-    isDraggingOver,
-    dragProps: {
-      onDragEnter,
-      onDragLeave,
-      onDragOver,
-      onDrop,
-    },
-  }
+    window.addEventListener('dragenter', onDragEnter)
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop', onDrop)
+
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter)
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [onFileOpen, onError])
+
+  return { isDraggingOver }
 }

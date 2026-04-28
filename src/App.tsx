@@ -24,6 +24,7 @@ import { SidebarFileExplorer } from './components/SidebarFileExplorer'
 import { ElectronFolderExplorer } from './components/ElectronFolderExplorer'
 import { FileInfoPanel } from './components/FileInfoPanel'
 import { FilePreviewPanel } from './components/FilePreviewPanel'
+import { ResizableSidebar } from './components/ResizableSidebar'
 import { BookmarkPanel, useBookmarks } from './components/Bookmark'
 import { ExportPanel } from './components/ExportPanel'
 import { useOutline } from './hooks/useOutline'
@@ -67,7 +68,8 @@ function AppInner() {
   const {
     tabs, activeTabId, isRestoringSession, activeTab: getActiveTab, failedRestores,
     newTab, selectTab, closeTab, closeOtherTabs, closeAllTabs, reorderTabs,
-    pinTab, unpinTab, setTabColor, openFile, openRecentFile, updateTabContent
+    pinTab, unpinTab, setTabColor, openFile, openRecentFile, updateTabContent,
+    clearFailedRestores
   } = useTabStore()
 
   const activeTab = getActiveTab()
@@ -146,7 +148,7 @@ function AppInner() {
   }, [tabs, isRestoringSession, watchFiles])
 
   // Drag and drop
-  const { isDraggingOver, dragProps } = useDragAndDrop(
+  const { isDraggingOver } = useDragAndDrop(
     (content, name, filePath) => {
       openFile(content, name, filePath)
       loadRecentFiles()
@@ -161,13 +163,14 @@ function AppInner() {
     }
   }, [activeTab])
 
-  // Show failed restore toast
+  // Show failed restore toast (auto-clear after first notification)
   useEffect(() => {
     if (!isRestoringSession && failedRestores.length > 0) {
       const names = failedRestores.map(basename).join('、')
       showToast(`以下文件已被移动或删除：${names}`, 'error')
+      clearFailedRestores()
     }
-  }, [isRestoringSession, failedRestores, showToast])
+  }, [isRestoringSession, failedRestores, showToast, clearFailedRestores])
 
   // File open handler
   const handleFileOpen = useCallback((fileContent: string, name: string, filePath: string = '', size?: number, lastModified?: number) => {
@@ -514,193 +517,184 @@ function AppInner() {
           </div>
         ))}
       </div>
-      {!showFocusMode && (
-        <>
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={selectTab}
-            onTabClose={closeTab}
-            onTabCloseOthers={closeOtherTabs}
-            onTabCloseAll={closeAllTabs}
-            onNewTab={newTab}
-            onTabReorder={reorderTabs}
-            onTabPin={pinTab}
-            onTabUnpin={unpinTab}
-            onTabColor={setTabColor}
-          />
-          <header className={styles.header}>
-            <div className={styles.toolbar}>
-              <FileOpener onFileOpen={handleFileOpen} onError={showToast} />
-              <button
-                onClick={() => togglePanel('recent')}
-                data-guide="recent-files"
-                className={`${styles.toolbarBtn} ${showRecent ? styles.toolbarBtnActive : ''}`}
-                aria-label="最近打开" data-tooltip="最近打开 (Ctrl+Shift+R)"
-              >
-                📜
-              </button>
-              <button
-                onClick={toggleSplitView}
-                className={`${styles.toolbarBtn} ${isSplitView ? styles.toolbarBtnActive : ''}`}
-                aria-label="分屏阅读" data-tooltip="分屏阅读 (Ctrl+\\)"
-              >
-                ⚡
-              </button>
-              <button
-                onClick={handleOpenFolder}
-                className={styles.toolbarBtn}
-                aria-label="打开文件夹" data-tooltip="打开文件夹"
-              >
-                📂
-              </button>
-              {(currentFolderHandle || currentFolderPath) && (
-                <button
-                  onClick={() => togglePanel('fileSidebar')}
-                  className={`${styles.toolbarBtn} ${showFileSidebar ? styles.toolbarBtnActive : ''}`}
-                  aria-label="文件列表" data-tooltip="文件列表"
-                >
-                  📋
-                </button>
-              )}
-            </div>
-            <div className={styles.titleWrapper}>
-              <span className={styles.title} title={activeTab?.name}>
-                {activeTab?.name}
-              </span>
-            </div>
-            <div className={styles.actions}>
-              <button
-                onClick={() => {
-                  if (!showOutline) {
-                    openPanel('outline')
-                    closePanel('filePreview')
-                  } else if (showFilePreview) {
-                    closePanel('filePreview')
-                  } else {
-                    openPanel('filePreview')
-                  }
-                }}
-                data-guide="outline"
-                className={`${styles.toolbarBtn} ${showOutline ? styles.toolbarBtnActive : ''}`}
-                data-tooltip={showFilePreview ? '显示目录' : '文件预览'}
-              >
-                {showFilePreview ? '📋' : '📑'}
-              </button>
-              <button
-                onClick={() => openPanel('search')}
-                data-guide="search"
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="搜索" data-tooltip="搜索 (Ctrl+F)"
-              >
-                🔍
-              </button>
-              <button
-                onClick={() => openPanel('globalSearch')}
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="全局搜索" data-tooltip="全局搜索 (Ctrl+Shift+F)"
-              >
-                🔎
-              </button>
-              <button
-                onClick={() => {
-                  const next = !showSource
-                  setShowSource(next)
-                  if (activeTab?.filePath) updateFileSetting('showSource', next)
-                }}
-                data-guide="source"
-                className={`${styles.toolbarBtn} ${showSource ? styles.toolbarBtnActive : ''}`}
-                aria-label="源码" data-tooltip="源码 (Ctrl+S)"
-              >
-                📄
-              </button>
-              <button
-                onClick={() => openPanel('exportPanel')}
-                className={styles.toolbarBtn}
-                aria-label="导出" data-tooltip="导出 (Ctrl+E)"
-              >
-                📤
-              </button>
-              <button
-                onClick={() => togglePanel('focusMode')}
-                data-guide="focus-mode"
-                className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
-                aria-label="专注模式" data-tooltip="专注模式 (Ctrl+.)"
-              >
-                👁️
-              </button>
-              <div className={styles.fontSizeControls} data-guide="font-size">
-                <button
-                  onClick={() => {
-                    const newSize = Math.max(fontSize - 2, 12)
-                    setFontSize(newSize)
-                    if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
-                  }}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                  aria-label="缩小" data-tooltip="缩小"
-                >
-                  A-
-                </button>
-                <span className={styles.fontSizeDisplay}>
-                  {fontSize}
-                </span>
-                <button
-                  onClick={() => {
-                    const newSize = Math.min(fontSize + 2, 32)
-                    setFontSize(newSize)
-                    if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
-                  }}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                  aria-label="放大" data-tooltip="放大"
-                >
-                  A+
-                </button>
-              </div>
-              <button
-                onClick={() => openPanel('keyboardShortcuts')}
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="快捷键" data-tooltip="快捷键 (Ctrl+/)"
-              >
-                ⌨️
-              </button>
-              <button
-                onClick={() => openPanel('fileInfo')}
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="文件信息" data-tooltip="文件信息"
-              >
-                ℹ️
-              </button>
-              <button
-                onClick={() => openPanel('readingStats')}
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="阅读统计" data-tooltip="阅读统计"
-              >
-                📊
-              </button>
-              <button
-                onClick={() => openPanel('diagnostics')}
-                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                aria-label="诊断面板" data-tooltip="诊断面板"
-              >
-                🛠️
-              </button>
-              <BookmarkPanel
-                bookmarks={bookmarks}
-                onAdd={addBookmark}
-                onRemove={removeBookmark}
-                onNavigate={handleBookmarkNavigate}
-                currentHeading={currentHeading}
-              />
-              <ThemeToggle onOpenCustomStyle={() => openPanel('customStyle')} />
-            </div>
-          </header>
-        </>
-      )}
       <ErrorBoundary>
-        <div className={styles.app} {...dragProps}>
+        <div className={styles.app}>
+          {tabs.length > 0 && !showFocusMode && (
+            <>
+              <TabBar
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onTabSelect={selectTab}
+                onTabClose={closeTab}
+                onTabCloseOthers={closeOtherTabs}
+                onTabCloseAll={closeAllTabs}
+                onNewTab={newTab}
+                onTabReorder={reorderTabs}
+                onTabPin={pinTab}
+                onTabUnpin={unpinTab}
+                onTabColor={setTabColor}
+              />
+              <header className={styles.header}>
+              <div className={styles.toolbar}>
+                <FileOpener onFileOpen={handleFileOpen} onError={showToast} />
+                <button
+                  onClick={() => togglePanel('recent')}
+                  data-guide="recent-files"
+                  className={`${styles.toolbarBtn} ${showRecent ? styles.toolbarBtnActive : ''}`}
+                  aria-label="最近打开" data-tooltip="最近打开 (Ctrl+Shift+R)"
+                >
+                  📜
+                </button>
+                <button
+                  onClick={toggleSplitView}
+                  className={`${styles.toolbarBtn} ${isSplitView ? styles.toolbarBtnActive : ''}`}
+                  aria-label="分屏阅读" data-tooltip="分屏阅读 (Ctrl+\\)"
+                >
+                  ⚡
+                </button>
+                <button
+                  onClick={handleOpenFolder}
+                  className={styles.toolbarBtn}
+                  aria-label="打开文件夹" data-tooltip="打开文件夹"
+                >
+                  📂
+                </button>
+                {(currentFolderHandle || currentFolderPath) && (
+                  <button
+                    onClick={() => togglePanel('fileSidebar')}
+                    className={`${styles.toolbarBtn} ${showFileSidebar ? styles.toolbarBtnActive : ''}`}
+                    aria-label="文件列表" data-tooltip="文件列表"
+                  >
+                    📋
+                  </button>
+                )}
+              </div>
+              <div className={styles.titleWrapper}>
+                <span className={styles.title} title={activeTab?.name}>
+                  {activeTab?.name}
+                </span>
+              </div>
+              <div className={styles.actions}>
+                <button
+                  onClick={() => {
+                    if (!showOutline) {
+                      openPanel('outline')
+                      closePanel('filePreview')
+                    } else if (showFilePreview) {
+                      closePanel('filePreview')
+                    } else {
+                      openPanel('filePreview')
+                    }
+                  }}
+                  data-guide="outline"
+                  className={`${styles.toolbarBtn} ${showOutline ? styles.toolbarBtnActive : ''}`}
+                  data-tooltip={showFilePreview ? '显示目录' : '文件预览'}
+                >
+                  {showFilePreview ? '📋' : '📑'}
+                </button>
+                <button
+                  onClick={() => openPanel('search')}
+                  data-guide="search"
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="搜索" data-tooltip="搜索 (Ctrl+F)"
+                >
+                  🔍
+                </button>
+                <button
+                  onClick={() => openPanel('globalSearch')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="全局搜索" data-tooltip="全局搜索 (Ctrl+Shift+F)"
+                >
+                  🔎
+                </button>
+                <button
+                  onClick={() => {
+                    const next = !showSource
+                    setShowSource(next)
+                    if (activeTab?.filePath) updateFileSetting('showSource', next)
+                  }}
+                  data-guide="source"
+                  className={`${styles.toolbarBtn} ${showSource ? styles.toolbarBtnActive : ''}`}
+                  aria-label="源码" data-tooltip="源码 (Ctrl+S)"
+                >
+                  📄
+                </button>
+                <button
+                  onClick={() => openPanel('exportPanel')}
+                  className={styles.toolbarBtn}
+                  aria-label="导出" data-tooltip="导出 (Ctrl+E)"
+                >
+                  📤
+                </button>
+                <button
+                  onClick={() => togglePanel('focusMode')}
+                  className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
+                  aria-label="专注模式" data-tooltip="专注模式 (Ctrl+.)"
+                >
+                  🎯
+                </button>
+                <div className={styles.fontSizeControls} data-guide="font-size">
+                  <button
+                    onClick={() => setFontSize(Math.max(10, fontSize - 1))}
+                    className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
+                    aria-label="缩小字体"
+                  >
+                    A-
+                  </button>
+                  <span className={styles.fontSizeDisplay}>
+                    {fontSize}
+                  </span>
+                  <button
+                    onClick={() => setFontSize(Math.min(32, fontSize + 1))}
+                    className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
+                    aria-label="放大字体"
+                  >
+                    A+
+                  </button>
+                </div>
+                <button
+                  onClick={() => openPanel('keyboardShortcuts')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="快捷键" data-tooltip="快捷键 (Ctrl+/)"
+                >
+                  ⌨️
+                </button>
+                <button
+                  onClick={() => openPanel('fileInfo')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="文件信息" data-tooltip="文件信息"
+                >
+                  ℹ️
+                </button>
+                <button
+                  onClick={() => openPanel('readingStats')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="阅读统计" data-tooltip="阅读统计"
+                >
+                  📊
+                </button>
+                <button
+                  onClick={() => openPanel('diagnostics')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="诊断面板" data-tooltip="诊断面板"
+                >
+                  🛠️
+                </button>
+                <BookmarkPanel
+                  bookmarks={bookmarks}
+                  onAdd={addBookmark}
+                  onRemove={removeBookmark}
+                  onNavigate={handleBookmarkNavigate}
+                  currentHeading={currentHeading}
+                />
+                <ThemeToggle onOpenCustomStyle={() => openPanel('customStyle')} />
+              </div>
+            </header>
+          </>
+          )}
           <div className={styles.splitView}>
             {!showFocusMode && showFileSidebar && currentFolderPath && (
-              <div className={styles.sidebar}>
+              <ResizableSidebar side="left" storageKey="file-sidebar" isOpen={showFileSidebar} onToggle={handleCloseFileSidebar}>
                 <ElectronFolderExplorer
                   folderPath={currentFolderPath}
                   folderName={currentFolderName}
@@ -708,10 +702,10 @@ function AppInner() {
                   onFileSelect={handleFolderFileSelect}
                   onClose={handleCloseFileSidebar}
                 />
-              </div>
+              </ResizableSidebar>
             )}
             {!showFocusMode && showFileSidebar && currentFolderHandle && !currentFolderPath && (
-              <div className={styles.sidebar}>
+              <ResizableSidebar side="left" storageKey="file-sidebar" isOpen={showFileSidebar} onToggle={handleCloseFileSidebar}>
                 <SidebarFileExplorer
                   folderName={currentFolderName}
                   handle={currentFolderHandle}
@@ -719,7 +713,7 @@ function AppInner() {
                   onFileSelect={handleFolderFileSelect}
                   onClose={handleCloseFileSidebar}
                 />
-              </div>
+              </ResizableSidebar>
             )}
             <main ref={mainRef} className={styles.main} style={{ flex: isSplitView ? 1 : undefined, fontSize: `${fontSize}px` }}>
               {!showFocusMode && !showSource && outlineItems.length >= 3 && (
@@ -761,34 +755,38 @@ function AppInner() {
                 </div>
               </main>
             )}
-            {!showFocusMode && showOutline && !showSource && (
-              <div className={styles.sidebar}>
-                {showFilePreview ? (
-                  <FilePreviewPanel
-                    fileName={activeTab?.name || ''}
-                    filePath={activeTab?.filePath || ''}
-                    fileSize={activeTab?.content ? new Blob([activeTab.content]).size : 0}
-                    lastModified={fileInfo?.lastModified}
-                    content={activeTab?.content || ''}
-                    outlineItems={outlineItems}
-                    bookmarks={bookmarks}
-                    onNavigate={handleOutlineClick}
-                    onBookmarkNavigate={handleBookmarkNavigate}
-                  />
-                ) : (
-                  <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} filePath={activeTab?.filePath} />
+            {!showFocusMode && !showSource && (showFilePreview || outlineItems.length > 0) && (
+              <ResizableSidebar side="right" storageKey="right-sidebar" isOpen={showOutline} onToggle={() => closePanel('outline')}>
+                {showOutline && (
+                  <div style={{ display: 'flex', flexDirection: 'row', height: '100%', width: '100%' }}>
+                    <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+                      {showFilePreview ? (
+                        <FilePreviewPanel
+                          fileName={activeTab?.name || ''}
+                          filePath={activeTab?.filePath || ''}
+                          fileSize={activeTab?.content ? new Blob([activeTab.content]).size : 0}
+                          lastModified={fileInfo?.lastModified}
+                          content={activeTab?.content || ''}
+                          outlineItems={outlineItems}
+                          bookmarks={bookmarks}
+                          onNavigate={handleOutlineClick}
+                          onBookmarkNavigate={handleBookmarkNavigate}
+                        />
+                      ) : (
+                        <Outline items={outlineItems} activeId={activeHeadingId} onItemClick={handleOutlineClick} filePath={activeTab?.filePath} />
+                      )}
+                    </div>
+                    {!showFilePreview && outlineItems.length > 0 && (
+                      <Minimap
+                        outlineItems={outlineItems}
+                        activeHeadingId={activeHeadingId}
+                        onNavigate={handleOutlineClick}
+                        contentLength={activeTab?.content?.length || 0}
+                      />
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            {!showFocusMode && showOutline && !showSource && !showFilePreview && outlineItems.length > 0 && (
-              <div className={styles.sidebar}>
-                <Minimap
-                  outlineItems={outlineItems}
-                  activeHeadingId={activeHeadingId}
-                  onNavigate={handleOutlineClick}
-                  contentLength={activeTab?.content?.length || 0}
-                />
-              </div>
+              </ResizableSidebar>
             )}
           </div>
           {!showFocusMode && <StatusBar content={activeTab?.content || ''} />}

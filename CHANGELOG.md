@@ -1,5 +1,39 @@
 # 更新日志
 
+## v1.5.0
+
+### 🚀 重大升级
+- **Electron 28 → 35** - 升级至 Electron 35.7.5（Chromium 134, Node 22），享受最新安全补丁和性能改进
+- **electron-builder 24 → 25** - 构建工具升级，修复 Apple Silicon 打包问题
+
+### ⚡ 性能优化
+- **Web Worker Markdown 解析** - markdown-it + Prism + KaTeX 全部 offload 到 Web Worker，主线程零阻塞
+- **虚拟滚动优化** - 长文档渲染性能显著提升
+
+### 🎨 界面与交互
+- **CSS Design Tokens** - 统一 light/dark/sepia 三主题的设计令牌系统（primitive + semantic + spacing/font/radius/shadow/z-index）
+- **布局重构** - TabBar + 工具栏移入 flex column，仅主内容区滚动，header/sidebar 移除 sticky
+- **Sidebar 拖拽与折叠** - 左右侧边栏支持鼠标拖拽调整宽度，一键折叠/展开，宽度持久化到 localStorage
+- **拖拽打开文件重写** - window 级别事件监听，支持整个窗口拖拽，计数器防止闪烁
+
+### 🛠️ 新功能
+- **代码块执行** - bash/sh/shell 代码块可直接运行（需先在设置中开启），内置命令白名单安全机制
+- **诊断面板** - 应用信息、内存占用、最近日志一键查看（工具栏 🛠️ 按钮）
+- **自动更新静默处理** - release 未发布时的 404 错误仅记录日志，不弹窗打扰用户
+
+### 🧪 工程化
+- **TypeScript Strict 模式** - 全部 3 个 tsconfig 启用 strict，零类型错误
+- **Playwright E2E 测试** - 应用启动与基础交互的端到端测试
+- **打包修复** - `electron-builder.yml` 正确包含 `lib/` 目录，修复 ad-hoc 签名兼容性
+
+### 🐛 Bug 修复
+- 修复右侧 sidebar 折叠后无展开按钮的问题
+- 修复 Minimap 被拉伸导致的空白区域问题
+- 修复空文档时 Outline 仍占据空间的空白问题
+- 修复已删除文件缓存导致每次启动重复提示的问题（首次提示后自动清理）
+
+---
+
 ## v1.4.0
 
 ### 🔒 安全加固
