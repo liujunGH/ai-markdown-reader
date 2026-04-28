@@ -29,7 +29,6 @@ import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
 import { useFileSettings } from './hooks/useFileSettings'
 import { TabBar } from './components/TabBar'
-import { useTabs } from './hooks/useTabs'
 import { useRecentFiles } from './hooks/useRecentFiles'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useDragAndDrop } from './hooks/useDragAndDrop'
@@ -43,39 +42,47 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import CommandPalette from './components/CommandPalette'
 import { Skeleton } from './components/Skeleton'
 import { GlobalSearch } from './components/GlobalSearch'
+import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
+import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 
-interface Toast {
-  id: string
-  message: string
-  type: 'error' | 'success'
-}
-
 function AppInner() {
   const { theme, accentColor, toggleTheme, customCSS, setCustomCSS } = useTheme()
-  const [showOutline, setShowOutline] = useState(true)
-  const [showSearch, setShowSearch] = useState(false)
-  const [showSource, setShowSource] = useState(false)
-  const [showRecent, setShowRecent] = useState(false)
-  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false)
-  const [showFocusMode, setShowFocusMode] = useState(false)
-  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
-  const [showFileSidebar, setShowFileSidebar] = useState(false)
-  const [currentFolderHandle, setCurrentFolderHandle] = useState<FileSystemDirectoryHandle | null>(null)
-  const [electronFolderPath, setElectronFolderPath] = useState<string | null>(null)
-  const [currentFolderName, setCurrentFolderName] = useState<string>('')
-  const [currentFilePath, setCurrentFilePath] = useState<string>('')
-  const [fontSize, setFontSize] = useState(16)
-  const [showFileInfo, setShowFileInfo] = useState(false)
-  const [showFilePreview, setShowFilePreview] = useState(false)
-  const [fileInfo, setFileInfo] = useState<{ name: string; size: number; lastModified: number } | null>(null)
+
+  // ── Stores ──
+  const {
+    showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
+    showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
+    showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
+    showReadingStats, showCustomStyle, fontSize, isSplitView, secondaryTabId,
+    highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
+    setHighlightedLine, setShowSource, setShowOutline
+  } = useUIStore()
+
+  const {
+    tabs, activeTabId, isRestoringSession, activeTab: getActiveTab, failedRestores,
+    newTab, selectTab, closeTab, closeOtherTabs, closeAllTabs, reorderTabs,
+    pinTab, unpinTab, setTabColor, openFile, openRecentFile, updateTabContent
+  } = useTabStore()
+
+  const activeTab = getActiveTab()
+
+  const {
+    currentFolderPath, currentFolderName, currentFilePath, currentFolderHandle, fileInfo,
+    setFolder, setCurrentFilePath, setFileInfo, clearFolder
+  } = useFileStore()
+
+  const { toasts, showToast } = useToastStore()
+
+  // ── Local state ──
   const [showGuide, setShowGuide] = useState(() => {
     const hasSeen = getStorageItem(HAS_SEEN_GUIDE_KEY)
     return !hasSeen
   })
+
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     try {
       const stored = getSessionItem(SEARCH_HISTORY_KEY)
@@ -84,36 +91,24 @@ function AppInner() {
       return []
     }
   })
-  const scrollHistory = useScrollHistory()
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const toastTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
-  const [isSplitView, setIsSplitView] = useState(false)
-  const [secondaryTabId, setSecondaryTabId] = useState<string | null>(null)
-  const [showExportPanel, setShowExportPanel] = useState(false)
-  const [showCommandPalette, setShowCommandPalette] = useState(false)
-  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
-  const [showQuickJump, setShowQuickJump] = useState(false)
-  const [showReadingStats, setShowReadingStats] = useState(false)
-  const [showCustomStyle, setShowCustomStyle] = useState(false)
-  const [highlightedLine, setHighlightedLine] = useState<number | undefined>(undefined)
-  const markdownRef = useRef<MarkdownRendererRef>(null)
 
+  // ── Hooks ──
+  const scrollHistory = useScrollHistory()
+  const markdownRef = useRef<MarkdownRendererRef>(null)
   const mainRef = useRef<HTMLElement>(null)
 
-  const {
-    tabs, activeTabId, isRestoringSession, activeTab, failedRestores,
-    handleNewTab, handleTabSelect, handleTabClose,
-    handleTabCloseOthers, handleTabCloseAll, handleTabReorder,
-    handleTabPin, handleTabUnpin, handleTabColor,
-    handleFileOpen: handleFileOpenInternal, handleRecentSelect: handleRecentSelectInternal,
-    updateTabContent
-  } = useTabs()
-
   const { totalStats } = useReadingStats(activeTab?.filePath)
-
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
+  const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
 
-  // 同步文件设置到全局状态
+  // ── Effects ──
+
+  // Restore session on mount
+  useEffect(() => {
+    useTabStore.getState().restoreSession()
+  }, [])
+
+  // Sync file settings to global UI state
   useEffect(() => {
     if (isRestoringSession) return
     setFontSize(fileSettings.fontSize)
@@ -122,56 +117,40 @@ function AppInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.filePath, isRestoringSession])
 
-  // 分屏时如果副标签被关闭，自动切换或关闭分屏
+  // Split view fallback when secondary tab is closed
   useEffect(() => {
     if (!isSplitView || !secondaryTabId) return
     if (!tabs.some(t => t.id === secondaryTabId)) {
       const fallback = tabs.find(t => t.id !== activeTabId)
       if (fallback) {
-        setSecondaryTabId(fallback.id)
+        setSplitView(true, fallback.id)
       } else {
-        setIsSplitView(false)
-        setSecondaryTabId(null)
+        setSplitView(false, null)
       }
     }
-  }, [tabs, activeTabId, isSplitView, secondaryTabId])
+  }, [tabs, activeTabId, isSplitView, secondaryTabId, setSplitView])
 
-  const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
-
+  // Watch files when tabs change
   const { changedFilePath, handleReloadChangedFile, watchFiles, ignoreChange } = useFileWatcher(
     (filePath, content, name) => {
       updateTabContent(filePath, content, name)
     }
   )
 
-  const { isDraggingOver, dragProps } = useDragAndDrop((content, name, filePath) => {
-    handleFileOpenInternal(content, name, filePath)
-    loadRecentFiles()
-  })
-
-  const showToast = useCallback((message: string, type: 'error' | 'success' = 'error') => {
-    const id = Date.now().toString()
-    setToasts(prev => [...prev, { id, message, type }])
-    const timeout = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-      toastTimeoutsRef.current.delete(timeout)
-    }, 3000)
-    toastTimeoutsRef.current.add(timeout)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      toastTimeoutsRef.current.forEach(timeout => clearTimeout(timeout))
-      toastTimeoutsRef.current.clear()
-    }
-  }, [])
-
-  // Watch files when tabs change
   useEffect(() => {
     if (!isRestoringSession) {
       watchFiles(tabs)
     }
   }, [tabs, isRestoringSession, watchFiles])
+
+  // Drag and drop
+  const { isDraggingOver, dragProps } = useDragAndDrop(
+    (content, name, filePath) => {
+      openFile(content, name, filePath)
+      loadRecentFiles()
+    },
+    showToast
+  )
 
   // Set window title
   useEffect(() => {
@@ -188,23 +167,26 @@ function AppInner() {
     }
   }, [isRestoringSession, failedRestores, showToast])
 
+  // File open handler
   const handleFileOpen = useCallback((fileContent: string, name: string, filePath: string = '', size?: number, lastModified?: number) => {
-    handleFileOpenInternal(fileContent, name, filePath, size, lastModified)
+    openFile(fileContent, name, filePath, size, lastModified)
     loadRecentFiles()
     setFileInfo({
       name,
       size: size ?? new Blob([fileContent]).size,
       lastModified: lastModified ?? Date.now()
     })
-  }, [handleFileOpenInternal, loadRecentFiles])
+  }, [openFile, loadRecentFiles, setFileInfo])
 
+  // Recent file select handler
   const handleRecentSelect = useCallback(async (file: RecentFile) => {
-    await handleRecentSelectInternal(file)
+    await openRecentFile(file)
     loadRecentFiles()
-    setShowRecent(false)
-  }, [handleRecentSelectInternal, loadRecentFiles])
+    closePanel('recent')
+  }, [openRecentFile, loadRecentFiles, closePanel])
 
-  const handleOpenFolder = async () => {
+  // Open folder
+  const handleOpenFolder = useCallback(async () => {
     if (!window.electronAPI) return
     try {
       const folderPath = await window.electronAPI.openFolderDialog()
@@ -226,11 +208,9 @@ function AppInner() {
       const fileResult = await window.electronAPI.readFile(firstFile.filePath)
       if (fileResult.success && fileResult.content) {
         handleFileOpen(fileResult.content, firstFile.name, firstFile.filePath)
-        setCurrentFolderName(basename(folderPath) || folderPath)
-        setElectronFolderPath(folderPath)
+        setFolder(folderPath, basename(folderPath) || folderPath)
         await window.electronAPI.setLastFolder(folderPath)
-        setShowFileSidebar(true)
-        // Index folder for global search
+        openPanel('fileSidebar')
         try {
           const allFiles = await getAllMarkdownFiles(folderPath)
           await indexFolder(folderPath, allFiles)
@@ -244,22 +224,22 @@ function AppInner() {
       console.error('[handleOpenFolder] error:', err)
       showToast('打开文件夹失败: ' + String(err), 'error')
     }
-  }
+  }, [handleFileOpen, setFolder, openPanel, showToast])
 
-  const handleFolderFileSelect = (fileContent: string, fileName: string, filePath: string) => {
+  // Folder file select
+  const handleFolderFileSelect = useCallback((fileContent: string, fileName: string, filePath: string) => {
     handleFileOpen(fileContent, fileName, filePath)
     setCurrentFilePath(filePath)
-  }
+  }, [handleFileOpen, setCurrentFilePath])
 
-  const handleCloseFileSidebar = () => {
-    setShowFileSidebar(false)
-    setCurrentFolderHandle(null)
-    setElectronFolderPath(null)
-    setCurrentFolderName('')
-    setCurrentFilePath('')
-  }
+  // Close file sidebar
+  const handleCloseFileSidebar = useCallback(() => {
+    closePanel('fileSidebar')
+    clearFolder()
+  }, [closePanel, clearFolder])
 
-  const handleGlobalSearchOpenFile = async (filePath: string) => {
+  // Global search open file
+  const handleGlobalSearchOpenFile = useCallback(async (filePath: string) => {
     if (!window.electronAPI) return
     const result = await window.electronAPI.readFile(filePath)
     if (result.success && result.content !== undefined) {
@@ -267,9 +247,10 @@ function AppInner() {
       handleFileOpen(result.content, name, filePath)
       setCurrentFilePath(filePath)
     }
-  }
+  }, [handleFileOpen, setCurrentFilePath])
 
-  const handleOutlineClick = (id: string) => {
+  // Outline click
+  const handleOutlineClick = useCallback((id: string) => {
     const main = document.querySelector('main')
     if (main) {
       scrollHistory.push(main.scrollTop)
@@ -278,8 +259,9 @@ function AppInner() {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
     }
-  }
+  }, [scrollHistory])
 
+  // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string) => {
     if (!activeTab?.filePath || !window.electronAPI) {
       showToast('WikiLink 需要文件路径支持', 'error')
@@ -302,24 +284,25 @@ function AppInner() {
     showToast(`未找到文件: ${target}`, 'error')
   }, [activeTab?.filePath, handleFileOpen, showToast])
 
+  // Toggle split view
   const toggleSplitView = useCallback(() => {
-    setIsSplitView(prev => {
-      if (prev) {
-        setSecondaryTabId(null)
-        return false
-      }
-      const currentIndex = tabs.findIndex(t => t.id === activeTabId)
-      const secondary = tabs[currentIndex + 1] || tabs[currentIndex - 1]
-      if (secondary && secondary.id !== activeTabId) {
-        setSecondaryTabId(secondary.id)
-      } else if (tabs[0] && tabs[0].id !== activeTabId) {
-        setSecondaryTabId(tabs[0].id)
-      }
-      return true
-    })
-  }, [tabs, activeTabId])
+    if (isSplitView) {
+      setSplitView(false, null)
+      return
+    }
+    const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+    const secondary = tabs[currentIndex + 1] || tabs[currentIndex - 1]
+    if (secondary && secondary.id !== activeTabId) {
+      setSplitView(true, secondary.id)
+    } else if (tabs[0] && tabs[0].id !== activeTabId) {
+      setSplitView(true, tabs[0].id)
+    } else {
+      setSplitView(true, null)
+    }
+  }, [isSplitView, tabs, activeTabId, setSplitView])
 
-  const handleBookmarkNavigate = (heading: string) => {
+  // Bookmark navigate
+  const handleBookmarkNavigate = useCallback((heading: string) => {
     const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
     for (const h of headings) {
       if (h.textContent === heading || h.textContent?.startsWith(heading)) {
@@ -327,7 +310,7 @@ function AppInner() {
         break
       }
     }
-  }
+  }, [])
 
   const { bookmarks, addBookmark, removeBookmark } = useBookmarks(activeTab?.name || '')
 
@@ -358,22 +341,23 @@ function AppInner() {
 
   const handleCloseSearch = useCallback(() => {
     clearSearch()
-    setShowSearch(false)
-  }, [clearSearch])
+    closePanel('search')
+  }, [clearSearch, closePanel])
 
-  const handleSearchQueryChange = (newQuery: string) => {
+  const handleSearchQueryChange = useCallback((newQuery: string) => {
     setQuery(newQuery)
-  }
+  }, [setQuery])
 
-  const addSearchHistory = (q: string) => {
+  const addSearchHistory = useCallback((q: string) => {
     if (!q.trim()) return
     setSearchHistory(prev => {
       const next = [q, ...prev.filter(h => h !== q)].slice(0, 5)
       setSessionItem(SEARCH_HISTORY_KEY, JSON.stringify(next))
       return next
     })
-  }
+  }, [])
 
+  // Electron file open listener
   const handleFileOpenRef = useRef(handleFileOpen)
   handleFileOpenRef.current = handleFileOpen
 
@@ -398,6 +382,10 @@ function AppInner() {
     }
   }, [showToast])
 
+  // Electron folder open listener
+  const handleOpenFolderRef = useRef(handleOpenFolder)
+  handleOpenFolderRef.current = handleOpenFolder
+
   useEffect(() => {
     if (!window.electronAPI) return
     const listener = async (folderPath: string) => {
@@ -417,10 +405,9 @@ function AppInner() {
         const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
         if (fileResult.success && fileResult.content) {
           handleFileOpenRef.current(fileResult.content, firstFile.name, firstFile.filePath)
-          setCurrentFolderName(basename(folderPath) || folderPath)
-          setElectronFolderPath(folderPath)
+          setFolder(folderPath, basename(folderPath) || folderPath)
           await window.electronAPI!.setLastFolder(folderPath)
-          setShowFileSidebar(true)
+          openPanel('fileSidebar')
           try {
             const allFiles = await getAllMarkdownFiles(folderPath)
             await indexFolder(folderPath, allFiles)
@@ -438,8 +425,9 @@ function AppInner() {
     return () => {
       window.electronAPI!.offOpenFolder(listener)
     }
-  }, [showToast])
+  }, [showToast, setFolder, openPanel])
 
+  // Focus mode body class
   useEffect(() => {
     if (showFocusMode) {
       document.body.classList.add('focus-mode')
@@ -449,51 +437,62 @@ function AppInner() {
     return () => document.body.classList.remove('focus-mode')
   }, [showFocusMode])
 
+  // Reset highlighted line on tab/source change
   useEffect(() => {
     setHighlightedLine(undefined)
-  }, [activeTabId, showSource])
+  }, [activeTabId, showSource, setHighlightedLine])
 
-  useKeyboardShortcuts({
-    activeTabId,
-    tabs,
-    fontSize,
-    showSource,
-    activeTabFilePath: activeTab?.filePath,
-    showSearch,
-    showKeyboardShortcuts,
-    showFocusMode,
-    showQuickSwitcher,
-    showExportPanel,
-    showCommandPalette,
-    showQuickJump,
-    showGlobalSearch,
-    showReadingStats,
-    showCustomStyle,
-    handleNewTab,
-    handleTabClose,
-    handleTabSelect,
-    handleCloseSearch,
-    toggleSplitView,
-    updateFileSetting: updateFileSetting as (key: string, value: unknown) => void,
+  // Scroll position memory
+  const prevActiveTabIdRef = useRef<string>('')
+  useEffect(() => {
+    if (isRestoringSession) {
+      prevActiveTabIdRef.current = activeTabId
+      return
+    }
+
+    const main = document.querySelector('main')
+    const prevId = prevActiveTabIdRef.current
+
+    // Save old tab scroll position
+    if (prevId && prevId !== activeTabId) {
+      const prevTab = tabs.find(t => t.id === prevId)
+      if (prevTab && main) {
+        const scrollKey = `scroll-position-${prevTab.filePath || prevId}` as const
+        setStorageItem(scrollKey, String(main.scrollTop))
+      }
+    }
+
+    // Restore new tab scroll position
+    const newTab = tabs.find(t => t.id === activeTabId)
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+    if (newTab && main) {
+      const scrollKey = `scroll-position-${newTab.filePath || activeTabId}` as const
+      const saved = getStorageItem(scrollKey)
+      if (saved != null) {
+        scrollTimeout = setTimeout(() => {
+          if (main) main.scrollTop = parseInt(saved, 10)
+        }, 100)
+      } else {
+        main.scrollTop = 0
+      }
+    }
+
+    prevActiveTabIdRef.current = activeTabId
+    return () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout)
+    }
+  }, [activeTabId, tabs, isRestoringSession])
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts(
     scrollHistory,
-    setters: {
-      setShowSearch,
-      setShowGlobalSearch,
-      setShowExportPanel,
-      setShowQuickSwitcher,
-      setShowFocusMode,
-      setShowKeyboardShortcuts,
-      setShowQuickJump,
-      setShowCommandPalette,
-      setShowReadingStats,
-      setShowCustomStyle,
-      setFontSize,
-      setShowSource,
-    },
-  })
+    handleCloseSearch,
+    updateFileSetting as (key: string, value: unknown) => void
+  )
 
   return (
     <>
+      <UpdateNotification />
       <ProgressBar containerRef={mainRef} />
       {isDraggingOver && (
         <div className={styles.dragOverlay}>
@@ -518,46 +517,46 @@ function AppInner() {
           <TabBar
             tabs={tabs}
             activeTabId={activeTabId}
-            onTabSelect={handleTabSelect}
-            onTabClose={handleTabClose}
-            onTabCloseOthers={handleTabCloseOthers}
-            onTabCloseAll={handleTabCloseAll}
-            onNewTab={handleNewTab}
-            onTabReorder={handleTabReorder}
-            onTabPin={handleTabPin}
-            onTabUnpin={handleTabUnpin}
-            onTabColor={handleTabColor}
+            onTabSelect={selectTab}
+            onTabClose={closeTab}
+            onTabCloseOthers={closeOtherTabs}
+            onTabCloseAll={closeAllTabs}
+            onNewTab={newTab}
+            onTabReorder={reorderTabs}
+            onTabPin={pinTab}
+            onTabUnpin={unpinTab}
+            onTabColor={setTabColor}
           />
           <header className={styles.header}>
             <div className={styles.toolbar}>
-              <FileOpener onFileOpen={handleFileOpen} />
+              <FileOpener onFileOpen={handleFileOpen} onError={showToast} />
               <button
-                onClick={() => setShowRecent(!showRecent)}
+                onClick={() => togglePanel('recent')}
                 data-guide="recent-files"
                 className={`${styles.toolbarBtn} ${showRecent ? styles.toolbarBtnActive : ''}`}
-                data-tooltip="最近打开 (Ctrl+Shift+R)"
+                aria-label="最近打开" data-tooltip="最近打开 (Ctrl+Shift+R)"
               >
                 📜
               </button>
               <button
                 onClick={toggleSplitView}
                 className={`${styles.toolbarBtn} ${isSplitView ? styles.toolbarBtnActive : ''}`}
-                data-tooltip="分屏阅读 (Ctrl+\\)"
+                aria-label="分屏阅读" data-tooltip="分屏阅读 (Ctrl+\\)"
               >
                 ⚡
               </button>
               <button
                 onClick={handleOpenFolder}
                 className={styles.toolbarBtn}
-                data-tooltip="打开文件夹"
+                aria-label="打开文件夹" data-tooltip="打开文件夹"
               >
                 📂
               </button>
-              {(currentFolderHandle || electronFolderPath) && (
+              {(currentFolderHandle || currentFolderPath) && (
                 <button
-                  onClick={() => setShowFileSidebar(!showFileSidebar)}
+                  onClick={() => togglePanel('fileSidebar')}
                   className={`${styles.toolbarBtn} ${showFileSidebar ? styles.toolbarBtnActive : ''}`}
-                  data-tooltip="文件列表"
+                  aria-label="文件列表" data-tooltip="文件列表"
                 >
                   📋
                 </button>
@@ -572,12 +571,12 @@ function AppInner() {
               <button
                 onClick={() => {
                   if (!showOutline) {
-                    setShowOutline(true)
-                    setShowFilePreview(false)
+                    openPanel('outline')
+                    closePanel('filePreview')
                   } else if (showFilePreview) {
-                    setShowFilePreview(false)
+                    closePanel('filePreview')
                   } else {
-                    setShowFilePreview(true)
+                    openPanel('filePreview')
                   }
                 }}
                 data-guide="outline"
@@ -587,17 +586,17 @@ function AppInner() {
                 {showFilePreview ? '📋' : '📑'}
               </button>
               <button
-                onClick={() => setShowSearch(true)}
+                onClick={() => openPanel('search')}
                 data-guide="search"
                 className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                data-tooltip="搜索 (Ctrl+F)"
+                aria-label="搜索" data-tooltip="搜索 (Ctrl+F)"
               >
                 🔍
               </button>
               <button
-                onClick={() => setShowGlobalSearch(true)}
+                onClick={() => openPanel('globalSearch')}
                 className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                data-tooltip="全局搜索 (Ctrl+Shift+F)"
+                aria-label="全局搜索" data-tooltip="全局搜索 (Ctrl+Shift+F)"
               >
                 🔎
               </button>
@@ -609,22 +608,22 @@ function AppInner() {
                 }}
                 data-guide="source"
                 className={`${styles.toolbarBtn} ${showSource ? styles.toolbarBtnActive : ''}`}
-                data-tooltip="源码 (Ctrl+S)"
+                aria-label="源码" data-tooltip="源码 (Ctrl+S)"
               >
                 📄
               </button>
               <button
-                onClick={() => setShowExportPanel(true)}
+                onClick={() => openPanel('exportPanel')}
                 className={styles.toolbarBtn}
-                data-tooltip="导出 (Ctrl+E)"
+                aria-label="导出" data-tooltip="导出 (Ctrl+E)"
               >
                 📤
               </button>
               <button
-                onClick={() => setShowFocusMode(!showFocusMode)}
+                onClick={() => togglePanel('focusMode')}
                 data-guide="focus-mode"
                 className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
-                data-tooltip="专注模式 (Ctrl+.)"
+                aria-label="专注模式" data-tooltip="专注模式 (Ctrl+.)"
               >
                 👁️
               </button>
@@ -636,7 +635,7 @@ function AppInner() {
                     if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
                   }}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                  data-tooltip="缩小"
+                  aria-label="缩小" data-tooltip="缩小"
                 >
                   A-
                 </button>
@@ -650,29 +649,29 @@ function AppInner() {
                     if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
                   }}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                  data-tooltip="放大"
+                  aria-label="放大" data-tooltip="放大"
                 >
                   A+
                 </button>
               </div>
               <button
-                onClick={() => setShowKeyboardShortcuts(true)}
+                onClick={() => openPanel('keyboardShortcuts')}
                 className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                data-tooltip="快捷键 (Ctrl+/)"
+                aria-label="快捷键" data-tooltip="快捷键 (Ctrl+/)"
               >
                 ⌨️
               </button>
               <button
-                onClick={() => setShowFileInfo(true)}
+                onClick={() => openPanel('fileInfo')}
                 className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                data-tooltip="文件信息"
+                aria-label="文件信息" data-tooltip="文件信息"
               >
                 ℹ️
               </button>
               <button
-                onClick={() => setShowReadingStats(true)}
+                onClick={() => openPanel('readingStats')}
                 className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                data-tooltip="阅读统计"
+                aria-label="阅读统计" data-tooltip="阅读统计"
               >
                 📊
               </button>
@@ -683,7 +682,7 @@ function AppInner() {
                 onNavigate={handleBookmarkNavigate}
                 currentHeading={currentHeading}
               />
-              <ThemeToggle onOpenCustomStyle={() => setShowCustomStyle(true)} />
+              <ThemeToggle onOpenCustomStyle={() => openPanel('customStyle')} />
             </div>
           </header>
         </>
@@ -691,10 +690,10 @@ function AppInner() {
       <ErrorBoundary>
         <div className={styles.app} {...dragProps}>
           <div className={styles.splitView}>
-            {!showFocusMode && showFileSidebar && electronFolderPath && (
+            {!showFocusMode && showFileSidebar && currentFolderPath && (
               <div className={styles.sidebar}>
                 <ElectronFolderExplorer
-                  folderPath={electronFolderPath}
+                  folderPath={currentFolderPath}
                   folderName={currentFolderName}
                   currentFilePath={currentFilePath}
                   onFileSelect={handleFolderFileSelect}
@@ -702,7 +701,7 @@ function AppInner() {
                 />
               </div>
             )}
-            {!showFocusMode && showFileSidebar && currentFolderHandle && !electronFolderPath && (
+            {!showFocusMode && showFileSidebar && currentFolderHandle && !currentFolderPath && (
               <div className={styles.sidebar}>
                 <SidebarFileExplorer
                   folderName={currentFolderName}
@@ -790,7 +789,7 @@ function AppInner() {
               onSelect={handleRecentSelect}
               onRemove={removeRecentFile}
               onClearAll={clearRecentFiles}
-              onClose={() => setShowRecent(false)}
+              onClose={() => closePanel('recent')}
               onOpenFolder={handleOpenFolder}
             />
           )}
@@ -809,17 +808,17 @@ function AppInner() {
               onSelectHistory={(h) => setQuery(h)}
               tabs={tabs}
               activeTabId={activeTabId}
-              onTabSelect={handleTabSelect}
+              onTabSelect={selectTab}
               onNavigateToMatch={goToMatch}
             />
           )}
           {showKeyboardShortcuts && (
-            <KeyboardShortcuts onClose={() => setShowKeyboardShortcuts(false)} />
+            <KeyboardShortcuts onClose={() => closePanel('keyboardShortcuts')} />
           )}
           {showExportPanel && (
             <ExportPanel
               isOpen={showExportPanel}
-              onClose={() => setShowExportPanel(false)}
+              onClose={() => closePanel('exportPanel')}
               fileName={activeTab?.name || ''}
               fileContent={activeTab?.content || ''}
               theme={theme}
@@ -843,38 +842,38 @@ function AppInner() {
               recentFiles={recentFiles}
               onFileSelect={(content, name, filePath) => {
                 handleFileOpen(content, name, filePath)
-                setShowQuickSwitcher(false)
+                closePanel('quickSwitcher')
               }}
               onRemoveRecent={removeRecentFile}
               onClearRecent={clearRecentFiles}
-              onClose={() => setShowQuickSwitcher(false)}
+              onClose={() => closePanel('quickSwitcher')}
             />
           )}
           {showFileInfo && (
             <FileInfoPanel
               fileInfo={fileInfo}
-              onClose={() => setShowFileInfo(false)}
+              onClose={() => closePanel('fileInfo')}
             />
           )}
           {showGlobalSearch && (
             <GlobalSearch
               isOpen={showGlobalSearch}
-              onClose={() => setShowGlobalSearch(false)}
-              folderPath={electronFolderPath}
+              onClose={() => closePanel('globalSearch')}
+              folderPath={currentFolderPath}
               onOpenFile={handleGlobalSearchOpenFile}
             />
           )}
           {showReadingStats && (
             <ReadingStatsPanel
               isOpen={showReadingStats}
-              onClose={() => setShowReadingStats(false)}
+              onClose={() => closePanel('readingStats')}
               stats={totalStats}
             />
           )}
           {showCustomStyle && (
             <CustomStylePanel
               isOpen={showCustomStyle}
-              onClose={() => setShowCustomStyle(false)}
+              onClose={() => closePanel('customStyle')}
               customCSS={customCSS}
               onChange={setCustomCSS}
             />
@@ -909,11 +908,11 @@ function AppInner() {
       {showQuickJump && (
         <QuickJump
           isOpen={showQuickJump}
-          onClose={() => setShowQuickJump(false)}
+          onClose={() => closePanel('quickJump')}
           content={activeTab?.content || ''}
           outlineItems={outlineItems}
           onJumpToLine={(line: number) => {
-            setShowQuickJump(false)
+            closePanel('quickJump')
             if (showSource) {
               setHighlightedLine(line)
             } else {
@@ -924,7 +923,7 @@ function AppInner() {
             }
           }}
           onJumpToHeading={(id: string) => {
-            setShowQuickJump(false)
+            closePanel('quickJump')
             handleOutlineClick(id)
           }}
           totalLines={activeTab?.content.split('\n').length || 0}
@@ -933,20 +932,20 @@ function AppInner() {
       )}
       <CommandPalette
         isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
+        onClose={() => closePanel('commandPalette')}
         onExecute={(commandId) => {
           switch (commandId) {
             case 'open-file':
-              setShowQuickSwitcher(true)
+              openPanel('quickSwitcher')
               break
             case 'open-folder':
               handleOpenFolder()
               break
             case 'new-tab':
-              handleNewTab()
+              newTab()
               break
             case 'close-tab':
-              if (activeTabId) handleTabClose(activeTabId)
+              if (activeTabId) closeTab(activeTabId)
               break
             case 'toggle-source': {
               const next = !showSource
@@ -955,16 +954,16 @@ function AppInner() {
               break
             }
             case 'toggle-outline':
-              setShowOutline(prev => !prev)
+              togglePanel('outline')
               break
             case 'toggle-search':
-              setShowSearch(true)
+              openPanel('search')
               break
             case 'toggle-focus':
-              setShowFocusMode(prev => !prev)
+              togglePanel('focusMode')
               break
             case 'toggle-recent':
-              setShowRecent(prev => !prev)
+              togglePanel('recent')
               break
             case 'toggle-split':
               toggleSplitView()
@@ -982,30 +981,30 @@ function AppInner() {
               break
             }
             case 'export-html':
-              setShowExportPanel(true)
+              openPanel('exportPanel')
               break
             case 'print':
               window.print()
               break
             case 'show-shortcuts':
-              setShowKeyboardShortcuts(true)
+              openPanel('keyboardShortcuts')
               break
             case 'toggle-theme':
               toggleTheme()
               break
             case 'reading-stats':
-              setShowReadingStats(true)
+              openPanel('readingStats')
               break
             case 'custom-style':
-              setShowCustomStyle(true)
+              openPanel('customStyle')
               break
             case 'quick-jump':
-              setShowQuickJump(true)
+              openPanel('quickJump')
               break
             default:
               break
           }
-          setShowCommandPalette(false)
+          closePanel('commandPalette')
         }}
       />
     </>

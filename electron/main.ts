@@ -2,6 +2,12 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOp
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
+import { createLogger } from './lib/logger'
+import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFileSize } from './lib/ipcGuard'
+
+const logger = createLogger('main')
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 const watchers = new Map<string, fs.FSWatcher>()
 
@@ -67,26 +73,12 @@ function saveStore(data: StoreData): void {
     // Also write backup
     fs.writeFileSync(`${storePath}.bak`, JSON.stringify(data, null, 2))
   } catch (err) {
-    console.error('Failed to save store:', err)
+    logger.error('Failed to save store', { error: String(err) })
   }
 }
 
 function isPathSafe(filePath: string): boolean {
-  if (!filePath || typeof filePath !== 'string') return false
-  // Reject paths with parent directory traversal
-  if (filePath.includes('..')) return false
-  // Resolve and ensure it's absolute
-  const resolved = path.resolve(filePath)
-  if (!path.isAbsolute(resolved)) return false
-  // Allow common safe base directories only
-  const homeDir = app.getPath('home')
-  const userDataDir = app.getPath('userData')
-  const tempDir = app.getPath('temp')
-  const desktopDir = app.getPath('desktop')
-  const documentsDir = app.getPath('documents')
-  const downloadsDir = app.getPath('downloads')
-  const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir, '/tmp']
-  return safeRoots.some(root => resolved.startsWith(root))
+  return validateFilePath(filePath)
 }
 
 const windows = new Map<number, BrowserWindow>()
@@ -99,11 +91,6 @@ let isQuiting = false
 const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
-
-function log(message: string, ...args: unknown[]) {
-  const timestamp = new Date().toISOString()
-  console.log(`[MAIN ${timestamp}] ${message}`, ...args)
-}
 
 function getWindowId(win: BrowserWindow): number {
   return windowIds.get(win) || 0
@@ -146,13 +133,21 @@ function saveWindowState() {
   saveStore(store)
 }
 
+function createTrayIcon(): Electron.NativeImage {
+  // Create a simple 16x16 colored square icon programmatically
+  // Base64-encoded 16x16 blue (#2b7de1) PNG
+  const base64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADBJREFUOE9jZGBg+M+ABhhpIA4w0sQaQDUSBrAaQYpRbcCmEVyXYDWMZgCuS7AaRjcAANIXCf8K6mNaAAAAAElFTkSuQmCC'
+  const buffer = Buffer.from(base64, 'base64')
+  return nativeImage.createFromBuffer(buffer, { width: 16, height: 16 })
+}
+
 function createWindow(filePath?: string, windowState?: WindowState) {
-  log('Creating window...')
+  logger.info('Creating window...')
 
   const preloadPath = app.isPackaged
     ? path.join(process.resourcesPath, 'electron', 'preload.js')
     : path.join(__dirname, 'preload.js')
-  log('Preload path:', preloadPath, 'exists:', fs.existsSync(preloadPath))
+  logger.info('Preload path resolved', { preloadPath, exists: fs.existsSync(preloadPath) })
 
   const win = new BrowserWindow({
     width: windowState?.width || 1200,
@@ -187,7 +182,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
   })
 
   win.on('closed', () => {
-    log('Window closed:', id)
+    logger.info('Window closed', { windowId: id })
     windowOpenFiles.delete(id)
     windows.delete(id)
     if (lastFocusedWindowId === id) {
@@ -202,41 +197,36 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     }
   })
 
-  const htmlPath = isDev 
+  const htmlPath = isDev
     ? 'http://localhost:5173'
     : path.join(__dirname, '../dist/index.html')
 
-  log('Loading HTML:', htmlPath)
+  logger.info('Loading HTML', { htmlPath })
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools()
   } else {
-    const loaded = win.loadFile(htmlPath)
-    log('loadFile returned:', loaded)
+    win.loadFile(htmlPath).catch(err => {
+      logger.error('Failed to load file', { htmlPath, error: String(err) })
+    })
   }
 
   win.webContents.on('did-finish-load', () => {
-    log('Page finished loading for window:', id)
+    logger.info('Page finished loading', { windowId: id })
   })
 
   win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     const levelName = ['verbose', 'info', 'warning', 'error'][level] || String(level)
-    log(`[RENDERER ${levelName}] ${message} (${sourceId}:${line})`)
+    logger.info(`[RENDERER ${levelName}] ${message}`, { sourceId, line })
   })
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-    log('Page failed to load:', errorCode, errorDescription)
-  })
-
-  win.webContents.on('console-message', (_event, level, message) => {
-    if (level >= 0) {
-      log('[RENDERER]', message)
-    }
+    logger.error('Page failed to load', { errorCode, errorDescription })
   })
 
   if (filePath) {
-    log('File to open via did-finish-load:', filePath)
+    logger.info('File to open via did-finish-load', { filePath })
     const loadHandler = () => {
       win.webContents.send('open-file', filePath)
     }
@@ -248,7 +238,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
 
 function createMenu() {
   const isMac = process.platform === 'darwin'
-  
+
   const getTargetWindow = (): BrowserWindow | undefined => {
     const focused = BrowserWindow.getFocusedWindow()
     if (focused && !focused.isDestroyed()) return focused
@@ -376,7 +366,7 @@ function createMenu() {
             const win = getTargetWindow()
             const detail = `一款沉浸式的 Markdown 阅读器
 
-版本: 1.3.2
+版本: 1.4.0
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -413,24 +403,24 @@ function createMenu() {
 }
 
 function handleFileOpen(filePath: string) {
-  log('handleFileOpen called:', filePath)
-  
+  logger.info('handleFileOpen called', { filePath })
+
   if (!filePath) return
 
   try {
     const stat = fs.statSync(filePath)
     if (stat.isDirectory()) {
-      log('Path is a directory, not a file:', filePath)
+      logger.info('Path is a directory, not a file', { filePath })
       return
     }
   } catch {
-    log('Cannot access file:', filePath)
+    logger.warn('Cannot access file', { filePath })
     return
   }
-  
+
   const ext = path.extname(filePath).toLowerCase()
   if (ext !== '.md' && ext !== '.markdown') {
-    log('Not a markdown file:', ext)
+    logger.info('Not a markdown file', { filePath, ext })
     return
   }
 
@@ -459,21 +449,21 @@ function handleFileOpen(filePath: string) {
 }
 
 const gotTheLock = app.requestSingleInstanceLock()
-log('Got lock:', gotTheLock)
+logger.info('Got lock', { gotTheLock })
 
 if (!gotTheLock) {
-  log('Another instance is running, quitting...')
+  logger.info('Another instance is running, quitting...')
   app.quit()
 } else {
   app.on('second-instance', (_event, commandLine) => {
-    log('Second instance detected:', commandLine)
-    const filePath = commandLine.find(arg => 
+    logger.info('Second instance detected', { commandLine })
+    const filePath = commandLine.find(arg =>
       arg.endsWith('.md') || arg.endsWith('.markdown')
     )
     if (filePath) {
       handleFileOpen(filePath)
     }
-    
+
     const win = getFocusedOrLastWindow()
     if (win && !win.isDestroyed()) {
       if (win.isMinimized()) win.restore()
@@ -484,11 +474,11 @@ if (!gotTheLock) {
 }
 
 app.whenReady().then(() => {
-  log('App ready')
+  logger.info('App ready')
   createMenu()
 
   if (process.platform === 'darwin') {
-    app.dock.setMenu(Menu.buildFromTemplate([
+    app.dock?.setMenu(Menu.buildFromTemplate([
       { label: '打开文件', click: async () => {
         const win = getFocusedOrLastWindow()
         if (!win || win.isDestroyed()) return
@@ -508,8 +498,9 @@ app.whenReady().then(() => {
     ]))
   }
 
-  // System tray
-  tray = new Tray(nativeImage.createEmpty())
+  // System tray with proper icon
+  const trayIcon = createTrayIcon()
+  tray = new Tray(trayIcon)
   tray.setToolTip('AI Markdown Reader')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开文件', click: async () => {
@@ -528,9 +519,9 @@ app.whenReady().then(() => {
         }
       }
     } },
-    { label: '显示窗口', click: () => { 
+    { label: '显示窗口', click: () => {
       const win = getFocusedOrLastWindow()
-      win?.show(); win?.focus() 
+      win?.show(); win?.focus()
     } },
     { type: 'separator' },
     { label: '退出', click: () => { isQuiting = true; app.quit() } }
@@ -538,8 +529,47 @@ app.whenReady().then(() => {
 
   // Auto-updater (only in packaged builds)
   if (app.isPackaged) {
+    const sendToAllWindows = (channel: string, ...args: unknown[]) => {
+      windows.forEach(win => {
+        if (!win.isDestroyed()) {
+          win.webContents.send(channel, ...args)
+        }
+      })
+    }
+
+    autoUpdater.on('checking-for-update', () => {
+      logger.info('Checking for update')
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      logger.info('Update available', { version: info.version })
+      sendToAllWindows('update-available', { version: info.version })
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      logger.info('Update not available')
+    })
+
+    autoUpdater.on('error', (err) => {
+      logger.error('Auto-updater error', { error: String(err) })
+      sendToAllWindows('update-error', { error: String(err) })
+    })
+
+    autoUpdater.on('download-progress', (progress) => {
+      sendToAllWindows('update-progress', {
+        percent: progress.percent,
+        transferred: progress.transferred,
+        total: progress.total,
+      })
+    })
+
+    autoUpdater.on('update-downloaded', (info) => {
+      logger.info('Update downloaded', { version: info.version })
+      sendToAllWindows('update-downloaded', { version: info.version })
+    })
+
     autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      log('Auto-updater check failed:', err)
+      logger.error('Auto-updater check failed', { error: String(err) })
     })
   }
 
@@ -566,7 +596,7 @@ app.whenReady().then(() => {
   })
 
   app.on('open-file', (event, filePath) => {
-    log('open-file event:', filePath)
+    logger.info('open-file event', { filePath })
     event.preventDefault()
     if (app.isReady()) {
       handleFileOpen(filePath)
@@ -575,11 +605,10 @@ app.whenReady().then(() => {
     }
   })
 
-  const filePath = process.argv.find(arg => 
+  const filePath = process.argv.find(arg =>
     arg.endsWith('.md') || arg.endsWith('.markdown')
   )
-  log('File from argv:', filePath)
-  log('Full argv:', process.argv)
+  logger.info('File from argv', { filePath, argv: process.argv })
 
   const store = loadStore()
   for (const pathToOpen of filesToOpenBeforeReady) {
@@ -597,7 +626,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  log('All windows closed')
+  logger.info('All windows closed')
   watchers.forEach(watcher => watcher.close())
   watchers.clear()
   if (process.platform !== 'darwin') {
@@ -606,7 +635,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  log('App activated')
+  logger.info('App activated')
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   } else {
@@ -622,17 +651,29 @@ app.on('before-quit', () => {
 })
 
 process.on('uncaughtException', (error: Error) => {
-  log('Uncaught exception:', error)
+  logger.error('Uncaught exception', { error: error.message, stack: error.stack })
 })
 
 process.on('unhandledRejection', (reason: unknown) => {
-  log('Unhandled rejection:', reason)
+  logger.error('Unhandled rejection', { reason: String(reason) })
 })
 
-ipcMain.handle('open-file-dialog', async () => {
+// IPC handlers with timeout and rate limiting
+const DEFAULT_TIMEOUT = 10000 // 10s
+const fileDialogLimiter = createRateLimiter(5, 1000) // 5 calls per second
+
+function wrapHandler(channel: string, handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any): void {
+  ipcMain.handle(channel, createTimeoutHandler(handler, DEFAULT_TIMEOUT, channel))
+}
+
+wrapHandler('open-file-dialog', async () => {
+  if (!fileDialogLimiter()) {
+    logger.warn('Rate limit exceeded for open-file-dialog')
+    throw new Error('Rate limit exceeded. Please slow down.')
+  }
   try {
     const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
-    log('open-file-dialog: focusedWindow=', BrowserWindow.getFocusedWindow()?.id, 'fallback=', win?.id)
+    logger.info('open-file-dialog', { focusedWindow: BrowserWindow.getFocusedWindow()?.id, fallback: win?.id })
     const options: Electron.OpenDialogOptions = {
       properties: ['openFile'],
       defaultPath: app.getPath('home'),
@@ -644,43 +685,57 @@ ipcMain.handle('open-file-dialog', async () => {
     const result = win
       ? await dialog.showOpenDialog(win, options)
       : await dialog.showOpenDialog(options)
-    log('open-file-dialog result:', result.canceled, result.filePaths)
-    
+    logger.info('open-file-dialog result', { canceled: result.canceled, filePaths: result.filePaths })
+
     if (!result.canceled && result.filePaths.length > 0) {
       const filePath = result.filePaths[0]
       try {
         const stat = fs.statSync(filePath)
         if (stat.isDirectory()) {
-          log('Selected path is a directory, reading first file inside:', filePath)
+          logger.info('Selected path is a directory, reading first file inside', { filePath })
           const entries = fs.readdirSync(filePath, { withFileTypes: true })
           const firstFile = entries.find(e =>
             !e.isDirectory() && (e.name.endsWith('.md') || e.name.endsWith('.markdown'))
           )
           if (firstFile) {
             const fullPath = path.join(filePath, firstFile.name)
+            const sizeCheck = validateFileSize(fullPath, MAX_FILE_SIZE)
+            if (!sizeCheck.valid) {
+              logger.warn('File too large in open-file-dialog', { filePath: fullPath, size: sizeCheck.size, max: MAX_FILE_SIZE })
+              return { filePath: fullPath, content: '', error: sizeCheck.error }
+            }
             const content = fs.readFileSync(fullPath, 'utf-8')
             return { filePath: fullPath, content }
           }
           return null
         }
+        const sizeCheck = validateFileSize(filePath, MAX_FILE_SIZE)
+        if (!sizeCheck.valid) {
+          logger.warn('File too large in open-file-dialog', { filePath, size: sizeCheck.size, max: MAX_FILE_SIZE })
+          return { filePath, content: '', error: sizeCheck.error }
+        }
         const content = fs.readFileSync(filePath, 'utf-8')
         return { filePath, content }
       } catch (readErr) {
-        log('Failed to read file:', filePath, readErr)
+        logger.error('Failed to read file in open-file-dialog', { filePath, error: String(readErr) })
         return null
       }
     }
     return null
   } catch (err) {
-    log('open-file-dialog error:', err)
+    logger.error('open-file-dialog error', { error: String(err) })
     throw err
   }
 })
 
-ipcMain.handle('open-folder-dialog', async () => {
+wrapHandler('open-folder-dialog', async () => {
+  if (!fileDialogLimiter()) {
+    logger.warn('Rate limit exceeded for open-folder-dialog')
+    throw new Error('Rate limit exceeded. Please slow down.')
+  }
   try {
     const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
-    log('open-folder-dialog: focusedWindow=', BrowserWindow.getFocusedWindow()?.id, 'fallback=', win?.id)
+    logger.info('open-folder-dialog', { focusedWindow: BrowserWindow.getFocusedWindow()?.id, fallback: win?.id })
     const options: Electron.OpenDialogOptions = {
       properties: ['openDirectory'],
       defaultPath: app.getPath('home')
@@ -688,19 +743,19 @@ ipcMain.handle('open-folder-dialog', async () => {
     const result = win
       ? await dialog.showOpenDialog(win, options)
       : await dialog.showOpenDialog(options)
-    log('open-folder-dialog result:', result.canceled, result.filePaths)
-    
+    logger.info('open-folder-dialog result', { canceled: result.canceled, filePaths: result.filePaths })
+
     if (!result.canceled && result.filePaths.length > 0) {
       return result.filePaths[0]
     }
     return null
   } catch (err) {
-    log('open-folder-dialog error:', err)
+    logger.error('open-folder-dialog error', { error: String(err) })
     throw err
   }
 })
 
-ipcMain.handle('read-folder', async (_event, folderPath: string) => {
+wrapHandler('read-folder', async (_event, folderPath: string) => {
   if (!isPathSafe(folderPath)) {
     return { success: false, error: '非法路径' }
   }
@@ -732,9 +787,14 @@ ipcMain.handle('read-folder', async (_event, folderPath: string) => {
   }
 })
 
-ipcMain.handle('read-file', async (_event, filePath: string) => {
+wrapHandler('read-file', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '非法路径' }
+  }
+  const sizeCheck = validateFileSize(filePath, MAX_FILE_SIZE)
+  if (!sizeCheck.valid) {
+    logger.warn('File too large in read-file', { filePath, size: sizeCheck.size, max: MAX_FILE_SIZE })
+    return { success: false, error: sizeCheck.error }
   }
   try {
     const stat = fs.statSync(filePath)
@@ -748,7 +808,7 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   }
 })
 
-ipcMain.handle('get-file-info', async (_event, filePath: string) => {
+wrapHandler('get-file-info', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '非法路径' }
   }
@@ -768,16 +828,16 @@ ipcMain.handle('get-file-info', async (_event, filePath: string) => {
   }
 })
 
-ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
+wrapHandler('show-in-folder', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) return
   shell.showItemInFolder(filePath)
 })
 
-ipcMain.handle('get-recent-files', async () => {
+wrapHandler('get-recent-files', async () => {
   return loadStore().recentFiles
 })
 
-ipcMain.handle('add-recent-file', async (_event, file: { name: string, filePath: string }) => {
+wrapHandler('add-recent-file', async (_event, file: { name: string, filePath: string }) => {
   const store = loadStore()
   const existing = store.recentFiles.findIndex(f => f.filePath === file.filePath)
   if (existing !== -1) {
@@ -794,33 +854,33 @@ ipcMain.handle('add-recent-file', async (_event, file: { name: string, filePath:
   saveStore(store)
 })
 
-ipcMain.handle('remove-recent-file', async (_event, filePath: string) => {
+wrapHandler('remove-recent-file', async (_event, filePath: string) => {
   const store = loadStore()
   store.recentFiles = store.recentFiles.filter(f => f.filePath !== filePath)
   saveStore(store)
 })
 
-ipcMain.handle('clear-recent-files', async () => {
+wrapHandler('clear-recent-files', async () => {
   const store = loadStore()
   store.recentFiles = []
   saveStore(store)
 })
 
-ipcMain.handle('get-last-folder', async () => {
+wrapHandler('get-last-folder', async () => {
   return loadStore().lastFolder
 })
 
-ipcMain.handle('set-last-folder', async (_event, folderPath: string) => {
+wrapHandler('set-last-folder', async (_event, folderPath: string) => {
   const store = loadStore()
   store.lastFolder = folderPath
   saveStore(store)
 })
 
-ipcMain.handle('get-max-recent-files', async () => {
+wrapHandler('get-max-recent-files', async () => {
   return loadStore().maxRecentFiles || DEFAULT_MAX_RECENT_FILES
 })
 
-ipcMain.handle('set-max-recent-files', async (_event, max: number) => {
+wrapHandler('set-max-recent-files', async (_event, max: number) => {
   const store = loadStore()
   store.maxRecentFiles = max
   if (store.recentFiles.length > max) {
@@ -829,7 +889,7 @@ ipcMain.handle('set-max-recent-files', async (_event, max: number) => {
   saveStore(store)
 })
 
-ipcMain.handle('watch-file', async (event, filePath: string) => {
+wrapHandler('watch-file', async (event, filePath: string) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '非法路径' }
   }
@@ -853,7 +913,7 @@ ipcMain.handle('watch-file', async (event, filePath: string) => {
   }
 })
 
-ipcMain.handle('unwatch-file', async (_event, filePath: string) => {
+wrapHandler('unwatch-file', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) return
   const watcher = watchers.get(filePath)
   if (watcher) {
@@ -862,21 +922,21 @@ ipcMain.handle('unwatch-file', async (_event, filePath: string) => {
   }
 })
 
-ipcMain.handle('set-progress-bar', (event, progress: number) => {
+wrapHandler('set-progress-bar', (event, progress: number) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win && !win.isDestroyed()) {
     win.setProgressBar(progress)
   }
 })
 
-ipcMain.handle('clear-progress-bar', (event) => {
+wrapHandler('clear-progress-bar', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win && !win.isDestroyed()) {
     win.setProgressBar(-1)
   }
 })
 
-ipcMain.handle('set-title', (event, title: string) => {
+wrapHandler('set-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win && !win.isDestroyed()) {
     win.setTitle(title ? `${title} - AI Markdown Reader` : 'AI Markdown Reader')
@@ -884,13 +944,13 @@ ipcMain.handle('set-title', (event, title: string) => {
 })
 
 // Multi-window IPC handlers
-ipcMain.handle('get-window-id', (event) => {
+wrapHandler('get-window-id', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return 0
   return getWindowId(win)
 })
 
-ipcMain.handle('focus-window', (_event, id: number) => {
+wrapHandler('focus-window', (_event, id: number) => {
   const win = windows.get(id)
   if (win && !win.isDestroyed()) {
     win.show()
@@ -898,7 +958,7 @@ ipcMain.handle('focus-window', (_event, id: number) => {
   }
 })
 
-ipcMain.handle('get-window-states', () => {
+wrapHandler('get-window-states', () => {
   const states: WindowState[] = []
   for (const win of windows.values()) {
     if (win.isDestroyed()) continue
@@ -915,7 +975,7 @@ ipcMain.handle('get-window-states', () => {
   return states
 })
 
-ipcMain.handle('register-window-files', (event, filePaths: string[]) => {
+wrapHandler('register-window-files', (event, filePaths: string[]) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return
   const id = getWindowId(win)

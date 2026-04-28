@@ -16,8 +16,8 @@
 }
 
 .modal {
-  background: var(--bg-primary, #fff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   width: 520px;
@@ -42,7 +42,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border);
 }
 
 .searchIcon {
@@ -57,11 +57,11 @@
   background: transparent;
   font-size: 16px;
   outline: none;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
 }
 
 .input::placeholder {
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary);
 }
 
 .clearBtn {
@@ -69,15 +69,15 @@
   border: none;
   cursor: pointer;
   font-size: 14px;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary);
   padding: 4px 8px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
 .clearBtn:hover {
-  background: var(--bg-hover, #f3f4f6);
-  color: var(--text-primary, #111);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .list {
@@ -89,7 +89,7 @@
 .empty {
   padding: 24px;
   text-align: center;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -101,12 +101,12 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  color: var(--text-primary, #111);
+  color: var(--text-primary);
 }
 
 .item:hover,
 .item.selected {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--bg-hover);
 }
 
 .itemIcon {
@@ -126,15 +126,15 @@
 
 .itemMeta {
   font-size: 11px;
-  color: var(--text-muted, #9ca3af);
-  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
   padding: 2px 6px;
   border-radius: 4px;
   flex-shrink: 0;
 }
 
 .highlight {
-  color: var(--accent, #0066cc);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -142,7 +142,7 @@
   display: flex;
   justify-content: space-between;
   padding: 10px 16px;
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  border-top: 1px solid var(--border);
   font-size: 12px;
-  color: var(--text-muted, #9ca3af);
+  color: var(--text-secondary);
 }

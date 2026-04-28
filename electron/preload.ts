@@ -6,6 +6,15 @@ interface RecentFile {
   openedAt: number
 }
 
+interface WindowState {
+  width: number
+  height: number
+  x?: number
+  y?: number
+  isMaximized?: boolean
+  isFullScreen?: boolean
+}
+
 // Simple path utilities (avoid importing 'path' which fails in sandbox preload)
 function pathBasename(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/').replace(/\/$/, '')
@@ -38,6 +47,10 @@ const openFileCallbacks = new Set<(filePath: string) => void>()
 const openFolderCallbacks = new Set<(folderPath: string) => void>()
 const fileChangedCallbacks = new Set<(filePath: string) => void>()
 const systemThemeCallbacks = new Set<(theme: 'light' | 'dark') => void>()
+const updateAvailableCallbacks = new Set<(info: { version: string }) => void>()
+const updateProgressCallbacks = new Set<(progress: { percent: number; transferred: number; total: number }) => void>()
+const updateDownloadedCallbacks = new Set<(info: { version: string }) => void>()
+const updateErrorCallbacks = new Set<(info: { error: string }) => void>()
 
 ipcRenderer.on('open-file', (_event, filePath: string) => {
   openFileCallbacks.forEach(cb => cb(filePath))
@@ -55,13 +68,76 @@ ipcRenderer.on('system-theme-changed', (_event, theme: 'light' | 'dark') => {
   systemThemeCallbacks.forEach(cb => cb(theme))
 })
 
+ipcRenderer.on('update-available', (_event, info: { version: string }) => {
+  updateAvailableCallbacks.forEach(cb => cb(info))
+})
+
+ipcRenderer.on('update-progress', (_event, progress: { percent: number; transferred: number; total: number }) => {
+  updateProgressCallbacks.forEach(cb => cb(progress))
+})
+
+ipcRenderer.on('update-downloaded', (_event, info: { version: string }) => {
+  updateDownloadedCallbacks.forEach(cb => cb(info))
+})
+
+ipcRenderer.on('update-error', (_event, info: { error: string }) => {
+  updateErrorCallbacks.forEach(cb => cb(info))
+})
+
+const DEFAULT_RENDERER_TIMEOUT = 10000
+
+function makeCallKey(channel: string, args: unknown[]): string {
+  try {
+    return `${channel}:${JSON.stringify(args)}`
+  } catch {
+    return `${channel}:${Date.now()}:${Math.random()}`
+  }
+}
+
+function invokeWithTimeout<T>(channel: string, timeoutMs: number, ...args: unknown[]): Promise<T> {
+  return Promise.race([
+    ipcRenderer.invoke(channel, ...args),
+    new Promise<T>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Renderer IPC timeout: ${channel}`))
+      }, timeoutMs)
+    })
+  ])
+}
+
+const pendingCalls = new Map<string, Promise<unknown>>()
+
+function dedupedInvoke<T>(channel: string, timeoutMs: number, ...args: unknown[]): Promise<T> {
+  const key = makeCallKey(channel, args)
+  const existing = pendingCalls.get(key)
+  if (existing) {
+    return existing as Promise<T>
+  }
+  const promise = invokeWithTimeout<T>(channel, timeoutMs, ...args).finally(() => {
+    pendingCalls.delete(key)
+  })
+  pendingCalls.set(key, promise)
+  return promise
+}
+
+function createIPCCall<T extends (...args: any[]) => Promise<any>>(
+  channel: string,
+  options: { dedup?: boolean; timeout?: number } = {}
+): T {
+  const timeout = options.timeout ?? DEFAULT_RENDERER_TIMEOUT
+  if (options.dedup) {
+    return ((...args: unknown[]) => dedupedInvoke(channel, timeout, ...args)) as T
+  }
+  return ((...args: unknown[]) => invokeWithTimeout(channel, timeout, ...args)) as T
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
-  openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
-  openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
-  readFolder: (folderPath: string) => ipcRenderer.invoke('read-folder', folderPath),
-  readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
-  getFileInfo: (filePath: string) => ipcRenderer.invoke('get-file-info', filePath),
-  showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
+  openFileDialog: createIPCCall<() => Promise<{ filePath: string; content: string; error?: string } | null>>('open-file-dialog', { dedup: true }),
+  openFolderDialog: createIPCCall<() => Promise<string | null>>('open-folder-dialog', { dedup: true }),
+  readFolder: createIPCCall<(folderPath: string) => Promise<{ success: boolean; files?: { name: string; filePath: string; size?: number; lastModified?: number; isDirectory?: boolean }[]; error?: string }>>('read-folder'),
+  readFile: createIPCCall<(filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>>('read-file'),
+  getFileInfo: createIPCCall<(filePath: string) => Promise<{ success: boolean; info?: { name: string; size: number; lastModified: number; created: number }; error?: string }>>('get-file-info'),
+  showInFolder: createIPCCall<(filePath: string) => Promise<void>>('show-in-folder'),
   onOpenFile: (callback: (filePath: string) => void) => {
     openFileCallbacks.add(callback)
   },
@@ -80,22 +156,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offFileChanged: (callback: (filePath: string) => void) => {
     fileChangedCallbacks.delete(callback)
   },
-  watchFile: (filePath: string) => ipcRenderer.invoke('watch-file', filePath),
-  unwatchFile: (filePath: string) => ipcRenderer.invoke('unwatch-file', filePath),
-  getRecentFiles: (): Promise<RecentFile[]> => ipcRenderer.invoke('get-recent-files'),
-  addRecentFile: (file: { name: string; filePath: string }) => ipcRenderer.invoke('add-recent-file', file),
-  removeRecentFile: (filePath: string) => ipcRenderer.invoke('remove-recent-file', filePath),
-  clearRecentFiles: () => ipcRenderer.invoke('clear-recent-files'),
-  getLastFolder: (): Promise<string | null> => ipcRenderer.invoke('get-last-folder'),
-  setLastFolder: (folderPath: string) => ipcRenderer.invoke('set-last-folder', folderPath),
-  getMaxRecentFiles: (): Promise<number> => ipcRenderer.invoke('get-max-recent-files'),
-  setMaxRecentFiles: (max: number) => ipcRenderer.invoke('set-max-recent-files', max),
+  watchFile: createIPCCall<(filePath: string) => Promise<{ success: boolean; error?: string }>>('watch-file'),
+  unwatchFile: createIPCCall<(filePath: string) => Promise<void>>('unwatch-file'),
+  getRecentFiles: createIPCCall<() => Promise<RecentFile[]>>('get-recent-files', { dedup: true }),
+  addRecentFile: createIPCCall<(file: { name: string; filePath: string }) => Promise<void>>('add-recent-file'),
+  removeRecentFile: createIPCCall<(filePath: string) => Promise<void>>('remove-recent-file'),
+  clearRecentFiles: createIPCCall<() => Promise<void>>('clear-recent-files'),
+  getLastFolder: createIPCCall<() => Promise<string | null>>('get-last-folder', { dedup: true }),
+  setLastFolder: createIPCCall<(folderPath: string) => Promise<void>>('set-last-folder'),
+  getMaxRecentFiles: createIPCCall<() => Promise<number>>('get-max-recent-files', { dedup: true }),
+  setMaxRecentFiles: createIPCCall<(max: number) => Promise<void>>('set-max-recent-files'),
   pathBasename,
   pathDirname,
   pathJoin,
-  setProgressBar: (progress: number) => ipcRenderer.invoke('set-progress-bar', progress),
-  clearProgressBar: () => ipcRenderer.invoke('clear-progress-bar'),
-  setTitle: (title: string) => ipcRenderer.invoke('set-title', title),
+  setProgressBar: createIPCCall<(progress: number) => Promise<void>>('set-progress-bar'),
+  clearProgressBar: createIPCCall<() => Promise<void>>('clear-progress-bar'),
+  setTitle: createIPCCall<(title: string) => Promise<void>>('set-title'),
   onSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => {
     systemThemeCallbacks.add(callback)
   },
@@ -103,8 +179,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     systemThemeCallbacks.delete(callback)
   },
   // Multi-window APIs
-  getWindowId: () => ipcRenderer.invoke('get-window-id'),
-  focusWindow: (id: number) => ipcRenderer.invoke('focus-window', id),
-  getWindowStates: () => ipcRenderer.invoke('get-window-states'),
-  registerWindowFiles: (filePaths: string[]) => ipcRenderer.invoke('register-window-files', filePaths)
+  getWindowId: createIPCCall<() => Promise<number>>('get-window-id'),
+  focusWindow: createIPCCall<(id: number) => Promise<void>>('focus-window'),
+  getWindowStates: createIPCCall<() => Promise<WindowState[]>>('get-window-states'),
+  registerWindowFiles: createIPCCall<(filePaths: string[]) => Promise<void>>('register-window-files'),
+  // Auto-updater events
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    updateAvailableCallbacks.add(callback)
+  },
+  offUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    updateAvailableCallbacks.delete(callback)
+  },
+  onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => {
+    updateProgressCallbacks.add(callback)
+  },
+  offUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => {
+    updateProgressCallbacks.delete(callback)
+  },
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    updateDownloadedCallbacks.add(callback)
+  },
+  offUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    updateDownloadedCallbacks.delete(callback)
+  },
+  onUpdateError: (callback: (info: { error: string }) => void) => {
+    updateErrorCallbacks.add(callback)
+  },
+  offUpdateError: (callback: (info: { error: string }) => void) => {
+    updateErrorCallbacks.delete(callback)
+  },
 })

@@ -272,8 +272,17 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
 
     const links = container.querySelectorAll('a')
     links.forEach((link) => {
-      const href = link.getAttribute('href')
-      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      const href = link.getAttribute('href') || ''
+      // Block dangerous protocols
+      const dangerousProtocols = ['javascript:', 'data:', 'file:', 'vbscript:']
+      if (dangerousProtocols.some(p => href.toLowerCase().startsWith(p))) {
+        link.removeAttribute('href')
+        link.style.color = '#888'
+        link.style.textDecoration = 'line-through'
+        link.title = '已禁用不安全的链接'
+        return
+      }
+      if (href.startsWith('http://') || href.startsWith('https://')) {
         link.setAttribute('target', '_blank')
         link.setAttribute('rel', 'noopener noreferrer')
       }
@@ -307,6 +316,17 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       if (!codeEl) return
 
       const code = codeEl.textContent || ''
+
+      // Language label
+      const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'))
+      if (langClass) {
+        const lang = langClass.replace('language-', '')
+        const langLabel = document.createElement('span')
+        langLabel.className = 'code-lang-label'
+        langLabel.textContent = lang
+        pre.appendChild(langLabel)
+      }
+
       const copyBtn = document.createElement('button')
       copyBtn.className = 'copy-button'
       copyBtn.innerHTML = '📋'

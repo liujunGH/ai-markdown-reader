@@ -22,7 +22,7 @@ export interface WindowState {
 }
 
 export interface ElectronAPI {
-  openFileDialog: () => Promise<{ filePath: string; content: string } | null>
+  openFileDialog: () => Promise<{ filePath: string; content: string; error?: string } | null>
   openFolderDialog: () => Promise<string | null>
   readFolder: (folderPath: string) => Promise<{ success: boolean; files?: FolderFile[]; error?: string }>
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
@@ -66,6 +66,15 @@ export interface ElectronAPI {
   focusWindow: (id: number) => Promise<void>
   getWindowStates: () => Promise<WindowState[]>
   registerWindowFiles: (filePaths: string[]) => Promise<void>
+  // Auto-updater events
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => void
+  offUpdateAvailable: (callback: (info: { version: string }) => void) => void
+  onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void
+  offUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => void
+  offUpdateDownloaded: (callback: (info: { version: string }) => void) => void
+  onUpdateError: (callback: (info: { error: string }) => void) => void
+  offUpdateError: (callback: (info: { error: string }) => void) => void
 }
 
 declare global {

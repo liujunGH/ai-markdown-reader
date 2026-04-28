@@ -1,0 +1,175 @@
+/* ============================================
+   Design Tokens for ai-markdown-reader
+   ============================================
+   Centralized CSS custom properties (variables)
+   for consistent theming across the application.
+   ============================================ */
+
+/* ----- Primitive Colors ----- */
+:root {
+  --token-color-white: #ffffff;
+  --token-color-black: #000000;
+
+  /* Gray scale */
+  --token-color-gray-50: #fafafa;
+  --token-color-gray-100: #f5f5f5;
+  --token-color-gray-200: #e5e5e5;
+  --token-color-gray-300: #d4d4d4;
+  --token-color-gray-400: #a3a3a3;
+  --token-color-gray-500: #737373;
+  --token-color-gray-600: #525252;
+  --token-color-gray-700: #404040;
+  --token-color-gray-800: #262626;
+  --token-color-gray-900: #171717;
+
+  /* Dark surface colors */
+  --token-color-dark-100: #1e1e1e;
+  --token-color-dark-200: #252526;
+  --token-color-dark-300: #2d2d2d;
+  --token-color-dark-400: #3d3d3d;
+
+  /* Sepia colors */
+  --token-color-sepia-100: #f4ecd8;
+  --token-color-sepia-200: #ebe1c8;
+  --token-color-sepia-300: #e0d5b8;
+  --token-color-sepia-400: #d4c4a8;
+
+  /* Accent defaults */
+  --token-color-accent-blue: #0066cc;
+  --token-color-accent-blue-light: #4da6ff;
+  --token-color-accent-gold: #b8860b;
+}
+
+/* ----- Spacing Tokens ----- */
+:root {
+  --space-0: 0px;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 20px;
+  --space-10: 24px;
+  --space-11: 32px;
+  --space-12: 48px;
+}
+
+/* ----- Font Tokens ----- */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC",
+               "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 24px;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.6;
+}
+
+/* ----- Radius Tokens ----- */
+:root {
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --radius-full: 9999px;
+}
+
+/* ----- Shadow Tokens ----- */
+:root {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-2xl: 0 4px 24px rgba(0, 0, 0, 0.2);
+  --shadow-3xl: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-4xl: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --shadow-5xl: 0 16px 48px rgba(0, 0, 0, 0.25);
+  --shadow-6xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* ----- Z-Index Tokens ----- */
+:root {
+  --z-base: 1;
+  --z-above: 10;
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-panel: 300;
+  --z-modal: 1000;
+  --z-modal-above: 1001;
+  --z-toast: 10000;
+  --z-toast-above: 10002;
+  --z-overlay: 9999;
+}
+
+/* ----- Semantic Colors: Light Theme ----- */
+:root,
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f5f5f5;
+  --bg-hover: #f3f4f6;
+  --bg-elevated: #2a2a2a;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-muted: #9ca3af;
+
+  --accent: #0066cc;
+  --accent-rgb: 0, 102, 204;
+
+  --border: #e5e5e5;
+  --border-color: #e5e7eb;
+}
+
+/* ----- Semantic Colors: Dark Theme ----- */
+[data-theme="dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d2d;
+  --bg-hover: #3d3d3d;
+  --bg-elevated: #2a2a2a;
+
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-muted: #888888;
+
+  --accent: #4da6ff;
+  --accent-rgb: 77, 166, 255;
+
+  --border: #3d3d3d;
+  --border-color: #3a3a3a;
+}
+
+/* ----- Semantic Colors: Sepia Theme ----- */
+[data-theme="sepia"] {
+  --bg-primary: #f4ecd8;
+  --bg-secondary: #ebe1c8;
+  --bg-tertiary: #e0d5b8;
+  --bg-hover: #d4c4a8;
+  --bg-elevated: #2a2a2a;
+
+  --text-primary: #5c4b37;
+  --text-secondary: #8b7355;
+  --text-muted: #a08b6d;
+
+  --accent: #b8860b;
+  --accent-rgb: 184, 134, 11;
+
+  --border: #d4c4a8;
+  --border-color: #d4c4a8;
+}

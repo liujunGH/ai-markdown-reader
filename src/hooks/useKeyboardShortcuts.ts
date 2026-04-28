@@ -1,59 +1,13 @@
-import { useEffect, useRef } from 'react'
-import { Tab } from '../types/Tab'
+import { useEffect } from 'react'
+import { useUIStore, useTabStore } from '../stores'
 
-export function useKeyboardShortcuts(options: {
-  activeTabId: string
-  tabs: Tab[]
-  fontSize: number
-  showSource: boolean
-  activeTabFilePath?: string
-  showSearch: boolean
-  showKeyboardShortcuts: boolean
-  showFocusMode: boolean
-  showQuickSwitcher: boolean
-  showExportPanel: boolean
-  showCommandPalette: boolean
-  showQuickJump: boolean
-  showGlobalSearch: boolean
-  showReadingStats: boolean
-  showCustomStyle: boolean
-  handleNewTab: () => void
-  handleTabClose: (id: string) => void
-  handleTabSelect: (id: string) => void
-  handleCloseSearch: () => void
-  toggleSplitView: () => void
+export function useKeyboardShortcuts(
+  scrollHistory: { back: () => number | null; forward: () => number | null },
+  handleCloseSearch: () => void,
   updateFileSetting: (key: string, value: unknown) => void
-  scrollHistory: { back: () => number | null; forward: () => number | null }
-  setters: {
-    setShowSearch: (v: boolean) => void
-    setShowGlobalSearch: (v: boolean | ((p: boolean) => boolean)) => void
-    setShowExportPanel: (v: boolean) => void
-    setShowQuickSwitcher: (v: boolean) => void
-    setShowFocusMode: (v: boolean | ((p: boolean) => boolean)) => void
-    setShowKeyboardShortcuts: (v: boolean) => void
-    setShowQuickJump: (v: boolean) => void
-    setShowCommandPalette: (v: boolean) => void
-    setShowReadingStats: (v: boolean) => void
-    setShowCustomStyle: (v: boolean) => void
-    setFontSize: (v: number | ((p: number) => number)) => void
-    setShowSource: (v: boolean | ((p: boolean) => boolean)) => void
-  }
-}) {
-  const optionsRef = useRef(options)
-  optionsRef.current = options
-
+) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const {
-        activeTabId, tabs, fontSize, showSource, activeTabFilePath,
-        showSearch, showKeyboardShortcuts, showFocusMode, showQuickSwitcher,
-        showExportPanel, showCommandPalette, showQuickJump, showGlobalSearch,
-        showReadingStats, showCustomStyle,
-        handleNewTab, handleTabClose, handleTabSelect, handleCloseSearch,
-        toggleSplitView, updateFileSetting, scrollHistory,
-        setters
-      } = optionsRef.current
-
       const target = document.activeElement as HTMLElement
       const isInput = target && (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable)
 
@@ -62,14 +16,24 @@ export function useKeyboardShortcuts(options: {
         return
       }
 
+      const { tabs, activeTabId, activeTab, newTab, closeTab, selectTab } = useTabStore.getState()
+      const {
+        fontSize, showSource, showSearch, showKeyboardShortcuts, showFocusMode,
+        showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
+        showGlobalSearch, showReadingStats, showCustomStyle, openPanel, closePanel,
+        togglePanel, setFontSize, setShowSource
+      } = useUIStore.getState()
+
+      const activeTabFilePath = activeTab()?.filePath
+
       if ((e.metaKey || e.ctrlKey) && e.key === 't') {
         e.preventDefault()
-        handleNewTab()
+        newTab()
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault()
-        if (activeTabId) handleTabClose(activeTabId)
+        if (activeTabId) closeTab(activeTabId)
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Tab') {
@@ -79,49 +43,63 @@ export function useKeyboardShortcuts(options: {
           const nextIndex = e.shiftKey
             ? (currentIndex - 1 + tabs.length) % tabs.length
             : (currentIndex + 1) % tabs.length
-          handleTabSelect(tabs[nextIndex].id)
+          selectTab(tabs[nextIndex].id)
         }
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
-        setters.setShowSearch(true)
+        openPanel('search')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
         e.preventDefault()
-        setters.setShowGlobalSearch(prev => !prev)
+        togglePanel('globalSearch')
         return
       }
       if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
         const newSize = Math.min(fontSize + 2, 32)
-        setters.setFontSize(newSize)
+        setFontSize(newSize)
         if (activeTabFilePath) updateFileSetting('fontSize', newSize)
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '-') {
         e.preventDefault()
         const newSize = Math.max(fontSize - 2, 12)
-        setters.setFontSize(newSize)
+        setFontSize(newSize)
         if (activeTabFilePath) updateFileSetting('fontSize', newSize)
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
         const next = !showSource
-        setters.setShowSource(next)
+        setShowSource(next)
         if (activeTabFilePath) updateFileSetting('showSource', next)
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault()
-        setters.setShowExportPanel(true)
+        openPanel('exportPanel')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault()
-        toggleSplitView()
+        const { tabs: currentTabs, activeTabId: currentActiveId } = useTabStore.getState()
+        const { isSplitView, setSplitView } = useUIStore.getState()
+        if (isSplitView) {
+          setSplitView(false, null)
+        } else {
+          const currentIndex = currentTabs.findIndex(t => t.id === currentActiveId)
+          const secondary = currentTabs[currentIndex + 1] || currentTabs[currentIndex - 1]
+          if (secondary && secondary.id !== currentActiveId) {
+            setSplitView(true, secondary.id)
+          } else if (currentTabs[0] && currentTabs[0].id !== currentActiveId) {
+            setSplitView(true, currentTabs[0].id)
+          } else {
+            setSplitView(true, null)
+          }
+        }
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
@@ -131,32 +109,32 @@ export function useKeyboardShortcuts(options: {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault()
-        setters.setShowQuickSwitcher(true)
+        openPanel('quickSwitcher')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '.') {
         e.preventDefault()
-        setters.setShowFocusMode(prev => !prev)
+        togglePanel('focusMode')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault()
-        setters.setShowKeyboardShortcuts(true)
+        openPanel('keyboardShortcuts')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
         e.preventDefault()
-        setters.setShowQuickJump(true)
+        openPanel('quickJump')
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
         e.preventDefault()
-        setters.setShowCommandPalette(true)
+        openPanel('commandPalette')
         return
       }
       if (e.key === 'F1') {
         e.preventDefault()
-        setters.setShowKeyboardShortcuts(true)
+        openPanel('keyboardShortcuts')
         return
       }
       if (e.key === 'F11') {
@@ -188,25 +166,25 @@ export function useKeyboardShortcuts(options: {
       }
       if (e.key === 'Escape') {
         if (showCommandPalette) {
-          setters.setShowCommandPalette(false)
+          closePanel('commandPalette')
         } else if (showReadingStats) {
-          setters.setShowReadingStats(false)
+          closePanel('readingStats')
         } else if (showCustomStyle) {
-          setters.setShowCustomStyle(false)
+          closePanel('customStyle')
         } else if (showQuickJump) {
-          setters.setShowQuickJump(false)
+          closePanel('quickJump')
         } else if (showGlobalSearch) {
-          setters.setShowGlobalSearch(false)
+          closePanel('globalSearch')
         } else if (showSearch) {
           handleCloseSearch()
         } else if (showKeyboardShortcuts) {
-          setters.setShowKeyboardShortcuts(false)
+          closePanel('keyboardShortcuts')
         } else if (showFocusMode) {
-          setters.setShowFocusMode(false)
+          closePanel('focusMode')
         } else if (showQuickSwitcher) {
-          setters.setShowQuickSwitcher(false)
+          closePanel('quickSwitcher')
         } else if (showExportPanel) {
-          setters.setShowExportPanel(false)
+          closePanel('exportPanel')
         }
         return
       }
@@ -214,5 +192,5 @@ export function useKeyboardShortcuts(options: {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [scrollHistory, handleCloseSearch, updateFileSetting])
 }
