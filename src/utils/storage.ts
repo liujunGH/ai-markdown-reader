@@ -15,6 +15,7 @@ export type ExactStorageKey =
   | 'folder-bookmarks'
   | 'reading-stats'
   | 'custom-css'
+  | 'enable-code-execution'
 
 export type PatternStorageKey =
   | `scroll-position-${string}`

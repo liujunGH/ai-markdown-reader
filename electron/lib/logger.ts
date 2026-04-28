@@ -80,3 +80,26 @@ export function createLogger(scope: string) {
 export function setLogLevel(level: LogLevel): void {
   globalMinLevel = level
 }
+
+export function getRecentLogs(maxLines = 200): string[] {
+  try {
+    const logFile = path.join(getLogDir(), 'app.log')
+    if (!fs.existsSync(logFile)) return []
+    const content = fs.readFileSync(logFile, 'utf-8')
+    const lines = content.trim().split('\n')
+    return lines.slice(-maxLines)
+  } catch {
+    return []
+  }
+}
+
+export function clearLogs(): void {
+  try {
+    const logFile = path.join(getLogDir(), 'app.log')
+    if (fs.existsSync(logFile)) {
+      fs.writeFileSync(logFile, '')
+    }
+  } catch {
+    // ignore
+  }
+}

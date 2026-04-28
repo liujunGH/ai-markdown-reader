@@ -343,8 +343,9 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
 
       // Language label
       const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'))
+      let lang = ''
       if (langClass) {
-        const lang = langClass.replace('language-', '')
+        lang = langClass.replace('language-', '')
         const langLabel = document.createElement('span')
         langLabel.className = 'code-lang-label'
         langLabel.textContent = lang
@@ -369,6 +370,115 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
 
       pre.style.position = 'relative'
       pre.appendChild(copyBtn)
+
+      // Code execution button for shell languages
+      const shellLanguages = ['bash', 'sh', 'shell']
+      const isShell = shellLanguages.includes(lang)
+      const codeExecutionEnabled = getStorageItem('enable-code-execution') === 'true'
+
+      if (isShell && codeExecutionEnabled && window.electronAPI?.executeShellCommand) {
+        const runBtn = document.createElement('button')
+        runBtn.className = 'code-run-btn'
+        runBtn.innerHTML = '▶'
+        runBtn.title = '运行代码'
+        pre.appendChild(runBtn)
+
+        // Result container (inserted after pre)
+        const resultContainer = document.createElement('div')
+        resultContainer.className = 'code-exec-result'
+        resultContainer.style.display = 'none'
+
+        const resultHeader = document.createElement('div')
+        resultHeader.className = 'code-exec-result-header'
+
+        const resultTitle = document.createElement('span')
+        resultTitle.className = 'code-exec-result-title'
+        resultTitle.textContent = '执行结果'
+
+        const resultToggle = document.createElement('button')
+        resultToggle.className = 'code-exec-result-toggle'
+        resultToggle.innerHTML = '▾'
+        resultToggle.title = '折叠结果'
+
+        const resultClose = document.createElement('button')
+        resultClose.className = 'code-exec-result-close'
+        resultClose.innerHTML = '✕'
+        resultClose.title = '关闭结果'
+
+        resultHeader.appendChild(resultTitle)
+        resultHeader.appendChild(resultToggle)
+        resultHeader.appendChild(resultClose)
+        resultContainer.appendChild(resultHeader)
+
+        const resultBody = document.createElement('div')
+        resultBody.className = 'code-exec-result-body'
+        resultContainer.appendChild(resultBody)
+
+        pre.parentNode?.insertBefore(resultContainer, pre.nextSibling)
+
+        let isResultCollapsed = false
+
+        resultToggle.addEventListener('click', () => {
+          isResultCollapsed = !isResultCollapsed
+          if (isResultCollapsed) {
+            resultBody.style.display = 'none'
+            resultToggle.innerHTML = '▸'
+            resultToggle.title = '展开结果'
+          } else {
+            resultBody.style.display = 'block'
+            resultToggle.innerHTML = '▾'
+            resultToggle.title = '折叠结果'
+          }
+        })
+
+        resultClose.addEventListener('click', () => {
+          resultContainer.style.display = 'none'
+        })
+
+        runBtn.addEventListener('click', async () => {
+          runBtn.disabled = true
+          runBtn.innerHTML = '⏳'
+          runBtn.title = '运行中...'
+          resultContainer.style.display = 'block'
+          resultBody.style.display = 'block'
+          isResultCollapsed = false
+          resultToggle.innerHTML = '▾'
+          resultToggle.title = '折叠结果'
+          resultBody.innerHTML = '<div class="code-exec-loading">运行中...</div>'
+
+          try {
+            const result = await window.electronAPI!.executeShellCommand(code, lang)
+            if (result.success) {
+              let html = ''
+              if (result.stdout) {
+                html += `<pre class="code-exec-stdout">${escapeHtml(result.stdout)}</pre>`
+              }
+              if (result.stderr) {
+                html += `<pre class="code-exec-stderr">${escapeHtml(result.stderr)}</pre>`
+              }
+              if (!result.stdout && !result.stderr) {
+                html += '<div class="code-exec-empty">(无输出)</div>'
+              }
+              resultBody.innerHTML = html
+            } else {
+              let html = `<div class="code-exec-error">${escapeHtml(result.error || '执行失败')}</div>`
+              if (result.stdout) {
+                html += `<pre class="code-exec-stdout">${escapeHtml(result.stdout)}</pre>`
+              }
+              if (result.stderr) {
+                html += `<pre class="code-exec-stderr">${escapeHtml(result.stderr)}</pre>`
+              }
+              resultBody.innerHTML = html
+            }
+          } catch (err) {
+            resultBody.innerHTML = `<div class="code-exec-error">${escapeHtml(err instanceof Error ? err.message : '执行失败')}</div>`
+          } finally {
+            runBtn.disabled = false
+            runBtn.innerHTML = '▶'
+            runBtn.title = '运行代码'
+          }
+        })
+      }
 
       // Code folding
       const lineCountAttr = pre.getAttribute('data-lines')

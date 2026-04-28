@@ -5,6 +5,8 @@ import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer, MarkdownRendererRef } from './components/MarkdownRenderer'
 import { ReadingStatsPanel } from './components/ReadingStatsPanel'
 import { CustomStylePanel } from './components/CustomStylePanel'
+import { DiagnosticsPanel } from './components/DiagnosticsPanel'
+
 import QuickJump from './components/QuickJump'
 import { FileOpener } from './components/FileOpener'
 import { Outline } from './components/Outline'
@@ -57,7 +59,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showReadingStats, showCustomStyle, fontSize, isSplitView, secondaryTabId,
+    showReadingStats, showCustomStyle, showDiagnostics, fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
   } = useUIStore()
@@ -675,6 +677,13 @@ function AppInner() {
               >
                 📊
               </button>
+              <button
+                onClick={() => openPanel('diagnostics')}
+                className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                aria-label="诊断面板" data-tooltip="诊断面板"
+              >
+                🛠️
+              </button>
               <BookmarkPanel
                 bookmarks={bookmarks}
                 onAdd={addBookmark}
@@ -876,6 +885,12 @@ function AppInner() {
               onClose={() => closePanel('customStyle')}
               customCSS={customCSS}
               onChange={setCustomCSS}
+            />
+          )}
+          {showDiagnostics && (
+            <DiagnosticsPanel
+              isOpen={showDiagnostics}
+              onClose={() => closePanel('diagnostics')}
             />
           )}
           {changedFilePath && (

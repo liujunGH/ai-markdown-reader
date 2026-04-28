@@ -2,8 +2,10 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOp
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
-import { createLogger } from './lib/logger'
+import { createLogger, getRecentLogs, clearLogs } from './lib/logger'
 import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFileSize } from './lib/ipcGuard'
+import { validateCommand } from './lib/commandWhitelist'
+import { exec } from 'child_process'
 
 const logger = createLogger('main')
 
@@ -982,4 +984,94 @@ wrapHandler('register-window-files', (event, filePaths: string[]) => {
   if (id) {
     windowOpenFiles.set(id, new Set(filePaths))
   }
+})
+
+const shellExecLimiter = createRateLimiter(10, 60000) // 10 calls per minute
+
+wrapHandler('execute-shell-command', async (_event, code: string, _language: string) => {
+  if (!shellExecLimiter()) {
+    logger.warn('Rate limit exceeded for execute-shell-command')
+    return { success: false, error: 'Rate limit exceeded. Please slow down.' }
+  }
+
+  const validation = validateCommand(code)
+  if (!validation.allowed) {
+    logger.warn('Command blocked by whitelist', { code, reason: validation.reason })
+    return { success: false, error: validation.reason || 'Command not allowed' }
+  }
+
+  logger.info('Executing shell command', { code: code.slice(0, 200) })
+
+  return new Promise<{ success: boolean; stdout?: string; stderr?: string; exitCode?: number; error?: string }>((resolve) => {
+    const child = exec(code, { timeout: 10000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error) {
+        if (error.killed || error.signal === 'SIGTERM') {
+          logger.warn('Shell command timed out', { code: code.slice(0, 200) })
+          resolve({ success: false, error: 'Command timed out (10s)', stdout: stdout || undefined, stderr: stderr || undefined })
+          return
+        }
+        logger.error('Shell command failed', { code: code.slice(0, 200), error: error.message })
+        resolve({
+          success: false,
+          error: error.message,
+          stdout: stdout || undefined,
+          stderr: stderr || undefined,
+          exitCode: error.code ?? undefined,
+        })
+        return
+      }
+      logger.info('Shell command completed', { code: code.slice(0, 200), stdoutLength: stdout.length })
+      resolve({
+        success: true,
+        stdout: stdout || undefined,
+        stderr: stderr || undefined,
+        exitCode: 0,
+      })
+    })
+
+    // Fallback timeout in case exec timeout doesn't fire
+    const fallbackTimeout = setTimeout(() => {
+      try {
+        child.kill('SIGTERM')
+      } catch {
+        // ignore
+      }
+      resolve({ success: false, error: 'Command timed out (10s)' })
+    }, 11000)
+
+    child.on('exit', () => {
+      clearTimeout(fallbackTimeout)
+    })
+  })
+})
+
+// Diagnostics IPC handlers
+wrapHandler('get-diagnostics-info', () => {
+  const processMemory = process.memoryUsage()
+  return {
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    chromiumVersion: process.versions.chrome,
+    nodeVersion: process.versions.node,
+    v8Version: process.versions.v8,
+    platform: process.platform,
+    arch: process.arch,
+    processMemory: {
+      rss: processMemory.rss,
+      heapTotal: processMemory.heapTotal,
+      heapUsed: processMemory.heapUsed,
+      external: processMemory.external,
+    },
+    uptime: process.uptime(),
+    pid: process.pid,
+  }
+})
+
+wrapHandler('get-recent-logs', () => {
+  return getRecentLogs(200)
+})
+
+wrapHandler('clear-logs', () => {
+  clearLogs()
+  return { success: true }
 })

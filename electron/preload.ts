@@ -183,6 +183,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   focusWindow: createIPCCall<(id: number) => Promise<void>>('focus-window'),
   getWindowStates: createIPCCall<() => Promise<WindowState[]>>('get-window-states'),
   registerWindowFiles: createIPCCall<(filePaths: string[]) => Promise<void>>('register-window-files'),
+  executeShellCommand: createIPCCall<(code: string, language: string) => Promise<{ success: boolean; stdout?: string; stderr?: string; exitCode?: number; error?: string }>>('execute-shell-command'),
   // Auto-updater events
   onUpdateAvailable: (callback: (info: { version: string }) => void) => {
     updateAvailableCallbacks.add(callback)
@@ -208,4 +209,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offUpdateError: (callback: (info: { error: string }) => void) => {
     updateErrorCallbacks.delete(callback)
   },
+  // Diagnostics
+  getDiagnosticsInfo: createIPCCall<() => Promise<{
+    appVersion: string
+    electronVersion: string
+    chromiumVersion: string
+    nodeVersion: string
+    v8Version: string
+    platform: string
+    arch: string
+    processMemory: { rss: number; heapTotal: number; heapUsed: number; external: number }
+    uptime: number
+    pid: number
+  }>>('get-diagnostics-info', { dedup: true }),
+  getRecentLogs: createIPCCall<() => Promise<string[]>>('get-recent-logs', { dedup: true }),
+  clearLogs: createIPCCall<() => Promise<{ success: boolean }>>('clear-logs'),
 })

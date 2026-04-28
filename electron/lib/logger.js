@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createLogger = createLogger;
 exports.setLogLevel = setLogLevel;
+exports.getRecentLogs = getRecentLogs;
+exports.clearLogs = clearLogs;
 const electron_1 = require("electron");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -72,4 +74,28 @@ function createLogger(scope) {
 }
 function setLogLevel(level) {
     globalMinLevel = level;
+}
+function getRecentLogs(maxLines = 200) {
+    try {
+        const logFile = path_1.default.join(getLogDir(), 'app.log');
+        if (!fs_1.default.existsSync(logFile))
+            return [];
+        const content = fs_1.default.readFileSync(logFile, 'utf-8');
+        const lines = content.trim().split('\n');
+        return lines.slice(-maxLines);
+    }
+    catch {
+        return [];
+    }
+}
+function clearLogs() {
+    try {
+        const logFile = path_1.default.join(getLogDir(), 'app.log');
+        if (fs_1.default.existsSync(logFile)) {
+            fs_1.default.writeFileSync(logFile, '');
+        }
+    }
+    catch {
+        // ignore
+    }
 }

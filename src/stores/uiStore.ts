@@ -18,6 +18,7 @@ export type PanelName =
   | 'quickJump'
   | 'readingStats'
   | 'customStyle'
+  | 'diagnostics'
 
 interface UIState {
   showOutline: boolean
@@ -36,6 +37,7 @@ interface UIState {
   showQuickJump: boolean
   showReadingStats: boolean
   showCustomStyle: boolean
+  showDiagnostics: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -74,6 +76,7 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'quickJump': return { showQuickJump: value }
     case 'readingStats': return { showReadingStats: value }
     case 'customStyle': return { showCustomStyle: value }
+    case 'diagnostics': return { showDiagnostics: value }
     default:
       return {}
   }
@@ -97,6 +100,7 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'quickJump': return state.showQuickJump
     case 'readingStats': return state.showReadingStats
     case 'customStyle': return state.showCustomStyle
+    case 'diagnostics': return state.showDiagnostics
     default:
       return false
   }
@@ -121,6 +125,7 @@ export const useUIStore = create<UIStore>()(
       showQuickJump: false,
       showReadingStats: false,
       showCustomStyle: false,
+      showDiagnostics: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -143,6 +148,7 @@ export const useUIStore = create<UIStore>()(
         showGlobalSearch: false,
         showReadingStats: false,
         showCustomStyle: false,
+        showDiagnostics: false,
         showFileInfo: false,
         showFilePreview: false,
         showRecent: false,

@@ -320,6 +320,127 @@
   background: #ef4444;
 }
 
+/* Code execution button */
+.renderer :global(.code-run-btn) {
+  position: absolute;
+  top: 8px;
+  right: 80px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  z-index: 10;
+  color: var(--text-primary);
+}
+
+.renderer :global(pre:hover .code-run-btn) {
+  opacity: 1;
+}
+
+.renderer :global(.code-run-btn:hover) {
+  background: var(--bg-tertiary);
+}
+
+.renderer :global(.code-run-btn:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Code execution result */
+.renderer :global(.code-exec-result) {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  margin-top: -1em;
+  margin-bottom: 1em;
+  overflow: hidden;
+}
+
+.renderer :global(.code-exec-result-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.renderer :global(.code-exec-result-title) {
+  font-weight: 500;
+  flex: 1;
+}
+
+.renderer :global(.code-exec-result-toggle),
+.renderer :global(.code-exec-result-close) {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.renderer :global(.code-exec-result-toggle:hover),
+.renderer :global(.code-exec-result-close:hover) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.renderer :global(.code-exec-result-body) {
+  padding: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 13px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.renderer :global(.code-exec-stdout) {
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.renderer :global(.code-exec-stderr) {
+  margin: 8px 0 0 0;
+  padding: 0;
+  background: none;
+  color: #f85149;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.renderer :global(.code-exec-error) {
+  color: #f85149;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.renderer :global(.code-exec-loading) {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.renderer :global(.code-exec-empty) {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 /* Diff highlighting */
 .renderer :global(.diff-add) {
   background-color: rgba(0, 200, 0, 0.1);
@@ -365,4 +486,19 @@
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   color: var(--text-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Performance: content-visibility for large documents */
+.renderer :global(.markdown-body > *),
+.renderer > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+/* Ensure images and interactive elements are not hidden */
+.renderer :global(img),
+.renderer :global(.mermaid-container),
+.renderer :global(.mermaid-code),
+.renderer :global(pre) {
+  content-visibility: visible;
 }
