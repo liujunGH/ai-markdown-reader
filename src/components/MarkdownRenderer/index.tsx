@@ -1,5 +1,7 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback, useMemo } from 'react'
+import DOMPurify from 'dompurify'
 import { parseMarkdown } from '../../utils/markdownParser'
+import { useMarkdownWorker } from '../../hooks/useMarkdownWorker'
 import { getStorageItem, setStorageItem } from '../../utils/storage'
 import styles from './MarkdownRenderer.module.css'
 import previewStyles from './ImagePreview.module.css'
@@ -138,7 +140,29 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     getContainer: () => containerRef.current
   }))
 
-  const html = useMemo(() => parseMarkdown(content), [content])
+  const { html: workerHtml } = useMarkdownWorker(content)
+
+  const html = useMemo(() => {
+    const raw = workerHtml || parseMarkdown(content)
+    return DOMPurify.sanitize(raw, {
+      ALLOWED_TAGS: [
+        'p', 'br', 'hr', 'div', 'span',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+        'strong', 'b', 'em', 'i', 'strike', 'del', 's',
+        'a', 'img',
+        'code', 'pre', 'blockquote',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'sup', 'sub',
+      ],
+      ALLOWED_ATTR: [
+        'href', 'title', 'target', 'rel',
+        'src', 'alt', 'width', 'height',
+        'class', 'id',
+        'data-content', 'data-code', 'data-lines', 'data-code-hash',
+      ],
+    })
+  }, [workerHtml, content])
 
   const renderMermaidDiagrams = useCallback(async () => {
     if (!containerRef.current) return
