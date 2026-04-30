@@ -1,0 +1,20 @@
+.floatBtn {
+  position: fixed;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.floatBtn:hover {
+  background: var(--bg-hover);
+  transform: translate(-50%, -100%) scale(1.05);
+}

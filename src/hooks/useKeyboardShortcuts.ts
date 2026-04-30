@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useUIStore, useTabStore } from '../stores'
+import { useAIStore } from '../stores/aiStore'
 
 export function useKeyboardShortcuts(
   scrollHistory: { back: () => number | null; forward: () => number | null },
@@ -23,6 +24,7 @@ export function useKeyboardShortcuts(
         showGlobalSearch, showReadingStats, showCustomStyle, openPanel, closePanel,
         togglePanel, setFontSize, setShowSource
       } = useUIStore.getState()
+      const { showAIPanel, toggleAIPanel, setShowAIPanel } = useAIStore.getState()
 
       const activeTabFilePath = activeTab()?.filePath
 
@@ -127,6 +129,17 @@ export function useKeyboardShortcuts(
         openPanel('quickJump')
         return
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'a') {
+        e.preventDefault()
+        toggleAIPanel()
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 's') {
+        e.preventDefault()
+        // Semantic search toggle is handled via App state, trigger event
+        window.dispatchEvent(new CustomEvent('toggle-semantic-search'))
+        return
+      }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
         e.preventDefault()
         openPanel('commandPalette')
@@ -185,7 +198,10 @@ export function useKeyboardShortcuts(
           closePanel('quickSwitcher')
         } else if (showExportPanel) {
           closePanel('exportPanel')
+        } else if (showAIPanel) {
+          setShowAIPanel(false)
         }
+        // Semantic search close is handled by its own component
         return
       }
     }

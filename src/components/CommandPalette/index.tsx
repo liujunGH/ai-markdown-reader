@@ -35,6 +35,8 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'quick-jump', label: '快速跳转', shortcut: 'Ctrl+G', category: '视图', icon: '↗', action: () => {} },
   { id: 'reading-stats', label: '阅读统计', category: '视图', icon: '📊', action: () => {} },
   { id: 'custom-style', label: '自定义 CSS', category: '视图', icon: '🎨', action: () => {} },
+  { id: 'ai-assistant', label: 'AI 助手', shortcut: 'Ctrl+Shift+A', category: 'AI', icon: '🤖', action: () => {} },
+  { id: 'semantic-search', label: '语义搜索', shortcut: 'Ctrl+Shift+S', category: 'AI', icon: '🔍', action: () => {} },
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },
   { id: 'show-shortcuts', label: '显示快捷键', shortcut: 'F1', category: '帮助', icon: '⌨️', action: () => {} },
@@ -61,6 +63,8 @@ const PINYIN_INITIAL_MAP: Record<string, string> = {
   '跳': 't', '转': 'z',
   '阅': 'y', '读': 'd', '统': 't', '计': 'j',
   '自': 'z', '定': 'd', '义': 'y',
+  '智': 'z', '能': 'n', '手': 's',
+  '语': 'y',
 }
 
 function getPinyinInitials(text: string): string {

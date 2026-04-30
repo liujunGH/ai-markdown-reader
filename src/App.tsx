@@ -47,9 +47,12 @@ import { Skeleton } from './components/Skeleton'
 import { GlobalSearch } from './components/GlobalSearch'
 import { UpdateNotification } from './components/UpdateNotification'
 import { AIPanel } from './components/AIPanel'
+import { AIFloatButton } from './components/AIFloatButton'
 import { SemanticSearch } from './components/SemanticSearch'
 import { useAIStore } from './stores/aiStore'
+import { useTextSelection } from './hooks/useTextSelection'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
+import { indexFolder as semanticIndexFolder } from './services/semanticIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
@@ -84,6 +87,7 @@ function AppInner() {
 
   const { toggleAIPanel } = useAIStore()
   const [showSemanticSearch, setShowSemanticSearch] = useState(false)
+  const selection = useTextSelection()
 
   const { toasts, showToast } = useToastStore()
 
@@ -225,6 +229,8 @@ function AppInner() {
         try {
           const allFiles = await getAllMarkdownFiles(folderPath)
           await indexFolder(folderPath, allFiles)
+          // Also trigger semantic index in background
+          void semanticIndexFolder(folderPath).catch((e) => console.error('Semantic index error:', e))
         } catch (err) {
           console.error('Failed to index folder:', err)
         }
@@ -422,6 +428,8 @@ function AppInner() {
           try {
             const allFiles = await getAllMarkdownFiles(folderPath)
             await indexFolder(folderPath, allFiles)
+            // Also trigger semantic index in background
+            void semanticIndexFolder(folderPath).catch((e) => console.error('Semantic index error:', e))
           } catch (err) {
             console.error('Failed to index folder:', err)
           }
@@ -911,6 +919,12 @@ function AppInner() {
               onClose={() => closePanel('diagnostics')}
             />
           )}
+          <AIFloatButton
+            text={selection.text}
+            x={selection.x}
+            y={selection.y}
+            visible={selection.visible}
+          />
           <AIPanel />
           {showSemanticSearch && (
             <SemanticSearch
@@ -1040,6 +1054,12 @@ function AppInner() {
               break
             case 'quick-jump':
               openPanel('quickJump')
+              break
+            case 'ai-assistant':
+              toggleAIPanel()
+              break
+            case 'semantic-search':
+              setShowSemanticSearch(true)
               break
             default:
               break

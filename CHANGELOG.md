@@ -1,5 +1,25 @@
 # 更新日志
 
+## v1.5.1
+
+### 🤖 AI 原生能力
+- **AI 对话助手** - 悬浮聊天面板，支持流式对话，自动带入当前文档作为上下文
+- **选中内容提问** - 在文档中选中任意文本，浮动 🤖 按钮一键向 AI 提问
+- **语义搜索** - 基于 transformers.js 本地 embedding（`Xenova/all-MiniLM-L6-v2`），支持自然语言搜索文件夹内所有 Markdown 文档
+- **AI 配置面板** - 可配置任意 OpenAI 兼容 API（默认 MiMo），支持 API Key、模型名、Base URL
+
+### 🧪 测试覆盖
+- React 组件测试从 27 个扩展至 **89 个**
+- 新增 Outline、ResizableSidebar、useOutline、useSearch、tabStore、aiStore 测试
+
+### ⌨️ 交互增强
+- 快捷键 `Ctrl+Shift+A` 打开/关闭 AI 助手面板
+- 快捷键 `Ctrl+Shift+S` 打开语义搜索
+- 命令面板新增 "AI 助手" 和 "语义搜索" 命令
+- 打开文件夹时自动在后台触发语义索引
+
+---
+
 ## v1.5.0
 
 ### 🚀 重大升级
