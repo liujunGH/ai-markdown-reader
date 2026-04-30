@@ -16,6 +16,7 @@ export type ExactStorageKey =
   | 'reading-stats'
   | 'custom-css'
   | 'enable-code-execution'
+  | 'llm-config'
 
 export type PatternStorageKey =
   | `scroll-position-${string}`

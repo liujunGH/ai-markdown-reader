@@ -46,6 +46,9 @@ import CommandPalette from './components/CommandPalette'
 import { Skeleton } from './components/Skeleton'
 import { GlobalSearch } from './components/GlobalSearch'
 import { UpdateNotification } from './components/UpdateNotification'
+import { AIPanel } from './components/AIPanel'
+import { SemanticSearch } from './components/SemanticSearch'
+import { useAIStore } from './stores/aiStore'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 
@@ -78,6 +81,9 @@ function AppInner() {
     currentFolderPath, currentFolderName, currentFilePath, currentFolderHandle, fileInfo,
     setFolder, setCurrentFilePath, setFileInfo, clearFolder
   } = useFileStore()
+
+  const { toggleAIPanel } = useAIStore()
+  const [showSemanticSearch, setShowSemanticSearch] = useState(false)
 
   const { toasts, showToast } = useToastStore()
 
@@ -680,6 +686,20 @@ function AppInner() {
                 >
                   🛠️
                 </button>
+                <button
+                  onClick={toggleAIPanel}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="AI 助手" data-tooltip="AI 助手"
+                >
+                  🤖
+                </button>
+                <button
+                  onClick={() => setShowSemanticSearch(true)}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="语义搜索" data-tooltip="语义搜索"
+                >
+                  🔍
+                </button>
                 <BookmarkPanel
                   bookmarks={bookmarks}
                   onAdd={addBookmark}
@@ -889,6 +909,13 @@ function AppInner() {
             <DiagnosticsPanel
               isOpen={showDiagnostics}
               onClose={() => closePanel('diagnostics')}
+            />
+          )}
+          <AIPanel />
+          {showSemanticSearch && (
+            <SemanticSearch
+              folderPath={currentFolderPath}
+              onClose={() => setShowSemanticSearch(false)}
             />
           )}
           {changedFilePath && (

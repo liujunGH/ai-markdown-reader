@@ -21,6 +21,8 @@
     "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@testing-library/user-event": "^14.6.1",
+    "@xenova/transformers": "^2.17.2",
     "dexie": "^4.4.2",
     "dompurify": "^3.4.0",
     "electron-updater": "^6.8.3",
