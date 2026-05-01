@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/your-org/ai-markdown-reader/discussions
+    about: Ask questions, share ideas, or show off what you built.
+  - name: 📖 Documentation
+    url: https://your-org.github.io/ai-markdown-reader
+    about: Check out the documentation and user guide.

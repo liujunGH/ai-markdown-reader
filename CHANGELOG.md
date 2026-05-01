@@ -6,17 +6,33 @@
 - **AI 对话助手** - 悬浮聊天面板，支持流式对话，自动带入当前文档作为上下文
 - **选中内容提问** - 在文档中选中任意文本，浮动 🤖 按钮一键向 AI 提问
 - **语义搜索** - 基于 transformers.js 本地 embedding（`Xenova/all-MiniLM-L6-v2`），支持自然语言搜索文件夹内所有 Markdown 文档
+- **知识图谱** - 基于语义 embedding 的力导向图可视化（D3.js），展示文档间的语义聚类关系，支持点击跳转
+- **自动标签提取** - AI 自动提取当前文档关键词，生成标签云，结果缓存到 localStorage
 - **AI 配置面板** - 可配置任意 OpenAI 兼容 API（默认 MiMo），支持 API Key、模型名、Base URL
 
 ### 🧪 测试覆盖
-- React 组件测试从 27 个扩展至 **89 个**
+- React 组件测试从 27 个扩展至 **99 个**
 - 新增 Outline、ResizableSidebar、useOutline、useSearch、tabStore、aiStore 测试
+- 新增 MarkdownRenderer 组件测试（10 个测试用例）
+- E2E 测试扩展至 **7 个**，新增 reading-flow 场景（文件打开、搜索、标签管理、主题切换、大纲导航）
+
+### 🎨 界面与交互
+- **启动画面** - Electron 主进程添加 splash window，提升应用启动体验
+- **数据备份面板** - 支持一键导出/导入所有应用数据（书签、阅读进度、文件设置、应用设置）为 JSON
+- **虚拟滚动优化** - 大文件（>300KB 或 >5000 行）自动启用虚拟滚动，显著降低内存占用
+- **i18n 多语言支持** - 集成 i18next + react-i18next，支持中文/英文界面切换，自动检测系统语言
 
 ### ⌨️ 交互增强
 - 快捷键 `Ctrl+Shift+A` 打开/关闭 AI 助手面板
 - 快捷键 `Ctrl+Shift+S` 打开语义搜索
-- 命令面板新增 "AI 助手" 和 "语义搜索" 命令
+- 快捷键 `Ctrl+Shift+B` 打开数据备份面板
+- 命令面板新增 "AI 助手"、"语义搜索"、"数据备份" 命令
 - 打开文件夹时自动在后台触发语义索引
+
+### ⚡ 性能优化
+- **内存清理** - 关闭标签页时自动 strip 内容后再存入 `closedTabs`，降低历史标签内存占用
+- **Worker 清理** - `useMarkdownWorker` 添加取消和 pending 任务清理机制
+- **打包压缩** - `electron-builder.yml` 全平台启用 `compression: maximum`，减小安装包体积
 
 ---
 
