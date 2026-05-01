@@ -53,10 +53,7 @@ const DiagnosticsPanel = React.lazy(() => import('./components/DiagnosticsPanel'
 const DataBackupPanel = React.lazy(() => import('./components/DataBackupPanel').then(m => ({ default: m.DataBackupPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { SemanticSearch } from './components/SemanticSearch'
-import { KnowledgeGraph } from './components/KnowledgeGraph'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
-import { indexFolder as semanticIndexFolder } from './services/semanticIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
@@ -89,10 +86,6 @@ function AppInner() {
     currentFolderPath, currentFolderName, currentFilePath, currentFolderHandle, fileInfo,
     setFolder, setCurrentFilePath, setFileInfo, clearFolder
   } = useFileStore()
-
-  const [showSemanticSearch, setShowSemanticSearch] = useState(false)
-  const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false)
-
 
   const { toasts, showToast } = useToastStore()
 
@@ -234,8 +227,7 @@ function AppInner() {
         try {
           const allFiles = await getAllMarkdownFiles(folderPath)
           await indexFolder(folderPath, allFiles)
-          // Also trigger semantic index in background
-          void semanticIndexFolder(folderPath).catch((e) => console.error('Semantic index error:', e))
+
         } catch (err) {
           console.error('Failed to index folder:', err)
         }
@@ -433,8 +425,6 @@ function AppInner() {
           try {
             const allFiles = await getAllMarkdownFiles(folderPath)
             await indexFolder(folderPath, allFiles)
-            // Also trigger semantic index in background
-            void semanticIndexFolder(folderPath).catch((e) => console.error('Semantic index error:', e))
           } catch (err) {
             console.error('Failed to index folder:', err)
           }
@@ -701,20 +691,6 @@ function AppInner() {
                 </button>
 
                 <button
-                  onClick={() => setShowSemanticSearch(true)}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.semanticSearch')} data-tooltip={t('toolbar.semanticSearch')}
-                >
-                  🔍
-                </button>
-                <button
-                  onClick={() => setShowKnowledgeGraph(true)}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="知识图谱" data-tooltip="知识图谱"
-                >
-                  🕸️
-                </button>
-                <button
                   onClick={() => openPanel('dataBackup')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
                   aria-label={t('toolbar.dataBackup')} data-tooltip={t('toolbar.dataBackup')}
@@ -964,19 +940,6 @@ function AppInner() {
             </Suspense>
           )}
 
-          {showSemanticSearch && (
-            <SemanticSearch
-              folderPath={currentFolderPath}
-              onClose={() => setShowSemanticSearch(false)}
-            />
-          )}
-          {showKnowledgeGraph && (
-            <KnowledgeGraph
-              isOpen={showKnowledgeGraph}
-              onClose={() => setShowKnowledgeGraph(false)}
-              onNavigate={handleGlobalSearchOpenFile}
-            />
-          )}
           {changedFilePath && (
             <div className={styles.fileChangeBanner}>
               <span className={styles.fileChangeBannerIcon}>📄</span>
@@ -1099,12 +1062,6 @@ function AppInner() {
               break
             case 'quick-jump':
               openPanel('quickJump')
-              break
-            case 'semantic-search':
-              setShowSemanticSearch(true)
-              break
-            case 'knowledge-graph':
-              setShowKnowledgeGraph(true)
               break
             case 'data-backup':
               openPanel('dataBackup')

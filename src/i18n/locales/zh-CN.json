@@ -6,20 +6,6 @@
     "search": "搜索",
     "unknown": "未知"
   },
-  "semanticSearch": {
-    "title": "语义搜索",
-    "placeholder": "输入自然语言查询...",
-    "ariaLabel": "语义搜索查询",
-    "indexFolder": "索引文件夹",
-    "indexing": "索引中...",
-    "loadingModel": "正在加载模型...",
-    "filesIndexed": "文件已索引",
-    "searching": "正在搜索...",
-    "resultsHeader": "搜索结果 ({{count}})",
-    "noResults": "未找到相关结果",
-    "emptyStateHint1": "输入自然语言描述来搜索文档内容",
-    "emptyStateHint2": "首次使用需点击「索引文件夹」构建语义索引"
-  },
   "searchBox": {
     "title": "文档搜索",
     "placeholder": "搜索...",
@@ -167,7 +153,6 @@
     "fileInfo": "文件信息",
     "readingStats": "阅读统计",
     "diagnostics": "诊断面板",
-    "semanticSearch": "语义搜索",
     "dataBackup": "数据备份"
   },
   "dataBackup": {

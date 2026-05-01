@@ -127,12 +127,6 @@ export function useKeyboardShortcuts(
         openPanel('quickJump')
         return
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 's') {
-        e.preventDefault()
-        // Semantic search toggle is handled via App state, trigger event
-        window.dispatchEvent(new CustomEvent('toggle-semantic-search'))
-        return
-      }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
         e.preventDefault()
         openPanel('commandPalette')

@@ -6,20 +6,6 @@
     "search": "Search",
     "unknown": "Unknown"
   },
-  "semanticSearch": {
-    "title": "Semantic Search",
-    "placeholder": "Enter natural language query...",
-    "ariaLabel": "Semantic search query",
-    "indexFolder": "Index Folder",
-    "indexing": "Indexing...",
-    "loadingModel": "Loading model...",
-    "filesIndexed": "files indexed",
-    "searching": "Searching...",
-    "resultsHeader": "Search Results ({{count}})",
-    "noResults": "No relevant results found",
-    "emptyStateHint1": "Enter a natural language description to search document content",
-    "emptyStateHint2": "First-time use requires clicking \"Index Folder\" to build a semantic index"
-  },
   "searchBox": {
     "title": "Document Search",
     "placeholder": "Search...",
@@ -167,7 +153,6 @@
     "fileInfo": "File Info",
     "readingStats": "Reading Stats",
     "diagnostics": "Diagnostics",
-    "semanticSearch": "Semantic Search",
     "dataBackup": "Data Backup"
   },
   "dataBackup": {

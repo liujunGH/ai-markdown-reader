@@ -35,8 +35,7 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'quick-jump', label: '快速跳转', shortcut: 'Ctrl+G', category: '视图', icon: '↗', action: () => {} },
   { id: 'reading-stats', label: '阅读统计', category: '视图', icon: '📊', action: () => {} },
   { id: 'custom-style', label: '自定义 CSS', category: '视图', icon: '🎨', action: () => {} },
-  { id: 'semantic-search', label: '语义搜索', shortcut: 'Ctrl+Shift+S', category: '搜索', icon: '🔍', action: () => {} },
-  { id: 'knowledge-graph', label: '知识图谱', category: '搜索', icon: '🕸️', action: () => {} },
+
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },
   { id: 'show-shortcuts', label: '显示快捷键', shortcut: 'F1', category: '帮助', icon: '⌨️', action: () => {} },
