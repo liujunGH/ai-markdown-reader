@@ -5,6 +5,8 @@ copyright: Copyright © 2026 liujun
 # electron-builder will auto-detect platform-specific formats from build/icon.*
 # If no icon is provided, the default Electron icon is used.
 
+asar: true
+
 directories:
   output: release
   buildResources: build
@@ -35,6 +37,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}.${ext}
+  compression: maximum
 
 nsis:
   oneClick: false
@@ -52,6 +55,7 @@ mac:
         - arm64
   artifactName: ${productName}-${version}-${arch}.${ext}
   category: public.app-category.productivity
+  compression: maximum
 
 linux:
   target:
@@ -59,6 +63,7 @@ linux:
     - deb
   artifactName: ${productName}-${version}.${ext}
   category: Office
+  compression: maximum
 
 fileAssociations:
   - ext: md

@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './styles/app.module.css'
 import { ThemeProvider, useTheme } from './context/ThemeContext'
 import { ThemeToggle } from './components/ThemeToggle'
 import { MarkdownRenderer, MarkdownRendererRef } from './components/MarkdownRenderer'
-import { ReadingStatsPanel } from './components/ReadingStatsPanel'
-import { CustomStylePanel } from './components/CustomStylePanel'
-import { DiagnosticsPanel } from './components/DiagnosticsPanel'
+import { VirtualMarkdown } from './components/VirtualMarkdown'
+
 
 import QuickJump from './components/QuickJump'
 import { FileOpener } from './components/FileOpener'
@@ -26,7 +26,7 @@ import { FileInfoPanel } from './components/FileInfoPanel'
 import { FilePreviewPanel } from './components/FilePreviewPanel'
 import { ResizableSidebar } from './components/ResizableSidebar'
 import { BookmarkPanel, useBookmarks } from './components/Bookmark'
-import { ExportPanel } from './components/ExportPanel'
+
 import { useOutline } from './hooks/useOutline'
 import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
@@ -44,13 +44,23 @@ import { getStorageItem, setStorageItem, getSessionItem, setSessionItem } from '
 import { ErrorBoundary } from './components/ErrorBoundary'
 import CommandPalette from './components/CommandPalette'
 import { Skeleton } from './components/Skeleton'
-import { GlobalSearch } from './components/GlobalSearch'
+
+const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m => ({ default: m.ExportPanel })))
+const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
+const ReadingStatsPanel = React.lazy(() => import('./components/ReadingStatsPanel').then(m => ({ default: m.ReadingStatsPanel })))
+const CustomStylePanel = React.lazy(() => import('./components/CustomStylePanel').then(m => ({ default: m.CustomStylePanel })))
+const DiagnosticsPanel = React.lazy(() => import('./components/DiagnosticsPanel').then(m => ({ default: m.DiagnosticsPanel })))
+const DataBackupPanel = React.lazy(() => import('./components/DataBackupPanel').then(m => ({ default: m.DataBackupPanel })))
+
 import { UpdateNotification } from './components/UpdateNotification'
 import { AIPanel } from './components/AIPanel'
 import { AIFloatButton } from './components/AIFloatButton'
 import { SemanticSearch } from './components/SemanticSearch'
+import { KnowledgeGraph } from './components/KnowledgeGraph'
+import { AutoTagCloud } from './components/AutoTagCloud'
 import { useAIStore } from './stores/aiStore'
 import { useTextSelection } from './hooks/useTextSelection'
+import { useAutoTags } from './hooks/useAutoTags'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
 import { indexFolder as semanticIndexFolder } from './services/semanticIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
@@ -59,6 +69,7 @@ const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 
 function AppInner() {
+  const { t } = useTranslation()
   const { theme, accentColor, toggleTheme, customCSS, setCustomCSS } = useTheme()
 
   // ── Stores ──
@@ -66,7 +77,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showReadingStats, showCustomStyle, showDiagnostics, fontSize, isSplitView, secondaryTabId,
+    showReadingStats, showCustomStyle, showDiagnostics, showDataBackup, fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
   } = useUIStore()
@@ -87,7 +98,12 @@ function AppInner() {
 
   const { toggleAIPanel } = useAIStore()
   const [showSemanticSearch, setShowSemanticSearch] = useState(false)
+  const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false)
   const selection = useTextSelection()
+  const { tags: autoTags, isLoading: autoTagsLoading } = useAutoTags(
+    activeTab?.filePath || '',
+    activeTab?.content || ''
+  )
 
   const { toasts, showToast } = useToastStore()
 
@@ -177,7 +193,7 @@ function AppInner() {
   useEffect(() => {
     if (!isRestoringSession && failedRestores.length > 0) {
       const names = failedRestores.map(basename).join('、')
-      showToast(`以下文件已被移动或删除：${names}`, 'error')
+      showToast(t('app.failedRestores', { names }), 'error')
       clearFailedRestores()
     }
   }, [isRestoringSession, failedRestores, showToast, clearFailedRestores])
@@ -210,14 +226,14 @@ function AppInner() {
       const result = await window.electronAPI.readFolder(folderPath)
       if (!result.success || !result.files || result.files.length === 0) {
         if (!result.success) {
-          showToast(result.error || '读取文件夹失败', 'error')
+          showToast(result.error || t('app.readFolderFailed'), 'error')
         }
         return
       }
 
       const firstFile = result.files.find(f => !f.isDirectory)
       if (!firstFile) {
-        showToast('该目录中没有 Markdown 文件', 'error')
+        showToast(t('app.noMarkdownFiles'), 'error')
         return
       }
       const fileResult = await window.electronAPI.readFile(firstFile.filePath)
@@ -235,11 +251,11 @@ function AppInner() {
           console.error('Failed to index folder:', err)
         }
       } else {
-        showToast(fileResult.error || '读取文件失败', 'error')
+        showToast(fileResult.error || t('app.readFileFailed'), 'error')
       }
     } catch (err) {
       console.error('[handleOpenFolder] error:', err)
-      showToast('打开文件夹失败: ' + String(err), 'error')
+      showToast(t('app.openFolderFailedWithError', { error: String(err) }), 'error')
     }
   }, [handleFileOpen, setFolder, openPanel, showToast])
 
@@ -260,7 +276,7 @@ function AppInner() {
     if (!window.electronAPI) return
     const result = await window.electronAPI.readFile(filePath)
     if (result.success && result.content !== undefined) {
-      const name = basename(filePath) || '未知文件.md'
+      const name = basename(filePath) || t('app.unknownFile')
       handleFileOpen(result.content, name, filePath)
       setCurrentFilePath(filePath)
     }
@@ -281,7 +297,7 @@ function AppInner() {
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string) => {
     if (!activeTab?.filePath || !window.electronAPI) {
-      showToast('WikiLink 需要文件路径支持', 'error')
+      showToast(t('app.wikiLinkNoPath'), 'error')
       return
     }
     const dir = dirname(activeTab.filePath)
@@ -298,7 +314,7 @@ function AppInner() {
         return
       }
     }
-    showToast(`未找到文件: ${target}`, 'error')
+    showToast(t('app.fileNotFound', { name: target }), 'error')
   }, [activeTab?.filePath, handleFileOpen, showToast])
 
   // Toggle split view
@@ -387,10 +403,10 @@ function AppInner() {
           const name = basename(filePath) || '未知文件.md'
           handleFileOpenRef.current(result.content, name, filePath)
         } else {
-          showToast(result.error || '打开文件失败', 'error')
+          showToast(result.error || t('app.openFileFailed'), 'error')
         }
       } catch {
-        showToast('打开文件失败', 'error')
+        showToast(t('app.openFileFailed'), 'error')
       }
     }
     window.electronAPI.onOpenFile(listener)
@@ -410,13 +426,13 @@ function AppInner() {
         const result = await window.electronAPI!.readFolder(folderPath)
         if (!result.success || !result.files || result.files.length === 0) {
           if (!result.success) {
-            showToast(result.error || '读取文件夹失败', 'error')
+            showToast(result.error || t('app.readFolderFailed'), 'error')
           }
           return
         }
         const firstFile = result.files.find(f => !f.isDirectory)
         if (!firstFile) {
-          showToast('该目录中没有 Markdown 文件', 'error')
+          showToast(t('app.noMarkdownFiles'), 'error')
           return
         }
         const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
@@ -434,10 +450,10 @@ function AppInner() {
             console.error('Failed to index folder:', err)
           }
         } else {
-          showToast(fileResult.error || '读取文件失败', 'error')
+          showToast(fileResult.error || t('app.readFileFailed'), 'error')
         }
       } catch {
-        showToast('打开文件夹失败', 'error')
+        showToast(t('app.openFolderFailed'), 'error')
       }
     }
     window.electronAPI.onOpenFolder(listener)
@@ -516,7 +532,7 @@ function AppInner() {
       {isDraggingOver && (
         <div className={styles.dragOverlay}>
           <div className={styles.dragOverlayContent}>
-            释放以打开 Markdown 文件
+            {t('app.dropOverlay')}
           </div>
         </div>
       )}
@@ -555,21 +571,21 @@ function AppInner() {
                   onClick={() => togglePanel('recent')}
                   data-guide="recent-files"
                   className={`${styles.toolbarBtn} ${showRecent ? styles.toolbarBtnActive : ''}`}
-                  aria-label="最近打开" data-tooltip="最近打开 (Ctrl+Shift+R)"
+                  aria-label={t('toolbar.recentFiles')} data-tooltip={t('toolbar.recentFilesTooltip')}
                 >
                   📜
                 </button>
                 <button
                   onClick={toggleSplitView}
                   className={`${styles.toolbarBtn} ${isSplitView ? styles.toolbarBtnActive : ''}`}
-                  aria-label="分屏阅读" data-tooltip="分屏阅读 (Ctrl+\\)"
+                  aria-label={t('toolbar.splitView')} data-tooltip={t('toolbar.splitViewTooltip')}
                 >
                   ⚡
                 </button>
                 <button
                   onClick={handleOpenFolder}
                   className={styles.toolbarBtn}
-                  aria-label="打开文件夹" data-tooltip="打开文件夹"
+                  aria-label={t('toolbar.openFolder')} data-tooltip={t('toolbar.openFolder')}
                 >
                   📂
                 </button>
@@ -577,7 +593,7 @@ function AppInner() {
                   <button
                     onClick={() => togglePanel('fileSidebar')}
                     className={`${styles.toolbarBtn} ${showFileSidebar ? styles.toolbarBtnActive : ''}`}
-                    aria-label="文件列表" data-tooltip="文件列表"
+                    aria-label={t('toolbar.fileList')} data-tooltip={t('toolbar.fileList')}
                   >
                     📋
                   </button>
@@ -602,7 +618,7 @@ function AppInner() {
                   }}
                   data-guide="outline"
                   className={`${styles.toolbarBtn} ${showOutline ? styles.toolbarBtnActive : ''}`}
-                  data-tooltip={showFilePreview ? '显示目录' : '文件预览'}
+                  data-tooltip={showFilePreview ? t('toolbar.showOutline') : t('toolbar.filePreview')}
                 >
                   {showFilePreview ? '📋' : '📑'}
                 </button>
@@ -610,14 +626,14 @@ function AppInner() {
                   onClick={() => openPanel('search')}
                   data-guide="search"
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="搜索" data-tooltip="搜索 (Ctrl+F)"
+                  aria-label={t('toolbar.search')} data-tooltip={t('toolbar.searchTooltip')}
                 >
                   🔍
                 </button>
                 <button
                   onClick={() => openPanel('globalSearch')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="全局搜索" data-tooltip="全局搜索 (Ctrl+Shift+F)"
+                  aria-label={t('toolbar.globalSearch')} data-tooltip={t('toolbar.globalSearchTooltip')}
                 >
                   🔎
                 </button>
@@ -629,21 +645,21 @@ function AppInner() {
                   }}
                   data-guide="source"
                   className={`${styles.toolbarBtn} ${showSource ? styles.toolbarBtnActive : ''}`}
-                  aria-label="源码" data-tooltip="源码 (Ctrl+S)"
+                  aria-label={t('toolbar.source')} data-tooltip={t('toolbar.sourceTooltip')}
                 >
                   📄
                 </button>
                 <button
                   onClick={() => openPanel('exportPanel')}
                   className={styles.toolbarBtn}
-                  aria-label="导出" data-tooltip="导出 (Ctrl+E)"
+                  aria-label={t('toolbar.export')} data-tooltip={t('toolbar.exportTooltip')}
                 >
                   📤
                 </button>
                 <button
                   onClick={() => togglePanel('focusMode')}
                   className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
-                  aria-label="专注模式" data-tooltip="专注模式 (Ctrl+.)"
+                  aria-label={t('toolbar.focusMode')} data-tooltip={t('toolbar.focusModeTooltip')}
                 >
                   🎯
                 </button>
@@ -651,7 +667,7 @@ function AppInner() {
                   <button
                     onClick={() => setFontSize(Math.max(10, fontSize - 1))}
                     className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                    aria-label="缩小字体"
+                    aria-label={t('toolbar.zoomOut')}
                   >
                     A-
                   </button>
@@ -661,7 +677,7 @@ function AppInner() {
                   <button
                     onClick={() => setFontSize(Math.min(32, fontSize + 1))}
                     className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                    aria-label="放大字体"
+                    aria-label={t('toolbar.zoomIn')}
                   >
                     A+
                   </button>
@@ -669,44 +685,58 @@ function AppInner() {
                 <button
                   onClick={() => openPanel('keyboardShortcuts')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="快捷键" data-tooltip="快捷键 (Ctrl+/)"
+                  aria-label={t('toolbar.shortcuts')} data-tooltip={t('toolbar.shortcutsTooltip')}
                 >
                   ⌨️
                 </button>
                 <button
                   onClick={() => openPanel('fileInfo')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="文件信息" data-tooltip="文件信息"
+                  aria-label={t('toolbar.fileInfo')} data-tooltip={t('toolbar.fileInfo')}
                 >
                   ℹ️
                 </button>
                 <button
                   onClick={() => openPanel('readingStats')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="阅读统计" data-tooltip="阅读统计"
+                  aria-label={t('toolbar.readingStats')} data-tooltip={t('toolbar.readingStats')}
                 >
                   📊
                 </button>
                 <button
                   onClick={() => openPanel('diagnostics')}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="诊断面板" data-tooltip="诊断面板"
+                  aria-label={t('toolbar.diagnostics')} data-tooltip={t('toolbar.diagnostics')}
                 >
                   🛠️
                 </button>
                 <button
                   onClick={toggleAIPanel}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="AI 助手" data-tooltip="AI 助手"
+                  aria-label={t('toolbar.aiAssistant')} data-tooltip={t('toolbar.aiAssistant')}
                 >
                   🤖
                 </button>
                 <button
                   onClick={() => setShowSemanticSearch(true)}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label="语义搜索" data-tooltip="语义搜索"
+                  aria-label={t('toolbar.semanticSearch')} data-tooltip={t('toolbar.semanticSearch')}
                 >
                   🔍
+                </button>
+                <button
+                  onClick={() => setShowKnowledgeGraph(true)}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label="知识图谱" data-tooltip="知识图谱"
+                >
+                  🕸️
+                </button>
+                <button
+                  onClick={() => openPanel('dataBackup')}
+                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
+                  aria-label={t('toolbar.dataBackup')} data-tooltip={t('toolbar.dataBackup')}
+                >
+                  💾
                 </button>
                 <BookmarkPanel
                   bookmarks={bookmarks}
@@ -747,6 +777,9 @@ function AppInner() {
               {!showFocusMode && !showSource && outlineItems.length >= 3 && (
                 <FloatingTOC outlineItems={outlineItems} activeHeadingId={activeHeadingId} onNavigate={handleOutlineClick} />
               )}
+              {!showFocusMode && !showSource && activeTab?.filePath && (
+                <AutoTagCloud tags={autoTags} isLoading={autoTagsLoading} />
+              )}
               {isRestoringSession ? (
                 <div style={{ padding: '20px' }}>
                   <Skeleton lines={20} />
@@ -756,15 +789,27 @@ function AppInner() {
                   {showSource ? (
                     <SourceView content={activeTab?.content || ''} highlightedLine={highlightedLine} />
                   ) : (
-                    <MarkdownRenderer
-                      ref={markdownRef}
-                      content={activeTab?.content || ''}
-                      searchQuery={query}
-                      searchRegex={isRegex}
-                      currentMatch={currentMatch}
-                      matchCount={matches.length}
-                      onWikiLinkClick={handleWikiLinkClick}
-                    />
+                    (activeTab?.content && (activeTab.content.length > 300000 || activeTab.content.split('\n').length > 5000)) ? (
+                      <VirtualMarkdown
+                        ref={markdownRef}
+                        content={activeTab.content}
+                        searchQuery={query}
+                        searchRegex={isRegex}
+                        currentMatch={currentMatch}
+                        matchCount={matches.length}
+                        onWikiLinkClick={handleWikiLinkClick}
+                      />
+                    ) : (
+                      <MarkdownRenderer
+                        ref={markdownRef}
+                        content={activeTab?.content || ''}
+                        searchQuery={query}
+                        searchRegex={isRegex}
+                        currentMatch={currentMatch}
+                        matchCount={matches.length}
+                        onWikiLinkClick={handleWikiLinkClick}
+                      />
+                    )
                   )}
                 </div>
               )}
@@ -851,14 +896,16 @@ function AppInner() {
             <KeyboardShortcuts onClose={() => closePanel('keyboardShortcuts')} />
           )}
           {showExportPanel && (
-            <ExportPanel
-              isOpen={showExportPanel}
-              onClose={() => closePanel('exportPanel')}
-              fileName={activeTab?.name || ''}
-              fileContent={activeTab?.content || ''}
-              theme={theme}
-              accentColor={accentColor}
-            />
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ExportPanel
+                isOpen={showExportPanel}
+                onClose={() => closePanel('exportPanel')}
+                fileName={activeTab?.name || ''}
+                fileContent={activeTab?.content || ''}
+                theme={theme}
+                accentColor={accentColor}
+              />
+            </Suspense>
           )}
           {showGuide && !isRestoringSession && tabs.length === 1 && tabs[0].name === '欢迎使用.md' && (
             <FirstUseGuide
@@ -891,33 +938,49 @@ function AppInner() {
             />
           )}
           {showGlobalSearch && (
-            <GlobalSearch
-              isOpen={showGlobalSearch}
-              onClose={() => closePanel('globalSearch')}
-              folderPath={currentFolderPath}
-              onOpenFile={handleGlobalSearchOpenFile}
-            />
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <GlobalSearch
+                isOpen={showGlobalSearch}
+                onClose={() => closePanel('globalSearch')}
+                folderPath={currentFolderPath}
+                onOpenFile={handleGlobalSearchOpenFile}
+              />
+            </Suspense>
           )}
           {showReadingStats && (
-            <ReadingStatsPanel
-              isOpen={showReadingStats}
-              onClose={() => closePanel('readingStats')}
-              stats={totalStats}
-            />
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ReadingStatsPanel
+                isOpen={showReadingStats}
+                onClose={() => closePanel('readingStats')}
+                stats={totalStats}
+              />
+            </Suspense>
           )}
           {showCustomStyle && (
-            <CustomStylePanel
-              isOpen={showCustomStyle}
-              onClose={() => closePanel('customStyle')}
-              customCSS={customCSS}
-              onChange={setCustomCSS}
-            />
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <CustomStylePanel
+                isOpen={showCustomStyle}
+                onClose={() => closePanel('customStyle')}
+                customCSS={customCSS}
+                onChange={setCustomCSS}
+              />
+            </Suspense>
           )}
           {showDiagnostics && (
-            <DiagnosticsPanel
-              isOpen={showDiagnostics}
-              onClose={() => closePanel('diagnostics')}
-            />
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <DiagnosticsPanel
+                isOpen={showDiagnostics}
+                onClose={() => closePanel('diagnostics')}
+              />
+            </Suspense>
+          )}
+          {showDataBackup && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <DataBackupPanel
+                isOpen={showDataBackup}
+                onClose={() => closePanel('dataBackup')}
+              />
+            </Suspense>
           )}
           <AIFloatButton
             text={selection.text}
@@ -932,11 +995,18 @@ function AppInner() {
               onClose={() => setShowSemanticSearch(false)}
             />
           )}
+          {showKnowledgeGraph && (
+            <KnowledgeGraph
+              isOpen={showKnowledgeGraph}
+              onClose={() => setShowKnowledgeGraph(false)}
+              onNavigate={handleGlobalSearchOpenFile}
+            />
+          )}
           {changedFilePath && (
             <div className={styles.fileChangeBanner}>
               <span className={styles.fileChangeBannerIcon}>📄</span>
               <div>
-                <div className={styles.fileChangeBannerTitle}>文件已在外被修改</div>
+                <div className={styles.fileChangeBannerTitle}>{t('app.fileChangedTitle')}</div>
                 <div className={styles.fileChangeBannerPath} title={changedFilePath}>
                   {basename(changedFilePath)}
                 </div>
@@ -946,13 +1016,13 @@ function AppInner() {
                   onClick={handleReloadChangedFile}
                   className={styles.fileChangeBannerBtnPrimary}
                 >
-                  重新加载
+                  {t('app.reload')}
                 </button>
                 <button
                   onClick={ignoreChange}
                   className={styles.fileChangeBannerBtnSecondary}
                 >
-                  忽略
+                  {t('app.ignore')}
                 </button>
               </div>
             </div>
@@ -1060,6 +1130,12 @@ function AppInner() {
               break
             case 'semantic-search':
               setShowSemanticSearch(true)
+              break
+            case 'knowledge-graph':
+              setShowKnowledgeGraph(true)
+              break
+            case 'data-backup':
+              openPanel('dataBackup')
               break
             default:
               break

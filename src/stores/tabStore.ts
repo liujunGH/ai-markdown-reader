@@ -92,7 +92,9 @@ export const useTabStore = create<TabStore>()(
           if (tabIndex === -1) return
           const tabToClose = state.tabs[tabIndex]
           if (tabToClose) {
-            state.closedTabs = [tabToClose, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
+            // Strip large content from closed tab to free memory
+            const lightweightTab = { ...tabToClose, content: '' }
+            state.closedTabs = [lightweightTab, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           }
           state.tabs = state.tabs.filter((t: Tab) => t.id !== id)
           if (state.tabs.length === 0) {
@@ -110,7 +112,9 @@ export const useTabStore = create<TabStore>()(
         set(produce(state => {
           const tab = state.tabs.find((t: Tab) => t.id === id)
           if (!tab) return
-          const tabsToClose = state.tabs.filter((t: Tab) => t.id !== id)
+          const tabsToClose = state.tabs
+            .filter((t: Tab) => t.id !== id)
+            .map((t: Tab) => ({ ...t, content: '' }))
           state.closedTabs = [...tabsToClose, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           state.activeTabId = id
           state.tabs = [tab]
@@ -119,7 +123,9 @@ export const useTabStore = create<TabStore>()(
 
       closeAllTabs: () => {
         set(produce(state => {
-          const tabsToClose = state.tabs.filter((t: Tab) => t.name !== '欢迎使用.md')
+          const tabsToClose = state.tabs
+            .filter((t: Tab) => t.name !== '欢迎使用.md')
+            .map((t: Tab) => ({ ...t, content: '' }))
           state.closedTabs = [...tabsToClose, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           const welcomeTab = getWelcomeTab()
           state.activeTabId = welcomeTab.id

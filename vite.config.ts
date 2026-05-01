@@ -13,6 +13,7 @@ export default defineConfig({
           'vendor-markdown': ['markdown-it', 'markdown-it-emoji', 'markdown-it-katex'],
           'katex': ['katex'],
           'prism': ['prismjs'],
+          'mermaid': ['mermaid'],
         }
       }
     }

@@ -91,6 +91,8 @@ export interface ElectronAPI {
   }>
   getRecentLogs: () => Promise<string[]>
   clearLogs: () => Promise<{ success: boolean }>
+  showSaveDialog: (options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string } | null>
+  showOpenDialog: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePaths: string[] } | null>
 }
 
 declare global {

@@ -25,11 +25,17 @@ function getWorker(): Worker {
   return workerInstance
 }
 
+/** Cancel all pending worker operations that are no longer needed */
+export function cancelPendingWorkerOperations(): void {
+  pending.clear()
+}
+
 export function useMarkdownWorker(content: string): { html: string; loading: boolean } {
   const [html, setHtml] = useState('')
   const [loading, setLoading] = useState(false)
   const contentRef = useRef(content)
   const idRef = useRef<number>(0)
+  const mountedRef = useRef(true)
 
   const parse = useCallback((text: string) => {
     setLoading(true)
@@ -40,11 +46,19 @@ export function useMarkdownWorker(content: string): { html: string; loading: boo
     worker.postMessage({ content: text, id: currentId })
 
     pending.set(currentId, (result: string) => {
-      if (idRef.current === currentId) {
+      pending.delete(currentId)
+      if (mountedRef.current && idRef.current === currentId) {
         setHtml(result)
         setLoading(false)
       }
     })
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
 
   useEffect(() => {

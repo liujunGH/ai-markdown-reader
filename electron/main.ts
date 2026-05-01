@@ -90,6 +90,7 @@ let windowIdCounter = 0
 let lastFocusedWindowId = 0
 let tray: Tray | null = null
 let isQuiting = false
+let splashWindow: BrowserWindow | null = null
 const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
@@ -173,7 +174,14 @@ function createWindow(filePath?: string, windowState?: WindowState) {
   if (windowState?.isFullScreen) {
     win.setFullScreen(true)
   }
-  win.show()
+
+  win.once('ready-to-show', () => {
+    win.show()
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close()
+      splashWindow = null
+    }
+  })
 
   const id = ++windowIdCounter
   windows.set(id, win)
@@ -236,6 +244,68 @@ function createWindow(filePath?: string, windowState?: WindowState) {
   }
 
   return win
+}
+
+function createSplashWindow() {
+  const splashHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      background: #1a1a2e;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .loader { text-align: center; }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      border-top-color: #4a9eff;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: 0.5px; }
+    p { margin: 8px 0 0; opacity: 0.6; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <h1>AI Markdown Reader</h1>
+    <p>Loading...</p>
+  </div>
+</body>
+</html>`
+
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 260,
+    frame: false,
+    alwaysOnTop: true,
+    center: true,
+    show: false,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    }
+  })
+  splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`)
+  splashWindow.once('ready-to-show', () => {
+    splashWindow?.show()
+  })
 }
 
 function createMenu() {
@@ -478,6 +548,11 @@ if (!gotTheLock) {
 app.whenReady().then(() => {
   logger.info('App ready')
   createMenu()
+
+  // Show splash window during initial load (not in dev mode)
+  if (!isDev) {
+    createSplashWindow()
+  }
 
   if (process.platform === 'darwin') {
     app.dock?.setMenu(Menu.buildFromTemplate([
