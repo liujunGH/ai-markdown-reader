@@ -99,6 +99,7 @@ md.use(texmath, {
   katexOptions: {
     output: 'html',
     throwOnError: false,
+    strict: 'ignore',
     trust: false,
   },
 })

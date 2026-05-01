@@ -3,16 +3,19 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { MarkdownRenderer } from '../../components/MarkdownRenderer'
+import { __resetMermaidLoaderForTests } from '../../utils/mermaidLoader'
+
+const mermaidMock = vi.hoisted(() => ({
+  initialize: vi.fn(),
+  render: vi.fn(),
+}))
 
 vi.mock('../../hooks/useMarkdownWorker', () => ({
   useMarkdownWorker: vi.fn(() => ({ html: '', loading: false })),
 }))
 
 vi.mock('mermaid', () => ({
-  default: {
-    initialize: vi.fn(),
-    render: vi.fn().mockResolvedValue({ svg: '<svg>mock</svg>' }),
-  },
+  default: mermaidMock,
 }))
 
 vi.mock('dompurify', async () => {
@@ -47,6 +50,11 @@ class LocalStorageMock {
 }
 
 beforeEach(() => {
+  __resetMermaidLoaderForTests()
+  mermaidMock.initialize.mockReset()
+  mermaidMock.render.mockReset()
+  mermaidMock.render.mockResolvedValue({ svg: '<svg data-testid="mermaid-svg">mock</svg>' })
+
   Object.defineProperty(window, 'localStorage', {
     value: new LocalStorageMock(),
     writable: true,
@@ -72,6 +80,16 @@ afterEach(() => {
 })
 
 describe('MarkdownRenderer', () => {
+  function expectNoExecutableHtml(root: ParentNode) {
+    expect(root.querySelector('script')).not.toBeInTheDocument()
+    expect(root.querySelector('iframe')).not.toBeInTheDocument()
+    expect(root.querySelector('object')).not.toBeInTheDocument()
+    expect(root.querySelector('embed')).not.toBeInTheDocument()
+    expect(root.querySelector('a[href^="javascript:" i]')).not.toBeInTheDocument()
+    expect(root.querySelector('a[href^="data:" i]')).not.toBeInTheDocument()
+    expect(root.querySelector('[onclick], [onerror], [onload]')).not.toBeInTheDocument()
+  }
+
   it('renders basic markdown content', () => {
     const { container } = render(
       <MarkdownRenderer content="# Hello\n\nThis is **bold** text." />
@@ -121,14 +139,118 @@ describe('MarkdownRenderer', () => {
     })
   })
 
-  it('renders inline and block math', async () => {
+  it('does not load or render Mermaid for ordinary markdown', async () => {
     const { container } = render(
-      <MarkdownRenderer content={'Inline math $E=mc^2$ and block math $$\\sum_{i=1}^{n} x_i$$'} />
+      <MarkdownRenderer content={'# Mermaid notes\n\nThis paragraph mentions mermaid without a diagram.'} />
     )
 
     await waitFor(() => {
-      expect(container.querySelectorAll('.katex').length).toBeGreaterThan(0)
+      expect(container.querySelector('h1')).toHaveTextContent('Mermaid notes')
     })
+
+    expect(container.querySelector('.mermaid-wrapper')).not.toBeInTheDocument()
+    expect(mermaidMock.initialize).not.toHaveBeenCalled()
+    expect(mermaidMock.render).not.toHaveBeenCalled()
+  })
+
+  it('loads Mermaid only when a mermaid code block is present', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={"Intro\n\n```mermaid\ngraph TD;\nA-->B;\n```\n\nOutro"} />
+    )
+
+    await waitFor(() => {
+      expect(mermaidMock.render).toHaveBeenCalledWith(
+        expect.stringMatching(/^mermaid-[a-z0-9]{9}$/),
+        'graph TD;\nA-->B;\n'
+      )
+    })
+
+    expect(mermaidMock.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      startOnLoad: false,
+      securityLevel: 'strict',
+    }))
+    expect(container.querySelector('.mermaid-svg-wrapper svg')).toBeInTheDocument()
+    expect(container).toHaveTextContent('Intro')
+    expect(container).toHaveTextContent('Outro')
+  })
+
+  it('isolates Mermaid render failures from the rest of the document', async () => {
+    mermaidMock.render.mockRejectedValueOnce(new Error('diagram exploded'))
+
+    const { container } = render(
+      <MarkdownRenderer content={"Before\n\n```mermaid\ngraph TD;\nA-->B;\n```\n\nAfter"} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.mermaid-error')).toHaveTextContent('diagram exploded')
+    })
+
+    expect(container).toHaveTextContent('Before')
+    expect(container).toHaveTextContent('After')
+    expect(container.querySelector('p')).toBeInTheDocument()
+  })
+
+  it('renders inline math with surrounding markdown content', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'Inline math $E=mc^2$ and **bold text** after it.'} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.katex')).toBeInTheDocument()
+    })
+
+    expect(container).toHaveTextContent('Inline math')
+    expect(container).toHaveTextContent('bold text')
+    expect(container.querySelector('.katex-display')).not.toBeInTheDocument()
+    expect(container.querySelector('strong')).toHaveTextContent('bold text')
+  })
+
+  it('renders block math as display math', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'Before\n\n$$\n\\sum_{i=1}^{n} x_i\n$$\n\nAfter'} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.katex-display')).toBeInTheDocument()
+    })
+
+    expect(container.querySelector('.katex-display .katex')).toBeInTheDocument()
+    expect(container).toHaveTextContent('Before')
+    expect(container).toHaveTextContent('After')
+  })
+
+  it('keeps rendering content around invalid math formulas', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'Start $\\notacommand{1}$ middle **still bold** end'} />
+    )
+
+    await waitFor(() => {
+      expect(container).toHaveTextContent('Start')
+    })
+
+    expect(container).toHaveTextContent('middle')
+    expect(container.querySelector('strong')).toHaveTextContent('still bold')
+    expect(container).toHaveTextContent('end')
+  })
+
+  it('sanitizes malicious KaTeX input without executable HTML or dangerous links', async () => {
+    const maliciousMath = [
+      String.raw`$\href{javascript:alert(1)}{click}$`,
+      String.raw`$\href{data:text/html,<script>alert(1)</script>}{data}$`,
+      String.raw`$\htmlClass{bad" onclick="alert(1)}{x}$`,
+      String.raw`$\includegraphics{javascript:alert(1)}$`,
+    ].join('\n\n')
+
+    const { container } = render(
+      <MarkdownRenderer content={`Before\n\n${maliciousMath}\n\nAfter`} />
+    )
+
+    await waitFor(() => {
+      expect(container).toHaveTextContent('Before')
+    })
+
+    expect(container).toHaveTextContent('After')
+    expectNoExecutableHtml(container)
   })
 
   it('renders wiki links as links', async () => {
