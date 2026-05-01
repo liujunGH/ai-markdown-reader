@@ -9,12 +9,14 @@ test.describe('Reading Flow', () => {
   let fixturePath: string
   let fixturePath2: string
   let fixturePath3: string
+  let smokeTestPath: string
 
   test.beforeAll(() => {
     const tmpDir = os.tmpdir()
     fixturePath = path.join(tmpDir, 'ai-markdown-reader-sample.md')
     fixturePath2 = path.join(tmpDir, 'ai-markdown-reader-sample2.md')
     fixturePath3 = path.join(tmpDir, 'ai-markdown-reader-sample3.md')
+    smokeTestPath = path.join(__dirname, '../examples/smoke-test.md')
 
     fs.writeFileSync(fixturePath, fs.readFileSync(path.join(__dirname, 'fixtures/sample.md'), 'utf-8'))
     fs.writeFileSync(fixturePath2, '# Second Document\n\nThis is the second test document.\n\n## Section A\n\nContent for section A.\n\n## Section B\n\nContent for section B.\n')
@@ -147,5 +149,22 @@ test.describe('Reading Flow', () => {
     await window.getByLabel('跳转到 Introduction').click()
 
     await expect(window.locator('#introduction')).toBeInViewport()
+  })
+
+  test('should render the release smoke-test document', async () => {
+    await mockOpenFileDialog([smokeTestPath])
+
+    await window.locator('[data-guide="file-opener"]').click()
+
+    await expect(window.getByRole('heading', { name: 'Markdown Reader Smoke Test' })).toBeVisible()
+    await expect(window.locator('pre.language-typescript')).toBeVisible()
+    await expect(window.locator('pre.language-diff')).toBeVisible()
+    await expect(window.locator('.katex').first()).toBeVisible()
+    await expect(window.locator('.katex-display').first()).toBeVisible()
+    await expect(window.locator('.mermaid-svg-wrapper svg').first()).toBeVisible({ timeout: 10000 })
+    await expect(window.locator('table').first()).toBeVisible()
+    await expect(window.locator('input.task-checkbox').first()).toBeVisible()
+    await expect(window.locator('a.wikilink').first()).toBeVisible()
+    await expect(window.getByRole('heading', { name: '发布前检查清单' })).toBeVisible()
   })
 })
