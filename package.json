@@ -4,7 +4,7 @@
   "version": "1.5.1",
   "description": "A Markdown Reader",
   "author": "liujun",
-  "main": "electron/main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

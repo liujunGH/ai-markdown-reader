@@ -21,7 +21,7 @@
    npm run build
    ```
 
-   > 如果 `electron/main.js` 或 `dist/index.html` 不存在，测试会自动启动失败，提示需要先执行编译和构建。
+   > 如果 `dist-electron/main.js` 或 `dist/index.html` 不存在，测试会自动启动失败，提示需要先执行编译和构建。
 
 ## 运行测试
 
@@ -41,7 +41,7 @@ npm run e2e:headed
 
 - **配置文件**: `playwright.config.ts`
 - **测试目录**: `e2e/`
-- **测试入口**: `electron/main.js`（编译后的 Electron 主进程）
+- **测试入口**: `dist-electron/main.js`（编译后的 Electron 主进程）
 - **Headless 支持**: 已在配置中启用，CI 环境下自动生效
 
 ## 工作原理
@@ -49,7 +49,7 @@ npm run e2e:headed
 测试启动时：
 
 1. Playwright 会先启动 `vite preview` 作为静态文件服务器（端口 `5173`）。
-2. 随后通过 `_electron.launch()` 启动 Electron 应用，主进程入口指向 `electron/main.js`。
+2. 随后通过 `_electron.launch()` 启动 Electron 应用，主进程入口指向 `dist-electron/main.js`。
 3. Electron 窗口加载 `http://localhost:5173`（即生产构建产物）。
 4. 测试执行断言（窗口标题、DOM 元素可见性等）。
 

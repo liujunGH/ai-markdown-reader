@@ -25,7 +25,7 @@ test.describe('Reading Flow', () => {
     const userDataDir = path.join(os.tmpdir(), `playwright-e2e-reading-${testInfo.workerIndex}-${Date.now()}`)
     electronApp = await _electron.launch({
       args: [
-        path.join(__dirname, '../electron/main.js'),
+        path.join(__dirname, '../dist-electron/main.js'),
         '--no-sandbox',
         '--disable-setuid-sandbox',
         `--user-data-dir=${userDataDir}`,

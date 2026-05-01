@@ -7,10 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": ".",
+    "outDir": "../dist-electron",
     "rootDir": ".",
     "declaration": false
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules", "dist", "src"]
+  "exclude": ["node_modules", "__tests__", "../dist", "../dist-electron", "../src"]
 }
