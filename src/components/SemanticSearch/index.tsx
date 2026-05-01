@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './SemanticSearch.module.css'
 import { useSemanticSearch } from '../../hooks/useSemanticSearch'
 
@@ -8,6 +9,7 @@ interface SemanticSearchProps {
 }
 
 export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
+  const { t } = useTranslation()
   const {
     query,
     setQuery,
@@ -52,10 +54,10 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
   const progressPercent = totalFiles > 0 ? Math.round((indexedCount / totalFiles) * 100) : 0
 
   return (
-    <div className={styles.container} role="search" aria-label="语义搜索">
+    <div className={styles.container} role="search" aria-label={t('semanticSearch.title')}>
       <div className={styles.header}>
-        <h3 className={styles.title}>语义搜索</h3>
-        <button className={styles.closeButton} onClick={onClose} title="关闭" aria-label="关闭">
+        <h3 className={styles.title}>{t('semanticSearch.title')}</h3>
+        <button className={styles.closeButton} onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
           ✕
         </button>
       </div>
@@ -68,8 +70,8 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
           <input
             type="text"
             className={styles.input}
-            placeholder="输入自然语言查询..."
-            aria-label="语义搜索查询"
+            placeholder={t('semanticSearch.placeholder')}
+            aria-label={t('semanticSearch.ariaLabel')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -79,9 +81,9 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
             className={styles.searchButton}
             onClick={handleSearch}
             disabled={isLoading || isIndexing || isModelLoading || !query.trim()}
-            aria-label="搜索"
+            aria-label={t('common.search')}
           >
-            搜索
+            {t('common.search')}
           </button>
         </div>
 
@@ -89,10 +91,10 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
           className={styles.indexButton}
           onClick={handleIndexFolder}
           disabled={isIndexing || isModelLoading || !folderPath}
-          aria-label="索引当前文件夹"
+          aria-label={t('semanticSearch.indexFolder')}
         >
           <span aria-hidden="true">📂</span>
-          <span>{isIndexing ? '索引中...' : '索引文件夹'}</span>
+          <span>{isIndexing ? t('semanticSearch.indexing') : t('semanticSearch.indexFolder')}</span>
         </button>
       </div>
 
@@ -104,13 +106,13 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
             </div>
           )}
           <div className={styles.statusText}>
-            {isModelLoading && <div>{modelLoadingProgress || '正在加载模型...'}</div>}
+            {isModelLoading && <div>{modelLoadingProgress || t('semanticSearch.loadingModel')}</div>}
             {isIndexing && (
               <div>
                 <strong>
                   {indexedCount} / {totalFiles}
                 </strong>{' '}
-                文件已索引
+                {t('semanticSearch.filesIndexed')}
               </div>
             )}
             {currentFile && isIndexing && (
@@ -132,13 +134,13 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
         {isLoading && !isModelLoading && (
           <div className={styles.loadingState}>
             <div className={styles.spinner} aria-hidden="true" />
-            <div className={styles.loadingText}>正在搜索...</div>
+            <div className={styles.loadingText}>{t('semanticSearch.searching')}</div>
           </div>
         )}
 
         {!isLoading && results.length > 0 && (
           <>
-            <div className={styles.resultsHeader}>搜索结果 ({results.length})</div>
+            <div className={styles.resultsHeader}>{t('semanticSearch.resultsHeader', { count: results.length })}</div>
             <div className={styles.resultList} role="list">
               {results.map((result, index) => (
                 <button
@@ -165,7 +167,7 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
             <div className={styles.emptyIcon} aria-hidden="true">
               🔍
             </div>
-            <div className={styles.emptyText}>未找到相关结果</div>
+            <div className={styles.emptyText}>{t('semanticSearch.noResults')}</div>
           </div>
         )}
 
@@ -175,9 +177,9 @@ export function SemanticSearch({ folderPath, onClose }: SemanticSearchProps) {
               ✨
             </div>
             <div className={styles.emptyText}>
-              输入自然语言描述来搜索文档内容
+              {t('semanticSearch.emptyStateHint1')}
               <br />
-              首次使用需点击「索引文件夹」构建语义索引
+              {t('semanticSearch.emptyStateHint2')}
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAIStore } from '../../stores/aiStore'
 import styles from './AIPanel.module.css'
 
@@ -8,6 +9,7 @@ interface AIConfigModalProps {
 }
 
 export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
+  const { t } = useTranslation()
   const modalRef = useRef<HTMLDivElement>(null)
   const config = useAIStore((state) => state.config)
   const updateConfig = useAIStore((state) => state.updateConfig)
@@ -61,15 +63,15 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         className={styles.configModal}
         role="dialog"
         aria-modal="true"
-        aria-label="AI 设置"
+        aria-label={t('aiConfig.title')}
       >
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>AI 设置</h3>
+          <h3 className={styles.modalTitle}>{t('aiConfig.title')}</h3>
           <button
             className={styles.modalCloseBtn}
             onClick={onClose}
             type="button"
-            aria-label="关闭"
+            aria-label={t('common.close')}
           >
             ×
           </button>
@@ -77,7 +79,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         <div className={styles.modalBody}>
           <div className={styles.formGroup}>
             <label className={styles.formLabel} htmlFor="ai-base-url">
-              API Base URL
+              {t('aiConfig.baseUrl')}
             </label>
             <input
               id="ai-base-url"
@@ -90,7 +92,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           </div>
           <div className={styles.formGroup}>
             <label className={styles.formLabel} htmlFor="ai-api-key">
-              API Key
+              {t('aiConfig.apiKey')}
             </label>
             <input
               id="ai-api-key"
@@ -103,7 +105,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           </div>
           <div className={styles.formGroup}>
             <label className={styles.formLabel} htmlFor="ai-model">
-              模型名称
+              {t('aiConfig.modelName')}
             </label>
             <input
               id="ai-model"
@@ -122,7 +124,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
                 checked={enabled}
                 onChange={(e) => setEnabled(e.target.checked)}
               />
-              <span>启用 AI 助手</span>
+              <span>{t('aiConfig.enableAI')}</span>
             </label>
           </div>
         </div>
@@ -132,14 +134,14 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             onClick={onClose}
             type="button"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             className={styles.saveBtn}
             onClick={handleSave}
             type="button"
           >
-            保存
+            {t('common.save')}
           </button>
         </div>
       </div>

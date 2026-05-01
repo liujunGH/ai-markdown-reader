@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import DOMPurify from 'dompurify'
 import { parseMarkdown } from '../../utils/markdownParser'
 import type { ChatMessage as ChatMessageType } from '../../services/ai'
@@ -9,6 +10,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
 
   const html = useMemo(() => {
@@ -97,7 +99,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <button
           className={styles.copyMessageBtn}
           onClick={handleCopy}
-          title="复制内容"
+          title={t('aiPanel.copyContent')}
           type="button"
         >
           📋

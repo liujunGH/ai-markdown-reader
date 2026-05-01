@@ -1,28 +1,43 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAIStore } from '../../stores/aiStore'
 import { useAIChat } from '../../hooks/useAIChat'
+import { useTabStore } from '../../stores/tabStore'
 import { ChatMessage } from './ChatMessage'
 import { AIConfigModal } from './AIConfigModal'
 import styles from './AIPanel.module.css'
 
-const MIN_WIDTH = 320
-const MAX_WIDTH = 480
-const DEFAULT_WIDTH = 380
+const MAX_DOC_CONTENT_LENGTH = 6000
+
+interface QuickAction {
+  icon: string
+  labelKey: string
+  getPrompt: (content: string) => string
+}
 
 export function AIPanel() {
+  const { t } = useTranslation()
   const showAIPanel = useAIStore((state) => state.showAIPanel)
   const messages = useAIStore((state) => state.messages)
   const isLoading = useAIStore((state) => state.isLoading)
   const clearMessages = useAIStore((state) => state.clearMessages)
   const setShowAIPanel = useAIStore((state) => state.setShowAIPanel)
   const config = useAIStore((state) => state.config)
-  const { input, setInput, handleSubmit, abort } = useAIChat()
+  const { input, setInput, handleSubmit, abort, sendMessage } = useAIChat()
+  const getActiveTab = useTabStore((state) => state.activeTab)
   const [showConfig, setShowConfig] = useState(false)
-  const [width, setWidth] = useState(DEFAULT_WIDTH)
+  const [width, setWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const startXRef = useRef(0)
   const startWidthRef = useRef(width)
+
+  const QUICK_ACTIONS: QuickAction[] = [
+    { icon: '📋', labelKey: 'aiPanel.summarize', getPrompt: (c) => `请为以下文档生成摘要：\n\n${c}` },
+    { icon: '🌐', labelKey: 'aiPanel.translate', getPrompt: (c) => `请将以下文档翻译成英文：\n\n${c}` },
+    { icon: '✏️', labelKey: 'aiPanel.rewrite', getPrompt: (c) => `请改写以下内容，使其更简洁：\n\n${c}` },
+    { icon: '➕', labelKey: 'aiPanel.continue', getPrompt: (c) => `请根据以下内容续写：\n\n${c}` },
+  ]
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -45,8 +60,8 @@ export function AIPanel() {
     const handleMouseMove = (e: MouseEvent) => {
       const delta = startXRef.current - e.clientX
       const newWidth = Math.max(
-        MIN_WIDTH,
-        Math.min(MAX_WIDTH, startWidthRef.current + delta)
+        320,
+        Math.min(480, startWidthRef.current + delta)
       )
       setWidth(newWidth)
     }
@@ -87,12 +102,12 @@ export function AIPanel() {
       >
         <div className={styles.resizer} onMouseDown={handleMouseDown} />
         <div className={styles.panelHeader}>
-          <span className={styles.panelTitle}>🤖 AI 助手</span>
+          <span className={styles.panelTitle}>{t('aiPanel.title')}</span>
           <div className={styles.panelActions}>
             <button
               className={styles.iconBtn}
               onClick={() => setShowConfig(true)}
-              title="设置"
+              title={t('aiPanel.settings')}
               type="button"
             >
               ⚙️
@@ -100,7 +115,7 @@ export function AIPanel() {
             <button
               className={styles.iconBtn}
               onClick={clearMessages}
-              title="清空对话"
+              title={t('aiPanel.clearChat')}
               type="button"
             >
               🗑️
@@ -108,7 +123,7 @@ export function AIPanel() {
             <button
               className={styles.iconBtn}
               onClick={() => setShowAIPanel(false)}
-              title="关闭"
+              title={t('common.close')}
               type="button"
             >
               ✕
@@ -122,8 +137,8 @@ export function AIPanel() {
               <div className={styles.emptyIcon}>💬</div>
               <div className={styles.emptyText}>
                 {isConfigured
-                  ? '开始与 AI 助手对话，询问关于当前文档的问题'
-                  : 'AI 助手未启用，请点击 ⚙️ 进行配置'}
+                  ? t('aiPanel.emptyStateConfigured')
+                  : t('aiPanel.emptyStateNotConfigured')}
               </div>
             </div>
           )}
@@ -148,6 +163,28 @@ export function AIPanel() {
           <div ref={messagesEndRef} />
         </div>
 
+        <div className={styles.quickActions}>
+          {QUICK_ACTIONS.map((action) => (
+            <button
+              key={action.labelKey}
+              className={styles.quickActionBtn}
+              onClick={() => {
+                const tab = getActiveTab()
+                const content = tab?.content
+                  ? tab.content.slice(0, MAX_DOC_CONTENT_LENGTH)
+                  : ''
+                void sendMessage(action.getPrompt(content))
+              }}
+              disabled={isLoading}
+              type="button"
+              title={t(action.labelKey)}
+            >
+              <span className={styles.quickActionIcon}>{action.icon}</span>
+              <span className={styles.quickActionLabel}>{t(action.labelKey)}</span>
+            </button>
+          ))}
+        </div>
+
         <div className={styles.inputArea}>
           <textarea
             className={styles.textarea}
@@ -156,8 +193,8 @@ export function AIPanel() {
             onKeyDown={handleKeyDown}
             placeholder={
               isConfigured
-                ? '输入消息... (Enter 发送, Shift+Enter 换行)'
-                : '请先配置 AI 设置'
+                ? t('aiPanel.placeholderConfigured')
+                : t('aiPanel.placeholderNotConfigured')
             }
             disabled={!isConfigured || isLoading}
             rows={2}
@@ -169,7 +206,7 @@ export function AIPanel() {
                 onClick={abort}
                 type="button"
               >
-                ⏹ 停止
+                {t('aiPanel.stop')}
               </button>
             ) : (
               <button
@@ -178,7 +215,7 @@ export function AIPanel() {
                 disabled={!input.trim() || !isConfigured}
                 type="button"
               >
-                ➤ 发送
+                {t('aiPanel.send')}
               </button>
             )}
           </div>
