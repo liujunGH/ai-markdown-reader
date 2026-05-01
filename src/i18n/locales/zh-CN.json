@@ -6,29 +6,6 @@
     "search": "搜索",
     "unknown": "未知"
   },
-  "aiPanel": {
-    "title": "🤖 AI 助手",
-    "settings": "设置",
-    "clearChat": "清空对话",
-    "emptyStateConfigured": "开始与 AI 助手对话，询问关于当前文档的问题",
-    "emptyStateNotConfigured": "AI 助手未启用，请点击 ⚙️ 进行配置",
-    "placeholderConfigured": "输入消息... (Enter 发送, Shift+Enter 换行)",
-    "placeholderNotConfigured": "请先配置 AI 设置",
-    "stop": "⏹ 停止",
-    "send": "➤ 发送",
-    "copyContent": "复制内容",
-    "summarize": "摘要",
-    "translate": "翻译",
-    "rewrite": "改写",
-    "continue": "续写"
-  },
-  "aiConfig": {
-    "title": "AI 设置",
-    "baseUrl": "API Base URL",
-    "apiKey": "API Key",
-    "modelName": "模型名称",
-    "enableAI": "启用 AI 助手"
-  },
   "semanticSearch": {
     "title": "语义搜索",
     "placeholder": "输入自然语言查询...",
@@ -190,7 +167,6 @@
     "fileInfo": "文件信息",
     "readingStats": "阅读统计",
     "diagnostics": "诊断面板",
-    "aiAssistant": "AI 助手",
     "semanticSearch": "语义搜索",
     "dataBackup": "数据备份"
   },

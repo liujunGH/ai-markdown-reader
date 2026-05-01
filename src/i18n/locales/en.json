@@ -6,29 +6,6 @@
     "search": "Search",
     "unknown": "Unknown"
   },
-  "aiPanel": {
-    "title": "🤖 AI Assistant",
-    "settings": "Settings",
-    "clearChat": "Clear Chat",
-    "emptyStateConfigured": "Start a conversation with the AI assistant about the current document",
-    "emptyStateNotConfigured": "AI assistant is not enabled. Click ⚙️ to configure",
-    "placeholderConfigured": "Type a message... (Enter to send, Shift+Enter for newline)",
-    "placeholderNotConfigured": "Please configure AI settings first",
-    "stop": "⏹ Stop",
-    "send": "➤ Send",
-    "copyContent": "Copy Content",
-    "summarize": "Summarize",
-    "translate": "Translate",
-    "rewrite": "Rewrite",
-    "continue": "Continue"
-  },
-  "aiConfig": {
-    "title": "AI Settings",
-    "baseUrl": "API Base URL",
-    "apiKey": "API Key",
-    "modelName": "Model Name",
-    "enableAI": "Enable AI Assistant"
-  },
   "semanticSearch": {
     "title": "Semantic Search",
     "placeholder": "Enter natural language query...",
@@ -190,7 +167,6 @@
     "fileInfo": "File Info",
     "readingStats": "Reading Stats",
     "diagnostics": "Diagnostics",
-    "aiAssistant": "AI Assistant",
     "semanticSearch": "Semantic Search",
     "dataBackup": "Data Backup"
   },

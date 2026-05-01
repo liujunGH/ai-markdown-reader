@@ -53,14 +53,8 @@ const DiagnosticsPanel = React.lazy(() => import('./components/DiagnosticsPanel'
 const DataBackupPanel = React.lazy(() => import('./components/DataBackupPanel').then(m => ({ default: m.DataBackupPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { AIPanel } from './components/AIPanel'
-import { AIFloatButton } from './components/AIFloatButton'
 import { SemanticSearch } from './components/SemanticSearch'
 import { KnowledgeGraph } from './components/KnowledgeGraph'
-import { AutoTagCloud } from './components/AutoTagCloud'
-import { useAIStore } from './stores/aiStore'
-import { useTextSelection } from './hooks/useTextSelection'
-import { useAutoTags } from './hooks/useAutoTags'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
 import { indexFolder as semanticIndexFolder } from './services/semanticIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
@@ -96,14 +90,9 @@ function AppInner() {
     setFolder, setCurrentFilePath, setFileInfo, clearFolder
   } = useFileStore()
 
-  const { toggleAIPanel } = useAIStore()
   const [showSemanticSearch, setShowSemanticSearch] = useState(false)
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false)
-  const selection = useTextSelection()
-  const { tags: autoTags, isLoading: autoTagsLoading } = useAutoTags(
-    activeTab?.filePath || '',
-    activeTab?.content || ''
-  )
+
 
   const { toasts, showToast } = useToastStore()
 
@@ -710,13 +699,7 @@ function AppInner() {
                 >
                   🛠️
                 </button>
-                <button
-                  onClick={toggleAIPanel}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.aiAssistant')} data-tooltip={t('toolbar.aiAssistant')}
-                >
-                  🤖
-                </button>
+
                 <button
                   onClick={() => setShowSemanticSearch(true)}
                   className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
@@ -777,9 +760,7 @@ function AppInner() {
               {!showFocusMode && !showSource && outlineItems.length >= 3 && (
                 <FloatingTOC outlineItems={outlineItems} activeHeadingId={activeHeadingId} onNavigate={handleOutlineClick} />
               )}
-              {!showFocusMode && !showSource && activeTab?.filePath && (
-                <AutoTagCloud tags={autoTags} isLoading={autoTagsLoading} />
-              )}
+
               {isRestoringSession ? (
                 <div style={{ padding: '20px' }}>
                   <Skeleton lines={20} />
@@ -982,13 +963,7 @@ function AppInner() {
               />
             </Suspense>
           )}
-          <AIFloatButton
-            text={selection.text}
-            x={selection.x}
-            y={selection.y}
-            visible={selection.visible}
-          />
-          <AIPanel />
+
           {showSemanticSearch && (
             <SemanticSearch
               folderPath={currentFolderPath}
@@ -1124,9 +1099,6 @@ function AppInner() {
               break
             case 'quick-jump':
               openPanel('quickJump')
-              break
-            case 'ai-assistant':
-              toggleAIPanel()
               break
             case 'semantic-search':
               setShowSemanticSearch(true)
