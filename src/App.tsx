@@ -50,6 +50,7 @@ const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
+import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
@@ -187,10 +188,14 @@ function AppInner() {
 
   // Recent file select handler
   const handleRecentSelect = useCallback(async (file: RecentFile) => {
-    await openRecentFile(file)
+    const opened = await openRecentFile(file)
     loadRecentFiles()
-    closePanel('recent')
-  }, [openRecentFile, loadRecentFiles, closePanel])
+    if (opened) {
+      closePanel('recent')
+    } else {
+      showToast(t('app.recentFileRemoved'), 'error')
+    }
+  }, [openRecentFile, loadRecentFiles, closePanel, showToast, t])
 
   // Open folder
   const handleOpenFolder = useCallback(async () => {
@@ -805,6 +810,7 @@ function AppInner() {
                 onClose={() => closePanel('exportPanel')}
                 fileName={activeTab?.name || ''}
                 fileContent={activeTab?.content || ''}
+                filePath={activeTab?.filePath}
                 theme={theme}
                 accentColor={accentColor}
               />
@@ -912,6 +918,9 @@ function AppInner() {
               break
             case 'open-folder':
               handleOpenFolder()
+              break
+            case 'open-example':
+              handleFileOpen(EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME)
               break
             case 'new-tab':
               newTab()

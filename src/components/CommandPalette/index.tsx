@@ -20,6 +20,7 @@ interface CommandPaletteProps {
 const DEFAULT_COMMANDS: Command[] = [
   { id: 'open-file', label: '打开文件', shortcut: 'Ctrl+O', category: '文件', icon: '📂', action: () => {} },
   { id: 'open-folder', label: '打开文件夹', shortcut: 'Ctrl+Shift+O', category: '文件', icon: '📁', action: () => {} },
+  { id: 'open-example', label: '打开示例文档', category: '文件', icon: '🧪', action: () => {} },
   { id: 'new-tab', label: '新建标签', shortcut: 'Ctrl+T', category: '标签', icon: '➕', action: () => {} },
   { id: 'close-tab', label: '关闭当前标签', shortcut: 'Ctrl+W', category: '标签', icon: '✕', action: () => {} },
   { id: 'toggle-source', label: '切换源码视图', shortcut: 'Ctrl+S', category: '视图', icon: '📄', action: () => {} },
@@ -42,7 +43,7 @@ const DEFAULT_COMMANDS: Command[] = [
 
 // 常见中文字符到拼音首字母的映射（覆盖默认命令中的字符）
 const PINYIN_INITIAL_MAP: Record<string, string> = {
-  '打': 'd', '开': 'k', '文': 'w', '件': 'j', '夹': 'j',
+  '打': 'd', '开': 'k', '文': 'w', '件': 'j', '夹': 'j', '例': 'l',
   '新': 'x', '建': 'j', '标': 'b', '签': 'q',
   '关': 'g', '闭': 'b', '当': 'd', '前': 'q',
   '切': 'q', '换': 'h', '源': 'y', '码': 'm', '视': 's', '图': 't',

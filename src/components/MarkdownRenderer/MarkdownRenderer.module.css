@@ -502,3 +502,50 @@
 .renderer :global(pre) {
   content-visibility: visible;
 }
+
+.renderer :global(.image-error-placeholder) {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 12px;
+  margin: 12px 0;
+  max-width: 100%;
+}
+
+.renderer :global(.image-error-title) {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.renderer :global(.image-error-path) {
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.renderer :global(.image-error-detail) {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.renderer :global(.image-error-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.renderer :global(.image-error-actions button) {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}

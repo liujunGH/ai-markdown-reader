@@ -116,6 +116,7 @@
     "readFolderFailed": "Failed to read folder",
     "noMarkdownFiles": "No Markdown files in this directory",
     "readFileFailed": "Failed to read file",
+    "recentFileRemoved": "Recent file is unavailable and was removed",
     "openFolderFailed": "Failed to open folder",
     "openFolderFailedWithError": "Failed to open folder: {{error}}",
     "openFileFailed": "Failed to open file",

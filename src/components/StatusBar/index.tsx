@@ -28,6 +28,8 @@ export function StatusBar({ content }: Props) {
       <span>{t('statusBar.lineEnding', { ending: stats.lineEnding })}</span>
       <span className={styles.separator}>|</span>
       <span>{t('statusBar.encoding')}</span>
+      <span className={styles.separator}>|</span>
+      <span title="当前应用版本">v{__APP_VERSION__}</span>
     </footer>
   )
 }

@@ -4,7 +4,7 @@ import { produce } from 'immer'
 
 import { Tab, TabColor, createTab, getWelcomeTab } from '../types/Tab'
 import { RecentFile } from '../types/electron'
-import { getStorageItem } from '../utils/storage'
+import { getStorageItem, setStorageItem } from '../utils/storage'
 
 interface StoredTab {
   id: string
@@ -45,7 +45,7 @@ interface TabActions {
   setTabColor: (id: string, color: TabColor) => void
   restoreTab: () => void
   openFile: (content: string, name: string, filePath?: string, size?: number, lastModified?: number) => void
-  openRecentFile: (file: RecentFile) => Promise<void>
+  openRecentFile: (file: RecentFile) => Promise<boolean>
   updateTabContent: (filePath: string, content: string, name?: string) => void
   restoreSession: () => Promise<void>
   clearFailedRestores: () => void
@@ -56,6 +56,37 @@ export type TabStore = TabState & TabActions
 function getMaxTabs(): number {
   const stored = getStorageItem(MAX_TABS_KEY)
   return stored ? parseInt(stored, 10) : DEFAULT_MAX_TABS
+}
+
+function createRestoredTab(storedTab: StoredTab, content: string): Tab {
+  const tab = createTab(
+    storedTab.name,
+    content,
+    storedTab.filePath,
+    undefined,
+    storedTab.size,
+    storedTab.lastModified,
+    storedTab.color
+  )
+  tab.id = storedTab.id || tab.id
+  tab.isPinned = storedTab.isPinned
+  return tab
+}
+
+function persistSessionSnapshot(tabs: Tab[], activeTabId: string): void {
+  const storedTabs: StoredTab[] = tabs.map(tab => ({
+    id: tab.id,
+    name: tab.name,
+    content: tab.filePath ? undefined : tab.content,
+    filePath: tab.filePath,
+    isPinned: tab.isPinned,
+    size: tab.size,
+    lastModified: tab.lastModified,
+    color: tab.color,
+  }))
+
+  setStorageItem(SESSION_TABS_KEY, JSON.stringify(storedTabs))
+  setStorageItem(SESSION_ACTIVE_TAB_KEY, activeTabId)
 }
 
 export const useTabStore = create<TabStore>()(
@@ -233,7 +264,7 @@ export const useTabStore = create<TabStore>()(
       },
 
       openRecentFile: async (file) => {
-        if (!window.electronAPI) return
+        if (!window.electronAPI) return false
         const result = await window.electronAPI.readFile(file.filePath)
         if (result.success && result.content) {
           const content = result.content
@@ -257,7 +288,10 @@ export const useTabStore = create<TabStore>()(
             state.tabs.push(newTab)
             state.activeTabId = newTab.id
           }))
+          return true
         }
+        await window.electronAPI.removeRecentFile?.(file.filePath)
+        return false
       },
 
       updateTabContent: (filePath, content, name) => {
@@ -288,28 +322,13 @@ export const useTabStore = create<TabStore>()(
               if (storedTab.filePath && window.electronAPI) {
                 const result = await window.electronAPI.readFile(storedTab.filePath)
                 if (result.success && result.content !== undefined) {
-                  restoredTabs.push(createTab(
-                    storedTab.name,
-                    result.content,
-                    storedTab.filePath,
-                    undefined,
-                    storedTab.size,
-                    storedTab.lastModified,
-                    storedTab.color
-                  ))
+                  restoredTabs.push(createRestoredTab(storedTab, result.content))
                 } else {
                   failedRestores.push(storedTab.filePath)
+                  await window.electronAPI.removeRecentFile?.(storedTab.filePath)
                 }
               } else if (storedTab.content !== undefined) {
-                restoredTabs.push(createTab(
-                  storedTab.name,
-                  storedTab.content,
-                  storedTab.filePath,
-                  undefined,
-                  storedTab.size,
-                  storedTab.lastModified,
-                  storedTab.color
-                ))
+                restoredTabs.push(createRestoredTab(storedTab, storedTab.content))
               }
             }
             if (restoredTabs.length > 0) {
@@ -331,8 +350,10 @@ export const useTabStore = create<TabStore>()(
           tabs: restoredTabs,
           activeTabId: restoredActiveTabId,
           isRestoringSession: false,
-          failedRestores,
+          failedRestores: [],
         })
+
+        persistSessionSnapshot(restoredTabs, restoredActiveTabId)
       },
 
       clearFailedRestores: () => {
@@ -359,10 +380,16 @@ useTabStore.subscribe((state, prevState) => {
 
   // Register window files when tabs change
   if (state.tabs !== prevState.tabs) {
+    persistSessionSnapshot(state.tabs, state.activeTabId)
+
     const filePaths = state.tabs.map(t => t.filePath).filter((fp): fp is string => !!fp)
     if (window.electronAPI) {
       window.electronAPI.registerWindowFiles(filePaths)
     }
+  }
+
+  if (state.activeTabId !== prevState.activeTabId) {
+    persistSessionSnapshot(state.tabs, state.activeTabId)
   }
 
   // Auto-add to recent files when active tab changes
@@ -370,7 +397,7 @@ useTabStore.subscribe((state, prevState) => {
     const tab = state.activeTab()
     if (tab?.filePath && window.electronAPI) {
       if (!(state.tabs.length === 1 && state.tabs[0].name === '欢迎使用.md')) {
-        window.electronAPI.addRecentFile({ name: tab.name, filePath: tab.filePath })
+        window.electronAPI.addRecentFile?.({ name: tab.name, filePath: tab.filePath })
       }
     }
   }

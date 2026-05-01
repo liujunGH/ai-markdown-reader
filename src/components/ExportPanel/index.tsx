@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { parseMarkdown } from '../../utils/markdownParser'
+import { resolveLocalImagePath } from '../../utils/imagePaths'
 import styles from './ExportPanel.module.css'
 
 interface ExportPanelProps {
@@ -8,6 +9,7 @@ interface ExportPanelProps {
   onClose: () => void
   fileName: string
   fileContent: string
+  filePath?: string
   theme: string
   accentColor: string
 }
@@ -164,7 +166,40 @@ function buildExportStyles(theme: string, accentColor: string): string {
   `
 }
 
-export function ExportPanel({ isOpen, onClose, fileName, fileContent, theme, accentColor }: ExportPanelProps) {
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+async function inlineLocalImages(html: string, filePath?: string): Promise<string> {
+  if (!window.electronAPI?.readImageAsDataUrl) return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const images = Array.from(template.content.querySelectorAll('img'))
+
+  await Promise.all(images.map(async (img) => {
+    const src = img.getAttribute('src') || ''
+    const localPath = resolveLocalImagePath(src, filePath)
+    if (!localPath) return
+
+    try {
+      const result = await window.electronAPI?.readImageAsDataUrl(localPath)
+      if (result?.success && result.dataUrl) {
+        img.setAttribute('src', result.dataUrl)
+      }
+    } catch {
+      // Keep the original src so the exported HTML remains debuggable.
+    }
+  }))
+
+  return template.innerHTML
+}
+
+export function ExportPanel({ isOpen, onClose, fileName, fileContent, filePath, theme, accentColor }: ExportPanelProps) {
   const { t } = useTranslation()
   const modalRef = useRef<HTMLDivElement>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -198,9 +233,9 @@ export function ExportPanel({ isOpen, onClose, fileName, fileContent, theme, acc
     }
   }, [isOpen, onClose])
 
-  const exportToHTML = useCallback(() => {
+  const exportToHTML = useCallback(async () => {
     try {
-      const html = parseMarkdown(fileContent)
+      const html = await inlineLocalImages(parseMarkdown(fileContent), filePath)
       const title = fileName || 'untitled'
       const css = buildExportStyles(theme, accentColor)
       const fullHTML = `<!DOCTYPE html>
@@ -208,7 +243,7 @@ export function ExportPanel({ isOpen, onClose, fileName, fileContent, theme, acc
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${escapeHtmlAttr(title)}</title>
   <style>${css}</style>
 </head>
 <body>
@@ -226,7 +261,7 @@ ${html}
     } catch {
       showToast(t('exportPanel.htmlError'), 'error')
     }
-  }, [fileContent, fileName, theme, accentColor, showToast, t])
+  }, [fileContent, fileName, filePath, theme, accentColor, showToast, t])
 
   const exportToPDF = useCallback(() => {
     const originalTitle = document.title

@@ -74,9 +74,13 @@ describe('validateFilePath', () => {
     fs.rmSync(outsideRoot, { recursive: true, force: true })
   })
 
-  it('rejects paths with parent traversal', () => {
+  it('rejects parent traversal outside safe roots', () => {
     expect(validateFilePath('/etc/passwd/../../../secret')).toBe(false)
     expect(validateFilePath(path.join(homeDir, '..', 'secret'))).toBe(false)
+  })
+
+  it('allows parent segments when the resolved real path stays inside safe roots', () => {
+    expect(validateFilePath(path.join(homeDir, 'notes', '..', 'doc.md'))).toBe(true)
   })
 
   it('rejects paths with null bytes', () => {

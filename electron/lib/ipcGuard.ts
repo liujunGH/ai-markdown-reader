@@ -36,8 +36,6 @@ export function createRateLimiter(maxCalls: number, windowMs: number): () => boo
 
 export function validateFilePath(filePath: string): boolean {
   if (!filePath || typeof filePath !== 'string') return false
-  // Reject paths with parent directory traversal
-  if (filePath.includes('..')) return false
   // Reject null bytes
   if (filePath.includes('\0')) return false
   // Require an absolute input path before resolving. path.resolve() would

@@ -296,4 +296,46 @@ describe('tabStore', () => {
     const state = useTabStore.getState()
     expect(state.tabs.length).toBeLessThanOrEqual(10)
   })
+
+  it('silently removes missing files from restored session', async () => {
+    const readFile = vi.fn(async (filePath: string) => {
+      if (filePath === '/docs/valid.md') {
+        return { success: true, content: 'valid content' }
+      }
+      return { success: false, error: 'ENOENT' }
+    })
+    const removeRecentFile = vi.fn(async () => undefined)
+    const registerWindowFiles = vi.fn(async () => undefined)
+
+    Object.defineProperty(window, 'electronAPI', {
+      value: {
+        readFile,
+        removeRecentFile,
+        registerWindowFiles,
+      },
+      writable: true,
+    })
+
+    window.localStorage.setItem('session-tabs', JSON.stringify([
+      { id: 'tab-valid', name: 'valid.md', filePath: '/docs/valid.md', isPinned: true },
+      { id: 'tab-missing', name: 'missing.md', filePath: '/docs/missing.md' },
+    ]))
+    window.localStorage.setItem('session-active-tab', 'tab-valid')
+
+    const { useTabStore } = await import('../../stores/tabStore')
+    await useTabStore.getState().restoreSession()
+
+    const state = useTabStore.getState()
+    expect(state.tabs).toHaveLength(1)
+    expect(state.tabs[0].id).toBe('tab-valid')
+    expect(state.tabs[0].content).toBe('valid content')
+    expect(state.tabs[0].isPinned).toBe(true)
+    expect(state.activeTabId).toBe('tab-valid')
+    expect(state.failedRestores).toEqual([])
+    expect(removeRecentFile).toHaveBeenCalledWith('/docs/missing.md')
+
+    const storedTabs = JSON.parse(window.localStorage.getItem('session-tabs') || '[]')
+    expect(storedTabs).toHaveLength(1)
+    expect(storedTabs[0].filePath).toBe('/docs/valid.md')
+  })
 })

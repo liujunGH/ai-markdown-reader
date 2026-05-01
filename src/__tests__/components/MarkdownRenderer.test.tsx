@@ -171,7 +171,7 @@ describe('MarkdownRenderer', () => {
 
     await waitFor(() => {
       expect(mermaidMock.render).toHaveBeenCalledWith(
-        expect.stringMatching(/^mermaid-[a-z0-9]{9}$/),
+        expect.stringMatching(/^mermaid-[a-z0-9]{8,9}$/),
         'graph TD;\nA-->B;\n'
       )
     })

@@ -4,6 +4,7 @@ import { parseMarkdown } from '../../utils/markdownParser'
 import { useMarkdownWorker } from '../../hooks/useMarkdownWorker'
 import { getStorageItem, setStorageItem } from '../../utils/storage'
 import { createMermaidRenderId, getInitializedMermaid, hasMermaidLoaded } from '../../utils/mermaidLoader'
+import { resolveLocalImagePath } from '../../utils/imagePaths'
 import styles from './MarkdownRenderer.module.css'
 import previewStyles from './ImagePreview.module.css'
 
@@ -49,36 +50,6 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-function isRemoteOrEmbeddedImageSrc(src: string): boolean {
-  return (
-    !src ||
-    src.startsWith('#') ||
-    src.startsWith('//') ||
-    /^[a-z][a-z0-9+.-]*:/i.test(src)
-  )
-}
-
-function splitSrcSuffix(src: string): { pathPart: string; suffix: string } {
-  const suffixIndex = src.search(/[?#]/)
-  if (suffixIndex === -1) return { pathPart: src, suffix: '' }
-  return {
-    pathPart: src.slice(0, suffixIndex),
-    suffix: src.slice(suffixIndex),
-  }
-}
-
-function resolveLocalImagePath(src: string, documentFilePath?: string): string | null {
-  if (isRemoteOrEmbeddedImageSrc(src) || !documentFilePath) return null
-
-  const { pathPart, suffix } = splitSrcSuffix(src)
-  if (!pathPart || suffix.startsWith('#')) return null
-
-  if (pathPart.startsWith('/')) return pathPart
-
-  const baseDir = window.electronAPI?.pathDirname(documentFilePath) || documentFilePath.replace(/[\\\/][^\\\/]+$/, '')
-  return window.electronAPI?.pathJoin(baseDir, pathPart) || `${baseDir.replace(/[\\\/]$/, '')}/${pathPart}`
-}
-
 function downloadFile(data: string, filename: string, mimeType: string) {
   const blob = mimeType === 'image/png'
     ? dataToBlob(data, mimeType)
@@ -92,6 +63,56 @@ function downloadFile(data: string, filename: string, mimeType: string) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+function buildImageErrorPlaceholder(src: string, alt: string, error?: string): HTMLDivElement {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'image-error-placeholder'
+
+  const title = document.createElement('div')
+  title.className = 'image-error-title'
+  title.textContent = alt ? `图片加载失败：${alt}` : '图片加载失败'
+
+  const path = document.createElement('div')
+  path.className = 'image-error-path'
+  path.textContent = src
+  path.title = src
+
+  const detail = document.createElement('div')
+  detail.className = 'image-error-detail'
+  detail.textContent = error || '请检查文件路径、网络连接或图片权限'
+
+  const actions = document.createElement('div')
+  actions.className = 'image-error-actions'
+
+  const copyButton = document.createElement('button')
+  copyButton.type = 'button'
+  copyButton.textContent = '复制路径'
+  copyButton.addEventListener('click', () => {
+    void navigator.clipboard?.writeText(src)
+  })
+  actions.appendChild(copyButton)
+
+  if (/^https?:\/\//i.test(src)) {
+    const openButton = document.createElement('button')
+    openButton.type = 'button'
+    openButton.textContent = '打开链接'
+    openButton.addEventListener('click', () => {
+      window.open(src, '_blank', 'noopener,noreferrer')
+    })
+    actions.appendChild(openButton)
+  } else if (src.startsWith('/') && window.electronAPI?.showInFolder) {
+    const revealButton = document.createElement('button')
+    revealButton.type = 'button'
+    revealButton.textContent = '在 Finder 中显示'
+    revealButton.addEventListener('click', () => {
+      void window.electronAPI?.showInFolder(src)
+    })
+    actions.appendChild(revealButton)
+  }
+
+  wrapper.append(title, path, detail, actions)
+  return wrapper
 }
 
 function dataToBlob(data: string, mimeType: string): Blob {
@@ -158,7 +179,7 @@ function buildMermaidContainer(svg: string): HTMLDivElement {
 
 export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, onWikiLinkClick }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string; originalSrc: string } | null>(null)
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -341,18 +362,35 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     const images = container.querySelectorAll('img')
     images.forEach((img) => {
       const src = img.getAttribute('src') || ''
+      const alt = img.getAttribute('alt') || ''
+      img.setAttribute('data-original-src', src)
+      const failImage = (displaySrc: string, error?: string) => {
+        if (!img.parentNode) return
+        img.parentNode.replaceChild(buildImageErrorPlaceholder(displaySrc, alt, error), img)
+      }
       const localImagePath = resolveLocalImagePath(src, filePath)
       if (localImagePath && window.electronAPI?.readImageAsDataUrl) {
         void window.electronAPI.readImageAsDataUrl(localImagePath).then((result) => {
           if (result.success && result.dataUrl) {
             img.setAttribute('src', result.dataUrl)
+          } else {
+            failImage(localImagePath, result.error)
           }
+        }).catch((error: unknown) => {
+          failImage(localImagePath, error instanceof Error ? error.message : String(error))
         })
       }
       img.loading = 'lazy'
       img.classList.add('clickable-image')
+      img.addEventListener('error', () => {
+        failImage(localImagePath || src)
+      }, { once: true })
       img.addEventListener('click', () => {
-        setPreviewImage({ src: img.src, alt: img.alt })
+        setPreviewImage({
+          src: img.src,
+          alt: img.alt,
+          originalSrc: img.getAttribute('data-original-src') || img.src,
+        })
       })
     })
 
@@ -706,6 +744,26 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
             <button onClick={handleZoomIn} title="放大">+</button>
             <button onClick={handleZoomReset} title="1:1">1:1</button>
             <button onClick={handleZoomFit} title="适应屏幕">适应</button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                void navigator.clipboard?.writeText(previewImage.originalSrc)
+              }}
+              title="复制图片地址"
+            >
+              复制
+            </button>
+            {/^https?:\/\//i.test(previewImage.originalSrc) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(previewImage.originalSrc, '_blank', 'noopener,noreferrer')
+                }}
+                title="打开原图"
+              >
+                原图
+              </button>
+            )}
           </div>
           <img
             src={previewImage.src}

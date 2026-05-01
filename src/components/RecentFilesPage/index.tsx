@@ -21,6 +21,7 @@ type SortType = 'time' | 'name' | 'path'
 export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose, onOpenFolder }: Props) {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('time')
+  const [isCleaning, setIsCleaning] = useState(false)
 
   const filteredAndSortedFiles = useMemo(() => {
     let result = [...files]
@@ -42,6 +43,21 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
     return result
   }, [files, search, sortBy])
 
+  const handleCleanInvalid = async () => {
+    if (!window.electronAPI?.getFileInfo) return
+    setIsCleaning(true)
+    try {
+      for (const file of files) {
+        const result = await window.electronAPI.getFileInfo(file.filePath)
+        if (!result.success) {
+          onRemove(file.filePath)
+        }
+      }
+    } finally {
+      setIsCleaning(false)
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -53,6 +69,11 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
           <button className={styles.openBtn} onClick={onOpenFolder} title="打开文件夹">
             📂 打开文件夹
           </button>
+          {files.length > 0 && (
+            <button className={styles.clearBtn} onClick={handleCleanInvalid} disabled={isCleaning} title="清理失效文件">
+              {isCleaning ? '清理中...' : '清理失效'}
+            </button>
+          )}
           {files.length > 0 && (
             <button className={styles.clearBtn} onClick={onClearAll} title="清空历史">
               清空历史

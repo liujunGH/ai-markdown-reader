@@ -116,6 +116,7 @@
     "readFolderFailed": "读取文件夹失败",
     "noMarkdownFiles": "该目录中没有 Markdown 文件",
     "readFileFailed": "读取文件失败",
+    "recentFileRemoved": "最近文件已失效，已自动移除",
     "openFolderFailed": "打开文件夹失败",
     "openFolderFailedWithError": "打开文件夹失败: {{error}}",
     "openFileFailed": "打开文件失败",

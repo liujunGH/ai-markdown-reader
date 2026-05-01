@@ -19,7 +19,7 @@ export interface UseTabsReturn {
   handleTabUnpin: (tabId: string) => void
   handleTabColor: (tabId: string, color: TabColor) => void
   handleFileOpen: (fileContent: string, name: string, filePath?: string, size?: number, lastModified?: number) => void
-  handleRecentSelect: (file: RecentFile) => Promise<void>
+  handleRecentSelect: (file: RecentFile) => Promise<boolean>
   handleRestoreTab: () => void
   updateTabContent: (filePath: string, content: string, name?: string) => void
 }

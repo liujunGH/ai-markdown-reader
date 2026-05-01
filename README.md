@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.3-blue)
+![Version](https://img.shields.io/badge/Version-1.5.4-blue)
 
 ## 功能特性
 

@@ -23,7 +23,7 @@
 default-src 'self';
 style-src 'self' 'unsafe-inline';
 script-src 'self';
-img-src 'self' data: blob:;
+img-src 'self' data: blob: https: http:;
 font-src 'self' data:;
 connect-src 'self';
 ```
@@ -31,6 +31,7 @@ connect-src 'self';
 ### Markdown 渲染安全
 - `markdown-it` 配置 `html: false`，禁止原始 HTML 注入
 - DOMPurify 白名单移除了 `style` 属性和 SVG 标签
+- Markdown 图片允许 `http/https` 网络资源；其他远程脚本、样式和 fetch 仍由 CSP 禁止
 - Mermaid `securityLevel: 'strict'`
 - KaTeX 使用 `markdown-it-texmath + katex`，替换旧的 `markdown-it-katex`
 - KaTeX 配置 `trust: false`、`throwOnError: false`，不信任输入中的危险命令
