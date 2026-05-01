@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.0-blue)
+![Version](https://img.shields.io/badge/Version-1.5.1-blue)
 
 ## 功能特性
 
@@ -131,6 +131,20 @@
 
 从 [GitHub Releases](https://github.com/liujunGH/ai-markdown-reader/releases) 下载对应平台的安装包。
 
+### macOS 自用版
+
+当前本地构建产物位于 `release/`：
+- Apple Silicon 芯片（M1/M2/M3/M4）使用 `Markdown Reader-1.5.1-arm64.dmg`
+- Intel 芯片使用 `Markdown Reader-1.5.1-x64.dmg`
+
+本项目的本地包默认使用 ad-hoc 签名，首次打开时 macOS 可能会拦截。自用安装时可在 Finder 中右键应用选择“打开”。如果系统仍提示安全限制，可执行：
+
+```bash
+xattr -cr /Applications/Markdown\ Reader.app
+```
+
+v1.5.1 已按纯 Markdown 阅读器路线收敛：保留 Markdown、Mermaid、KaTeX、搜索、标签、导出等核心阅读功能；移除代码执行、未落地 AI 能力、诊断面板、数据备份、自定义 CSS、阅读统计等偏高级能力。
+
 ### Windows
 下载 `Markdown-Reader-x.x.x.exe` 并运行安装程序。
 
@@ -206,6 +220,7 @@ markdown-reader/
 ├── electron/           # Electron 主进程
 │   ├── main.ts         # 主进程入口（多窗口、托盘）
 │   └── preload.ts      # 预加载脚本
+├── dist-electron/      # Electron 编译输出（本地生成，不提交）
 └── release/           # 构建输出
 ```
 
