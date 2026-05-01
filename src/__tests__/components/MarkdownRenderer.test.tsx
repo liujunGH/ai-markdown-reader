@@ -73,6 +73,17 @@ beforeEach(() => {
       writeText: vi.fn().mockResolvedValue(undefined),
     },
   })
+
+  Object.assign(window, {
+    electronAPI: {
+      pathDirname: vi.fn((filePath: string) => filePath.replace(/[\\\/][^\\\/]+$/, '')),
+      pathJoin: vi.fn((...paths: string[]) => paths.join('/').replace(/\/+/g, '/')),
+      readImageAsDataUrl: vi.fn().mockResolvedValue({
+        success: true,
+        dataUrl: 'data:image/png;base64,ZmFrZQ==',
+      }),
+    },
+  })
 })
 
 afterEach(() => {
@@ -299,6 +310,25 @@ describe('MarkdownRenderer', () => {
     expect(img).toHaveAttribute('alt', 'Alt text')
     expect(img.loading).toBe('lazy')
     expect(img).toHaveClass('clickable-image')
+  })
+
+  it('loads relative local images through the Electron image bridge', async () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={'![Local image](./assets/local.png)'}
+        filePath="/Users/test/docs/readme.md"
+      />
+    )
+
+    await waitFor(() => {
+      expect(window.electronAPI?.readImageAsDataUrl).toHaveBeenCalledWith('/Users/test/docs/./assets/local.png')
+    })
+
+    const img = container.querySelector('img') as HTMLImageElement
+    await waitFor(() => {
+      expect(img).toHaveAttribute('src', 'data:image/png;base64,ZmFrZQ==')
+    })
+    expect(img).toHaveAttribute('alt', 'Local image')
   })
 
   it('highlights matching text when searchQuery is provided', async () => {

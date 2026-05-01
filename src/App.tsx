@@ -693,6 +693,7 @@ function AppInner() {
                       <VirtualMarkdown
                         ref={markdownRef}
                         content={activeTab.content}
+                        filePath={activeTab.filePath}
                         searchQuery={query}
                         searchRegex={isRegex}
                         currentMatch={currentMatch}
@@ -703,6 +704,7 @@ function AppInner() {
                       <MarkdownRenderer
                         ref={markdownRef}
                         content={activeTab?.content || ''}
+                        filePath={activeTab?.filePath}
                         searchQuery={query}
                         searchRegex={isRegex}
                         currentMatch={currentMatch}
@@ -722,6 +724,7 @@ function AppInner() {
                   ) : (
                     <MarkdownRenderer
                       content={secondaryTab.content || ''}
+                      filePath={secondaryTab.filePath}
                       onWikiLinkClick={handleWikiLinkClick}
                     />
                   )}

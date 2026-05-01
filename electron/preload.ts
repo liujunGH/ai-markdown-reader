@@ -136,6 +136,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFolderDialog: createIPCCall<() => Promise<string | null>>('open-folder-dialog', { dedup: true }),
   readFolder: createIPCCall<(folderPath: string) => Promise<{ success: boolean; files?: { name: string; filePath: string; size?: number; lastModified?: number; isDirectory?: boolean }[]; error?: string }>>('read-folder'),
   readFile: createIPCCall<(filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>>('read-file'),
+  readImageAsDataUrl: createIPCCall<(filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>>('read-image-as-data-url', { dedup: true }),
   getFileInfo: createIPCCall<(filePath: string) => Promise<{ success: boolean; info?: { name: string; size: number; lastModified: number; created: number }; error?: string }>>('get-file-info'),
   showInFolder: createIPCCall<(filePath: string) => Promise<void>>('show-in-folder'),
   onOpenFile: (callback: (filePath: string) => void) => {

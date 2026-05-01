@@ -31,6 +31,7 @@ function splitByHeadings(content: string): Section[] {
 
 interface Props {
   content: string
+  filePath?: string
   searchQuery?: string
   searchRegex?: boolean
   currentMatch?: number

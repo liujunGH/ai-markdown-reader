@@ -79,9 +79,9 @@ graph TD
 
 ## 9. 图片
 
-如果网络可用，下面的图片应懒加载，并支持点击预览。
+下面的图片来自当前文档旁边的本地文件，应在离线状态下正常显示，并支持点击预览。
 
-![Markdown badge](https://img.shields.io/badge/Markdown-Reader-blue)
+![Markdown Reader local fixture](./assets/markdown-reader.svg)
 
 ## 10. 发布前检查清单
 

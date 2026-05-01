@@ -13,6 +13,7 @@ export interface MarkdownRendererRef {
 
 interface Props {
   content: string
+  filePath?: string
   searchQuery?: string
   searchRegex?: boolean
   currentMatch?: number
@@ -46,6 +47,36 @@ function slugify(text: string): string {
     .toLowerCase()
     .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+function isRemoteOrEmbeddedImageSrc(src: string): boolean {
+  return (
+    !src ||
+    src.startsWith('#') ||
+    src.startsWith('//') ||
+    /^[a-z][a-z0-9+.-]*:/i.test(src)
+  )
+}
+
+function splitSrcSuffix(src: string): { pathPart: string; suffix: string } {
+  const suffixIndex = src.search(/[?#]/)
+  if (suffixIndex === -1) return { pathPart: src, suffix: '' }
+  return {
+    pathPart: src.slice(0, suffixIndex),
+    suffix: src.slice(suffixIndex),
+  }
+}
+
+function resolveLocalImagePath(src: string, documentFilePath?: string): string | null {
+  if (isRemoteOrEmbeddedImageSrc(src) || !documentFilePath) return null
+
+  const { pathPart, suffix } = splitSrcSuffix(src)
+  if (!pathPart || suffix.startsWith('#')) return null
+
+  if (pathPart.startsWith('/')) return pathPart
+
+  const baseDir = window.electronAPI?.pathDirname(documentFilePath) || documentFilePath.replace(/[\\\/][^\\\/]+$/, '')
+  return window.electronAPI?.pathJoin(baseDir, pathPart) || `${baseDir.replace(/[\\\/]$/, '')}/${pathPart}`
 }
 
 function downloadFile(data: string, filename: string, mimeType: string) {
@@ -125,7 +156,7 @@ function buildMermaidContainer(svg: string): HTMLDivElement {
   return containerDiv
 }
 
-export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, onWikiLinkClick }, ref) => {
+export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, onWikiLinkClick }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
   const [scale, setScale] = useState(1)
@@ -309,6 +340,15 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
 
     const images = container.querySelectorAll('img')
     images.forEach((img) => {
+      const src = img.getAttribute('src') || ''
+      const localImagePath = resolveLocalImagePath(src, filePath)
+      if (localImagePath && window.electronAPI?.readImageAsDataUrl) {
+        void window.electronAPI.readImageAsDataUrl(localImagePath).then((result) => {
+          if (result.success && result.dataUrl) {
+            img.setAttribute('src', result.dataUrl)
+          }
+        })
+      }
       img.loading = 'lazy'
       img.classList.add('clickable-image')
       img.addEventListener('click', () => {
@@ -465,7 +505,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         }
       })
     })
-  }, [content, renderMermaidDiagrams, onWikiLinkClick])
+  }, [content, filePath, renderMermaidDiagrams, onWikiLinkClick])
 
   useEffect(() => {
     if (!containerRef.current) return

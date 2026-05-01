@@ -8,6 +8,17 @@ import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFile
 const logger = createLogger('main')
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024 // 20MB
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
+  '.gif': 'image/gif',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+}
 
 const watchers = new Map<string, fs.FSWatcher>()
 
@@ -883,6 +894,31 @@ wrapHandler('read-file', async (_event, filePath: string) => {
     }
     const content = fs.readFileSync(filePath, 'utf-8')
     return { success: true, content }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
+wrapHandler('read-image-as-data-url', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
+
+  const ext = path.extname(filePath).toLowerCase()
+  const mimeType = IMAGE_MIME_TYPES[ext]
+  if (!mimeType) {
+    return { success: false, error: '不支持的图片格式' }
+  }
+
+  const sizeCheck = validateFileSize(filePath, MAX_IMAGE_SIZE)
+  if (!sizeCheck.valid) {
+    logger.warn('Image too large in read-image-as-data-url', { filePath, size: sizeCheck.size, max: MAX_IMAGE_SIZE })
+    return { success: false, error: sizeCheck.error }
+  }
+
+  try {
+    const data = fs.readFileSync(filePath)
+    return { success: true, dataUrl: `data:${mimeType};base64,${data.toString('base64')}` }
   } catch (error) {
     return { success: false, error: String(error) }
   }

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="240" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
+  <title id="title">Markdown Reader local image fixture</title>
+  <desc id="desc">A local smoke-test graphic for Markdown Reader.</desc>
+  <rect width="640" height="240" rx="18" fill="#f5f7fb"/>
+  <rect x="28" y="28" width="584" height="184" rx="14" fill="#ffffff" stroke="#c8d2e4" stroke-width="2"/>
+  <path d="M72 76h216v88H72z" fill="#26364d"/>
+  <path d="M104 139V101h16l20 25 20-25h16v38h-16v-17l-20 24-20-24v17z" fill="#ffffff"/>
+  <path d="M204 101h24l28 38h-22l-6-9h-24l-6 9h-22z" fill="#7dd3fc"/>
+  <path d="M210 118h12l-6-9z" fill="#26364d"/>
+  <text x="320" y="107" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#1f2937">Markdown Reader</text>
+  <text x="320" y="143" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#526173">Local image loaded successfully</text>
+  <circle cx="552" cy="120" r="34" fill="#10b981"/>
+  <path d="M536 120l11 11 22-25" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
