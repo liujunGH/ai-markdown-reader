@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './FirstUseGuide.module.css'
 
 interface GuideStep {
@@ -8,67 +9,68 @@ interface GuideStep {
   position: 'bottom' | 'top' | 'right'
 }
 
-const GUIDE_STEPS: GuideStep[] = [
-  {
-    target: '[data-guide="file-opener"]',
-    title: '打开文件',
-    description: '点击按钮选择本地 .md 文件，或直接将文件拖拽到窗口中',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="recent-files"]',
-    title: '最近文件',
-    description: '快速访问最近打开的文件',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="outline"]',
-    title: '目录导航',
-    description: '查看文档大纲，快速跳转到任意章节',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="search"]',
-    title: '全文搜索',
-    description: '按 Ctrl+F 搜索内容，支持正则表达式',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="source"]',
-    title: '源码模式',
-    description: '查看 Markdown 原始内容',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="font-size"]',
-    title: '字体大小',
-    description: '调整阅读字体大小，或使用 Ctrl+= / Ctrl+- 快捷键',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="focus-mode"]',
-    title: '专注模式',
-    description: '隐藏所有界面元素，只保留内容。按 Ctrl+. 切换',
-    position: 'bottom'
-  },
-  {
-    target: '[data-guide="theme-toggle"]',
-    title: '主题切换',
-    description: '切换深色/浅色模式，点击颜色圆点自定义主题色',
-    position: 'bottom'
-  }
-]
-
 interface Props {
   onComplete: () => void
   onSkip: () => void
 }
 
 export function FirstUseGuide({ onComplete, onSkip }: Props) {
+  const { t } = useTranslation()
   const [currentStep, setCurrentStep] = useState(0)
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
   const [showTips, setShowTips] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+
+  const GUIDE_STEPS: GuideStep[] = [
+    {
+      target: '[data-guide="file-opener"]',
+      title: t('guide.steps.openFile.title'),
+      description: t('guide.steps.openFile.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="recent-files"]',
+      title: t('guide.steps.recentFiles.title'),
+      description: t('guide.steps.recentFiles.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="outline"]',
+      title: t('guide.steps.outline.title'),
+      description: t('guide.steps.outline.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="search"]',
+      title: t('guide.steps.search.title'),
+      description: t('guide.steps.search.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="source"]',
+      title: t('guide.steps.source.title'),
+      description: t('guide.steps.source.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="font-size"]',
+      title: t('guide.steps.fontSize.title'),
+      description: t('guide.steps.fontSize.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="focus-mode"]',
+      title: t('guide.steps.focusMode.title'),
+      description: t('guide.steps.focusMode.description'),
+      position: 'bottom'
+    },
+    {
+      target: '[data-guide="theme-toggle"]',
+      title: t('guide.steps.theme.title'),
+      description: t('guide.steps.theme.description'),
+      position: 'bottom'
+    }
+  ]
 
   useEffect(() => {
     const step = GUIDE_STEPS[currentStep]
@@ -129,12 +131,12 @@ export function FirstUseGuide({ onComplete, onSkip }: Props) {
   const step = GUIDE_STEPS[currentStep]
 
   return (
-    <div className={styles.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="新手引导">
+    <div className={styles.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label={t('guide.ariaLabel')}>
       <div className={styles.header}>
-        <h3 className={styles.title}>欢迎使用 AI Markdown Reader</h3>
+        <h3 className={styles.title}>{t('guide.welcomeTitle')}</h3>
         <div className={styles.actions}>
           <button className={styles.skipBtn} onClick={onSkip}>
-            跳过引导
+            {t('guide.skip')}
           </button>
         </div>
       </div>
@@ -144,7 +146,7 @@ export function FirstUseGuide({ onComplete, onSkip }: Props) {
           className={`${styles.tipToggle} ${showTips ? styles.active : ''}`}
           onClick={() => setShowTips(!showTips)}
         >
-          💡 使用提示
+          {t('guide.tips')}
         </button>
         
         {showTips && (
@@ -173,11 +175,11 @@ export function FirstUseGuide({ onComplete, onSkip }: Props) {
             <div className={styles.navButtons}>
               {currentStep > 0 && (
                 <button className={styles.navBtn} onClick={handlePrev}>
-                  ← 上一步
+                  {t('guide.prev')}
                 </button>
               )}
               <button className={styles.navBtn} onClick={handleNext}>
-                {currentStep === GUIDE_STEPS.length - 1 ? '完成' : '下一步 →'}
+                {currentStep === GUIDE_STEPS.length - 1 ? t('guide.finish') : t('guide.next')}
               </button>
             </div>
           </div>

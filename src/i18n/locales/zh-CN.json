@@ -1,0 +1,212 @@
+{
+  "common": {
+    "close": "关闭",
+    "cancel": "取消",
+    "save": "保存",
+    "search": "搜索",
+    "unknown": "未知"
+  },
+  "aiPanel": {
+    "title": "🤖 AI 助手",
+    "settings": "设置",
+    "clearChat": "清空对话",
+    "emptyStateConfigured": "开始与 AI 助手对话，询问关于当前文档的问题",
+    "emptyStateNotConfigured": "AI 助手未启用，请点击 ⚙️ 进行配置",
+    "placeholderConfigured": "输入消息... (Enter 发送, Shift+Enter 换行)",
+    "placeholderNotConfigured": "请先配置 AI 设置",
+    "stop": "⏹ 停止",
+    "send": "➤ 发送",
+    "copyContent": "复制内容",
+    "summarize": "摘要",
+    "translate": "翻译",
+    "rewrite": "改写",
+    "continue": "续写"
+  },
+  "aiConfig": {
+    "title": "AI 设置",
+    "baseUrl": "API Base URL",
+    "apiKey": "API Key",
+    "modelName": "模型名称",
+    "enableAI": "启用 AI 助手"
+  },
+  "semanticSearch": {
+    "title": "语义搜索",
+    "placeholder": "输入自然语言查询...",
+    "ariaLabel": "语义搜索查询",
+    "indexFolder": "索引文件夹",
+    "indexing": "索引中...",
+    "loadingModel": "正在加载模型...",
+    "filesIndexed": "文件已索引",
+    "searching": "正在搜索...",
+    "resultsHeader": "搜索结果 ({{count}})",
+    "noResults": "未找到相关结果",
+    "emptyStateHint1": "输入自然语言描述来搜索文档内容",
+    "emptyStateHint2": "首次使用需点击「索引文件夹」构建语义索引"
+  },
+  "searchBox": {
+    "title": "文档搜索",
+    "placeholder": "搜索...",
+    "ariaLabel": "搜索关键词",
+    "ariaDescription": "输入关键词搜索文档内容，支持正则表达式",
+    "matchCount": "第 {{current}} 个，共 {{total}} 个匹配",
+    "noMatches": "无匹配结果",
+    "resultCount": "{{count}} 个结果",
+    "regex": "正则表达式",
+    "currentTab": "仅当前文档",
+    "allTabs": "所有标签页",
+    "prevMatch": "上一个匹配",
+    "nextMatch": "下一个匹配",
+    "noResultsCrossTab": "无结果",
+    "matchIndex": "第 {{index}} 个匹配"
+  },
+  "statusBar": {
+    "words": "{{count}} 字",
+    "readingTime": "约 {{time}} 分钟",
+    "lineEnding": "{{ending}}",
+    "encoding": "UTF-8"
+  },
+  "tabBar": {
+    "ariaLabel": "文档标签",
+    "newTab": "新建标签 (Ctrl+T)",
+    "closeTab": "关闭标签",
+    "closeAllTabs": "关闭所有标签",
+    "closeAll": "全部关闭",
+    "copyFileName": "复制文件名称",
+    "copyFilePath": "复制文件路径",
+    "showInFinder": "在 Finder 中显示",
+    "pin": "固定标签",
+    "unpin": "取消固定",
+    "markColor": "标记颜色",
+    "closeThisTab": "关闭该标签",
+    "closeOtherTabs": "关闭其他标签",
+    "reopenClosedTab": "重新打开关闭的标签",
+    "clearColor": "清除颜色",
+    "size": "大小: {{size}}",
+    "modified": "修改: {{date}}"
+  },
+  "colors": {
+    "red": "红色",
+    "orange": "橙色",
+    "yellow": "黄色",
+    "green": "绿色",
+    "blue": "蓝色",
+    "purple": "紫色"
+  },
+  "exportPanel": {
+    "title": "导出文档",
+    "exportHTML": "导出为 HTML",
+    "printPDF": "打印 / 导出为 PDF",
+    "copyPlainText": "复制为纯文本",
+    "copyRichText": "复制为富文本",
+    "htmlSuccess": "HTML 导出成功",
+    "htmlError": "HTML 导出失败",
+    "plainTextSuccess": "纯文本已复制到剪贴板",
+    "richTextSuccess": "富文本已复制到剪贴板",
+    "copyError": "复制失败"
+  },
+  "guide": {
+    "welcomeTitle": "欢迎使用 AI Markdown Reader",
+    "skip": "跳过引导",
+    "tips": "💡 使用提示",
+    "finish": "完成",
+    "prev": "← 上一步",
+    "next": "下一步 →",
+    "ariaLabel": "新手引导",
+    "steps": {
+      "openFile": {
+        "title": "打开文件",
+        "description": "点击按钮选择本地 .md 文件，或直接将文件拖拽到窗口中"
+      },
+      "recentFiles": {
+        "title": "最近文件",
+        "description": "快速访问最近打开的文件"
+      },
+      "outline": {
+        "title": "目录导航",
+        "description": "查看文档大纲，快速跳转到任意章节"
+      },
+      "search": {
+        "title": "全文搜索",
+        "description": "按 Ctrl+F 搜索内容，支持正则表达式"
+      },
+      "source": {
+        "title": "源码模式",
+        "description": "查看 Markdown 原始内容"
+      },
+      "fontSize": {
+        "title": "字体大小",
+        "description": "调整阅读字体大小，或使用 Ctrl+= / Ctrl+- 快捷键"
+      },
+      "focusMode": {
+        "title": "专注模式",
+        "description": "隐藏所有界面元素，只保留内容。按 Ctrl+. 切换"
+      },
+      "theme": {
+        "title": "主题切换",
+        "description": "切换深色/浅色模式，点击颜色圆点自定义主题色"
+      }
+    }
+  },
+  "app": {
+    "dropOverlay": "释放以打开 Markdown 文件",
+    "failedRestores": "以下文件已被移动或删除：{{names}}",
+    "readFolderFailed": "读取文件夹失败",
+    "noMarkdownFiles": "该目录中没有 Markdown 文件",
+    "readFileFailed": "读取文件失败",
+    "openFolderFailed": "打开文件夹失败",
+    "openFolderFailedWithError": "打开文件夹失败: {{error}}",
+    "openFileFailed": "打开文件失败",
+    "wikiLinkNoPath": "WikiLink 需要文件路径支持",
+    "fileNotFound": "未找到文件: {{name}}",
+    "fileChangedTitle": "文件已在外被修改",
+    "reload": "重新加载",
+    "ignore": "忽略",
+    "unknownFile": "未知文件.md",
+    "welcomeTabName": "欢迎使用.md"
+  },
+  "toolbar": {
+    "recentFiles": "最近打开",
+    "recentFilesTooltip": "最近打开 (Ctrl+Shift+R)",
+    "splitView": "分屏阅读",
+    "splitViewTooltip": "分屏阅读 (Ctrl+\\)",
+    "openFolder": "打开文件夹",
+    "fileList": "文件列表",
+    "showOutline": "显示目录",
+    "filePreview": "文件预览",
+    "search": "搜索",
+    "searchTooltip": "搜索 (Ctrl+F)",
+    "globalSearch": "全局搜索",
+    "globalSearchTooltip": "全局搜索 (Ctrl+Shift+F)",
+    "source": "源码",
+    "sourceTooltip": "源码 (Ctrl+S)",
+    "export": "导出",
+    "exportTooltip": "导出 (Ctrl+E)",
+    "focusMode": "专注模式",
+    "focusModeTooltip": "专注模式 (Ctrl+.)",
+    "zoomOut": "缩小字体",
+    "zoomIn": "放大字体",
+    "shortcuts": "快捷键",
+    "shortcutsTooltip": "快捷键 (Ctrl+/)",
+    "fileInfo": "文件信息",
+    "readingStats": "阅读统计",
+    "diagnostics": "诊断面板",
+    "aiAssistant": "AI 助手",
+    "semanticSearch": "语义搜索",
+    "dataBackup": "数据备份"
+  },
+  "dataBackup": {
+    "title": "数据备份",
+    "export": "导出数据",
+    "import": "导入数据",
+    "exportDescription": "将所有应用数据导出为 JSON 文件",
+    "importDescription": "从 JSON 文件恢复应用数据",
+    "exportSuccess": "数据导出成功",
+    "exportError": "数据导出失败",
+    "importSuccess": "数据导入成功，请重启应用",
+    "importError": "数据导入失败：{{error}}",
+    "invalidFile": "无效的数据文件",
+    "confirmImport": "导入将覆盖现有数据，确定要继续吗？",
+    "importing": "正在导入...",
+    "selectFile": "选择备份文件"
+  }
+}

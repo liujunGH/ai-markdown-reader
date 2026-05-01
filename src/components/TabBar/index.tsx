@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Tab, TabColor } from '../../types/Tab'
 import styles from './TabBar.module.css'
 
@@ -34,15 +35,15 @@ interface ColorPickerState {
   tabId: string | null
 }
 
-function formatFileSize(size?: number): string {
-  if (size === undefined) return '未知'
+function formatFileSize(size?: number, t?: (key: string) => string): string {
+  if (size === undefined) return t ? t('common.unknown') : 'Unknown'
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatDate(timestamp?: number): string {
-  if (timestamp === undefined) return '未知'
+  if (timestamp === undefined) return ''
   return new Date(timestamp).toLocaleString('zh-CN')
 }
 
@@ -70,6 +71,7 @@ export function TabBar({
   onRestoreTab,
   closedTabsCount = 0
 }: TabBarProps) {
+  const { t } = useTranslation()
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
     x: 0,
@@ -205,29 +207,29 @@ export function TabBar({
   const contextMenuTab = tabs.find(t => t.id === contextMenu.tabId)
 
   const contextMenuItems = [
-    { label: '复制文件名称', onClick: handleCopyFileName },
-    { label: '复制文件路径', onClick: handleCopyFilePath, disabled: !contextMenuTab?.filePath },
-    { label: '在 Finder 中显示', onClick: handleShowInFinder, disabled: !contextMenuTab?.filePath },
-    { type: 'separator' },
+    { label: t('tabBar.copyFileName'), onClick: handleCopyFileName },
+    { label: t('tabBar.copyFilePath'), onClick: handleCopyFilePath, disabled: !contextMenuTab?.filePath },
+    { label: t('tabBar.showInFinder'), onClick: handleShowInFinder, disabled: !contextMenuTab?.filePath },
+    { type: 'separator' as const },
     contextMenuTab?.isPinned
-      ? { label: '取消固定', onClick: handleUnpin }
-      : { label: '固定标签', onClick: handlePin },
-    { label: '标记颜色', onClick: handleShowColorPicker },
-    { type: 'separator' },
-    { label: '关闭该标签', onClick: handleCloseTab },
-    { label: '关闭其他标签', onClick: handleCloseOtherTabs, disabled: tabs.length <= 1 },
-    { label: '关闭所有标签', onClick: handleCloseAllTabs, disabled: tabs.length <= 1 },
-    { type: 'separator' },
-    { label: '重新打开关闭的标签', onClick: handleRestoreTab, disabled: closedTabsCount === 0 },
+      ? { label: t('tabBar.unpin'), onClick: handleUnpin }
+      : { label: t('tabBar.pin'), onClick: handlePin },
+    { label: t('tabBar.markColor'), onClick: handleShowColorPicker },
+    { type: 'separator' as const },
+    { label: t('tabBar.closeThisTab'), onClick: handleCloseTab },
+    { label: t('tabBar.closeOtherTabs'), onClick: handleCloseOtherTabs, disabled: tabs.length <= 1 },
+    { label: t('tabBar.closeAllTabs'), onClick: handleCloseAllTabs, disabled: tabs.length <= 1 },
+    { type: 'separator' as const },
+    { label: t('tabBar.reopenClosedTab'), onClick: handleRestoreTab, disabled: closedTabsCount === 0 },
   ]
 
   const colorOptions: { color: TabColor; label: string; className: string }[] = [
-    { color: 'red', label: '红色', className: styles.colorRed },
-    { color: 'orange', label: '橙色', className: styles.colorOrange },
-    { color: 'yellow', label: '黄色', className: styles.colorYellow },
-    { color: 'green', label: '绿色', className: styles.colorGreen },
-    { color: 'blue', label: '蓝色', className: styles.colorBlue },
-    { color: 'purple', label: '紫色', className: styles.colorPurple },
+    { color: 'red', label: t('colors.red'), className: styles.colorRed },
+    { color: 'orange', label: t('colors.orange'), className: styles.colorOrange },
+    { color: 'yellow', label: t('colors.yellow'), className: styles.colorYellow },
+    { color: 'green', label: t('colors.green'), className: styles.colorGreen },
+    { color: 'blue', label: t('colors.blue'), className: styles.colorBlue },
+    { color: 'purple', label: t('colors.purple'), className: styles.colorPurple },
   ]
 
   const handleMouseEnter = (tabId: string) => {
@@ -253,7 +255,7 @@ export function TabBar({
   const tooltipTab = hoveredTab ? tabs.find(t => t.id === hoveredTab) : null
 
   return (
-    <div className={styles.tabBar} role="tablist" aria-label="文档标签">
+    <div className={styles.tabBar} role="tablist" aria-label={t('tabBar.ariaLabel')}>
       <div className={styles.tabs}>
         {tabs.map((tab, index) => (
           <div
@@ -323,7 +325,7 @@ export function TabBar({
                   e.stopPropagation()
                   onTabClose(tab.id)
                 }}
-                title="关闭标签"
+                title={t('tabBar.closeTab')}
               >
                 ×
               </button>
@@ -335,9 +337,9 @@ export function TabBar({
         <button
           className={styles.actionBtn}
           onClick={onNewTab}
-          title="新建标签 (Ctrl+T)"
+          title={t('tabBar.newTab')}
           role="tab"
-          aria-label="新建标签"
+          aria-label={t('tabBar.newTab')}
         >
           +
         </button>
@@ -345,9 +347,9 @@ export function TabBar({
           <button
             className={styles.actionBtn}
             onClick={onTabCloseAll}
-            title="关闭所有标签"
+            title={t('tabBar.closeAllTabs')}
           >
-            全部关闭
+            {t('tabBar.closeAll')}
           </button>
         )}
       </div>
@@ -383,7 +385,7 @@ export function TabBar({
           className={styles.colorPicker}
           style={{ left: colorPicker.x, top: colorPicker.y }}
         >
-          <div className={styles.colorPickerTitle}>标记颜色</div>
+          <div className={styles.colorPickerTitle}>{t('tabBar.markColor')}</div>
           <div className={styles.colorGrid}>
             {colorOptions.map(option => (
               <button
@@ -399,7 +401,7 @@ export function TabBar({
             className={styles.clearColorBtn}
             onClick={() => handleColor('none')}
           >
-            清除颜色
+            {t('tabBar.clearColor')}
           </button>
         </div>
       )}
@@ -414,8 +416,8 @@ export function TabBar({
             <div className={styles.tooltipPath}>{tooltipTab.filePath}</div>
           )}
           <div className={styles.tooltipMeta}>
-            <span>大小: {formatFileSize(tooltipTab.size)}</span>
-            <span>修改: {formatDate(tooltipTab.lastModified)}</span>
+            <span>{t('tabBar.size', { size: formatFileSize(tooltipTab.size, t) })}</span>
+            <span>{t('tabBar.modified', { date: formatDate(tooltipTab.lastModified) })}</span>
           </div>
           <div className={styles.tooltipPreview}>
             {getContentPreview(tooltipTab.content)}

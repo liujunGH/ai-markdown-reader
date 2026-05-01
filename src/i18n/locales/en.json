@@ -1,0 +1,212 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "search": "Search",
+    "unknown": "Unknown"
+  },
+  "aiPanel": {
+    "title": "🤖 AI Assistant",
+    "settings": "Settings",
+    "clearChat": "Clear Chat",
+    "emptyStateConfigured": "Start a conversation with the AI assistant about the current document",
+    "emptyStateNotConfigured": "AI assistant is not enabled. Click ⚙️ to configure",
+    "placeholderConfigured": "Type a message... (Enter to send, Shift+Enter for newline)",
+    "placeholderNotConfigured": "Please configure AI settings first",
+    "stop": "⏹ Stop",
+    "send": "➤ Send",
+    "copyContent": "Copy Content",
+    "summarize": "Summarize",
+    "translate": "Translate",
+    "rewrite": "Rewrite",
+    "continue": "Continue"
+  },
+  "aiConfig": {
+    "title": "AI Settings",
+    "baseUrl": "API Base URL",
+    "apiKey": "API Key",
+    "modelName": "Model Name",
+    "enableAI": "Enable AI Assistant"
+  },
+  "semanticSearch": {
+    "title": "Semantic Search",
+    "placeholder": "Enter natural language query...",
+    "ariaLabel": "Semantic search query",
+    "indexFolder": "Index Folder",
+    "indexing": "Indexing...",
+    "loadingModel": "Loading model...",
+    "filesIndexed": "files indexed",
+    "searching": "Searching...",
+    "resultsHeader": "Search Results ({{count}})",
+    "noResults": "No relevant results found",
+    "emptyStateHint1": "Enter a natural language description to search document content",
+    "emptyStateHint2": "First-time use requires clicking \"Index Folder\" to build a semantic index"
+  },
+  "searchBox": {
+    "title": "Document Search",
+    "placeholder": "Search...",
+    "ariaLabel": "Search keywords",
+    "ariaDescription": "Enter keywords to search document content, supports regular expressions",
+    "matchCount": "{{current}} of {{total}} matches",
+    "noMatches": "No matches",
+    "resultCount": "{{count}} results",
+    "regex": "Regex",
+    "currentTab": "Current Tab Only",
+    "allTabs": "All Tabs",
+    "prevMatch": "Previous Match",
+    "nextMatch": "Next Match",
+    "noResultsCrossTab": "No results",
+    "matchIndex": "Match {{index}}"
+  },
+  "statusBar": {
+    "words": "{{count}} words",
+    "readingTime": "~{{time}} min read",
+    "lineEnding": "{{ending}}",
+    "encoding": "UTF-8"
+  },
+  "tabBar": {
+    "ariaLabel": "Document Tabs",
+    "newTab": "New Tab (Ctrl+T)",
+    "closeTab": "Close Tab",
+    "closeAllTabs": "Close All Tabs",
+    "closeAll": "Close All",
+    "copyFileName": "Copy File Name",
+    "copyFilePath": "Copy File Path",
+    "showInFinder": "Show in Finder",
+    "pin": "Pin Tab",
+    "unpin": "Unpin Tab",
+    "markColor": "Mark Color",
+    "closeThisTab": "Close This Tab",
+    "closeOtherTabs": "Close Other Tabs",
+    "reopenClosedTab": "Reopen Closed Tab",
+    "clearColor": "Clear Color",
+    "size": "Size: {{size}}",
+    "modified": "Modified: {{date}}"
+  },
+  "colors": {
+    "red": "Red",
+    "orange": "Orange",
+    "yellow": "Yellow",
+    "green": "Green",
+    "blue": "Blue",
+    "purple": "Purple"
+  },
+  "exportPanel": {
+    "title": "Export Document",
+    "exportHTML": "Export as HTML",
+    "printPDF": "Print / Export as PDF",
+    "copyPlainText": "Copy as Plain Text",
+    "copyRichText": "Copy as Rich Text",
+    "htmlSuccess": "HTML exported successfully",
+    "htmlError": "HTML export failed",
+    "plainTextSuccess": "Plain text copied to clipboard",
+    "richTextSuccess": "Rich text copied to clipboard",
+    "copyError": "Copy failed"
+  },
+  "guide": {
+    "welcomeTitle": "Welcome to AI Markdown Reader",
+    "skip": "Skip Guide",
+    "tips": "💡 Usage Tips",
+    "finish": "Finish",
+    "prev": "← Previous",
+    "next": "Next →",
+    "ariaLabel": "First-time Guide",
+    "steps": {
+      "openFile": {
+        "title": "Open File",
+        "description": "Click the button to select a local .md file, or drag and drop a file into the window"
+      },
+      "recentFiles": {
+        "title": "Recent Files",
+        "description": "Quickly access recently opened files"
+      },
+      "outline": {
+        "title": "Outline Navigation",
+        "description": "View document outline and jump to any section"
+      },
+      "search": {
+        "title": "Full-text Search",
+        "description": "Press Ctrl+F to search content, supports regular expressions"
+      },
+      "source": {
+        "title": "Source Mode",
+        "description": "View Markdown source content"
+      },
+      "fontSize": {
+        "title": "Font Size",
+        "description": "Adjust reading font size, or use Ctrl+= / Ctrl+- shortcuts"
+      },
+      "focusMode": {
+        "title": "Focus Mode",
+        "description": "Hide all UI elements, keep only content. Press Ctrl+. to toggle"
+      },
+      "theme": {
+        "title": "Theme",
+        "description": "Toggle dark/light mode, click color dot to customize theme color"
+      }
+    }
+  },
+  "app": {
+    "dropOverlay": "Drop to open Markdown file",
+    "failedRestores": "The following files have been moved or deleted: {{names}}",
+    "readFolderFailed": "Failed to read folder",
+    "noMarkdownFiles": "No Markdown files in this directory",
+    "readFileFailed": "Failed to read file",
+    "openFolderFailed": "Failed to open folder",
+    "openFolderFailedWithError": "Failed to open folder: {{error}}",
+    "openFileFailed": "Failed to open file",
+    "wikiLinkNoPath": "WikiLink requires file path support",
+    "fileNotFound": "File not found: {{name}}",
+    "fileChangedTitle": "File modified externally",
+    "reload": "Reload",
+    "ignore": "Ignore",
+    "unknownFile": "Unknown File.md",
+    "welcomeTabName": "Welcome.md"
+  },
+  "toolbar": {
+    "recentFiles": "Recent",
+    "recentFilesTooltip": "Recent (Ctrl+Shift+R)",
+    "splitView": "Split View",
+    "splitViewTooltip": "Split View (Ctrl+\\)",
+    "openFolder": "Open Folder",
+    "fileList": "File List",
+    "showOutline": "Show Outline",
+    "filePreview": "File Preview",
+    "search": "Search",
+    "searchTooltip": "Search (Ctrl+F)",
+    "globalSearch": "Global Search",
+    "globalSearchTooltip": "Global Search (Ctrl+Shift+F)",
+    "source": "Source",
+    "sourceTooltip": "Source (Ctrl+S)",
+    "export": "Export",
+    "exportTooltip": "Export (Ctrl+E)",
+    "focusMode": "Focus Mode",
+    "focusModeTooltip": "Focus Mode (Ctrl+.)",
+    "zoomOut": "Zoom Out",
+    "zoomIn": "Zoom In",
+    "shortcuts": "Shortcuts",
+    "shortcutsTooltip": "Shortcuts (Ctrl+/)",
+    "fileInfo": "File Info",
+    "readingStats": "Reading Stats",
+    "diagnostics": "Diagnostics",
+    "aiAssistant": "AI Assistant",
+    "semanticSearch": "Semantic Search",
+    "dataBackup": "Data Backup"
+  },
+  "dataBackup": {
+    "title": "Data Backup",
+    "export": "Export Data",
+    "import": "Import Data",
+    "exportDescription": "Export all application data as a JSON file",
+    "importDescription": "Restore application data from a JSON file",
+    "exportSuccess": "Data exported successfully",
+    "exportError": "Data export failed",
+    "importSuccess": "Data imported successfully, please restart the app",
+    "importError": "Data import failed: {{error}}",
+    "invalidFile": "Invalid data file",
+    "confirmImport": "Import will overwrite existing data. Are you sure you want to continue?",
+    "importing": "Importing...",
+    "selectFile": "Select backup file"
+  }
+}

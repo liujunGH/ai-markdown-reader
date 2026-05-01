@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './StatusBar.module.css'
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function StatusBar({ content }: Props) {
+  const { t } = useTranslation()
   const stats = useMemo(() => {
     const wordCount = content.trim().split(/\s+/).filter(Boolean).length
     const readingTime = Math.ceil(wordCount / 300)
@@ -19,13 +21,13 @@ export function StatusBar({ content }: Props) {
 
   return (
     <footer className={styles.statusBar}>
-      <span>{stats.wordCount} 字</span>
+      <span>{t('statusBar.words', { count: stats.wordCount })}</span>
       <span className={styles.separator}>|</span>
-      <span>约 {stats.readingTime} 分钟</span>
+      <span>{t('statusBar.readingTime', { time: stats.readingTime })}</span>
       <span className={styles.separator}>|</span>
-      <span>{stats.lineEnding}</span>
+      <span>{t('statusBar.lineEnding', { ending: stats.lineEnding })}</span>
       <span className={styles.separator}>|</span>
-      <span>UTF-8</span>
+      <span>{t('statusBar.encoding')}</span>
     </footer>
   )
 }

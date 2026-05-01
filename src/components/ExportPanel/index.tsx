@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { parseMarkdown } from '../../utils/markdownParser'
 import styles from './ExportPanel.module.css'
 
@@ -164,6 +165,7 @@ function buildExportStyles(theme: string, accentColor: string): string {
 }
 
 export function ExportPanel({ isOpen, onClose, fileName, fileContent, theme, accentColor }: ExportPanelProps) {
+  const { t } = useTranslation()
   const modalRef = useRef<HTMLDivElement>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -220,11 +222,11 @@ ${html}
       a.download = title.replace(/\.md$/, '') + '.html'
       a.click()
       URL.revokeObjectURL(url)
-      showToast('HTML 导出成功')
+      showToast(t('exportPanel.htmlSuccess'))
     } catch {
-      showToast('HTML 导出失败', 'error')
+      showToast(t('exportPanel.htmlError'), 'error')
     }
-  }, [fileContent, fileName, theme, accentColor, showToast])
+  }, [fileContent, fileName, theme, accentColor, showToast, t])
 
   const exportToPDF = useCallback(() => {
     const originalTitle = document.title
@@ -236,11 +238,11 @@ ${html}
   const copyPlainText = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(fileContent)
-      showToast('纯文本已复制到剪贴板')
+      showToast(t('exportPanel.plainTextSuccess'))
     } catch {
-      showToast('复制失败', 'error')
+      showToast(t('exportPanel.copyError'), 'error')
     }
-  }, [fileContent, showToast])
+  }, [fileContent, showToast, t])
 
   const copyRichText = useCallback(() => {
     try {
@@ -264,29 +266,29 @@ ${html}
       document.body.removeChild(div)
 
       if (success) {
-        showToast('富文本已复制到剪贴板')
+        showToast(t('exportPanel.richTextSuccess'))
       } else {
-        showToast('复制失败', 'error')
+        showToast(t('exportPanel.copyError'), 'error')
       }
     } catch {
-      showToast('复制失败', 'error')
+      showToast(t('exportPanel.copyError'), 'error')
     }
-  }, [fileContent, showToast])
+  }, [fileContent, showToast, t])
 
   if (!isOpen) return null
 
   const actions = [
-    { icon: '📄', label: '导出为 HTML', onClick: exportToHTML },
-    { icon: '🖨️', label: '打印 / 导出为 PDF', onClick: exportToPDF },
-    { icon: '📋', label: '复制为纯文本', onClick: copyPlainText },
-    { icon: '📑', label: '复制为富文本', onClick: copyRichText },
+    { icon: '📄', label: t('exportPanel.exportHTML'), onClick: exportToHTML },
+    { icon: '🖨️', label: t('exportPanel.printPDF'), onClick: exportToPDF },
+    { icon: '📋', label: t('exportPanel.copyPlainText'), onClick: copyPlainText },
+    { icon: '📑', label: t('exportPanel.copyRichText'), onClick: copyRichText },
   ]
 
   return (
     <div className={styles.overlay}>
-      <div ref={modalRef} className={styles.modal} role="dialog" aria-modal="true" aria-label="导出文档">
+      <div ref={modalRef} className={styles.modal} role="dialog" aria-modal="true" aria-label={t('exportPanel.title')}>
         <div className={styles.header}>
-          <h3 className={styles.title}>导出文档</h3>
+          <h3 className={styles.title}>{t('exportPanel.title')}</h3>
           <button className={styles.closeBtn} onClick={onClose}>×</button>
         </div>
         <div className={styles.content}>
@@ -304,7 +306,7 @@ ${html}
           </div>
         </div>
         <div className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>取消</button>
+          <button className={styles.cancelBtn} onClick={onClose}>{t('common.cancel')}</button>
         </div>
       </div>
       <div className={styles.toastContainer}>

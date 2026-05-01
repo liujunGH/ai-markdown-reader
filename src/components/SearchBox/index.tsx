@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './SearchBox.module.css'
 import { Tab } from '../../types/Tab'
 
@@ -44,6 +45,7 @@ export function SearchBox({
   onTabSelect,
   onNavigateToMatch
 }: Props) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -191,15 +193,15 @@ export function SearchBox({
   }
 
   return (
-    <div className={styles.container} role="search" aria-label="文档搜索">
+    <div className={styles.container} role="search" aria-label={t('searchBox.title')}>
       <div className={styles.inputWrapper}>
         <span className={styles.icon}>🔍</span>
         <input
           ref={inputRef}
           type="text"
           className={styles.input}
-          placeholder="搜索..."
-          aria-label="搜索关键词"
+          placeholder={t('searchBox.placeholder')}
+          aria-label={t('searchBox.ariaLabel')}
           aria-describedby="search-hint"
           value={query}
           onChange={(e) => {
@@ -211,17 +213,17 @@ export function SearchBox({
           onBlur={handleBlur}
         />
         <span id="search-hint" className="sr-only">
-          输入关键词搜索文档内容，支持正则表达式
+          {t('searchBox.ariaDescription')}
         </span>
         {query && (
           <span className={styles.count} aria-live="polite" aria-atomic="true">
             {searchScope === 'current'
-              ? (matches > 0 ? `第 ${currentMatch + 1} 个，共 ${matches} 个匹配` : '无匹配结果')
-              : `${allTabMatches.length} 个结果`
+              ? (matches > 0 ? t('searchBox.matchCount', { current: currentMatch + 1, total: matches }) : t('searchBox.noMatches'))
+              : t('searchBox.resultCount', { count: allTabMatches.length })
             }
           </span>
         )}
-        <button className={styles.closeButton} onClick={onClose} title="关闭">✕</button>
+        <button className={styles.closeButton} onClick={onClose} title={t('common.close')}>✕</button>
       </div>
       {showHistory && searchHistory.length > 0 && (
         <div className={styles.historyDropdown}>
@@ -246,34 +248,34 @@ export function SearchBox({
               checked={isRegex}
               onChange={(e) => onRegexChange(e.target.checked)}
             />
-            正则表达式
+            {t('searchBox.regex')}
           </label>
           <div className={styles.scopeToggle}>
             <button
               className={`${styles.scopeBtn} ${searchScope === 'current' ? styles.scopeActive : ''}`}
               onClick={() => setSearchScope('current')}
             >
-              仅当前文档
+              {t('searchBox.currentTab')}
             </button>
             <button
               className={`${styles.scopeBtn} ${searchScope === 'all' ? styles.scopeActive : ''}`}
               onClick={() => setSearchScope('all')}
             >
-              所有标签页
+              {t('searchBox.allTabs')}
             </button>
           </div>
         </div>
         {searchScope === 'current' && matches > 0 && (
           <div className={styles.navButtons}>
-            <button onClick={onPrev} className={styles.navBtn} title="上一个匹配">↑</button>
-            <button onClick={onNext} className={styles.navBtn} title="下一个匹配">↓</button>
+            <button onClick={onPrev} className={styles.navBtn} title={t('searchBox.prevMatch')}>↑</button>
+            <button onClick={onNext} className={styles.navBtn} title={t('searchBox.nextMatch')}>↓</button>
           </div>
         )}
       </div>
       {searchScope === 'all' && query.trim() && (
         <div className={styles.crossTabResults}>
           {allTabMatches.length === 0 ? (
-            <div className={styles.noResults}>无结果</div>
+            <div className={styles.noResults}>{t('searchBox.noResultsCrossTab')}</div>
           ) : (
             Array.from(groupedMatches.entries()).map(([tabId, matches]) => (
               <div key={tabId} className={styles.resultGroup}>
@@ -283,7 +285,7 @@ export function SearchBox({
                     key={idx}
                     className={styles.resultItem}
                     onClick={() => handleCrossTabMatchClick(tabId, m.index)}
-                    title={`第 ${m.index + 1} 个匹配`}
+                    title={t('searchBox.matchIndex', { index: m.index + 1 })}
                   >
                     <span className={styles.resultBullet}>·</span>
                     <span className={styles.resultText}>{m.text}</span>
