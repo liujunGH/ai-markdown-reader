@@ -157,7 +157,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     minHeight: 600,
     x: windowState?.x,
     y: windowState?.y,
-    title: 'AI Markdown Reader',
+    title: 'Markdown Reader',
     show: false,
     webPreferences: {
       nodeIntegration: false,
@@ -279,7 +279,7 @@ function createSplashWindow() {
 <body>
   <div class="loader">
     <div class="spinner"></div>
-    <h1>AI Markdown Reader</h1>
+    <h1>Markdown Reader</h1>
     <p>Loading...</p>
   </div>
 </body>
@@ -317,7 +317,7 @@ function createMenu() {
 
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{
-      label: 'AI Markdown Reader',
+      label: 'Markdown Reader',
       submenu: [
         { role: 'about' as const, label: '关于' },
         { type: 'separator' as const },
@@ -431,12 +431,12 @@ function createMenu() {
       label: '帮助',
       submenu: [
         {
-          label: '关于 AI Markdown Reader',
+          label: '关于 Markdown Reader',
           click: () => {
             const win = getTargetWindow()
             const detail = `一款沉浸式的 Markdown 阅读器
 
-版本: 1.4.0
+版本: 1.5.2
 
 功能特性:
 • 多标签页支持，标签拖拽重排序
@@ -458,9 +458,9 @@ function createMenu() {
 
 作者: liujun`
             if (win && !win.isDestroyed()) {
-              dialog.showMessageBox(win, { type: 'info', title: '关于 AI Markdown Reader', message: 'AI Markdown Reader', detail })
+              dialog.showMessageBox(win, { type: 'info', title: '关于 Markdown Reader', message: 'Markdown Reader', detail })
             } else {
-              dialog.showMessageBox({ type: 'info', title: '关于 AI Markdown Reader', message: 'AI Markdown Reader', detail })
+              dialog.showMessageBox({ type: 'info', title: '关于 Markdown Reader', message: 'Markdown Reader', detail })
             }
           }
         }
@@ -576,7 +576,7 @@ app.whenReady().then(() => {
   // System tray with proper icon
   const trayIcon = createTrayIcon()
   tray = new Tray(trayIcon)
-  tray.setToolTip('AI Markdown Reader')
+  tray.setToolTip('Markdown Reader')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开文件', click: async () => {
       const win = getFocusedOrLastWindow()
@@ -1019,7 +1019,7 @@ wrapHandler('clear-progress-bar', (event) => {
 wrapHandler('set-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win && !win.isDestroyed()) {
-    win.setTitle(title ? `${title} - AI Markdown Reader` : 'AI Markdown Reader')
+    win.setTitle(title ? `${title} - Markdown Reader` : 'Markdown Reader')
   }
 })
 

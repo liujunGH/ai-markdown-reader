@@ -37,7 +37,7 @@ export function createTab(
 }
 
 export function getWelcomeTab(): Tab {
-  const welcomeContent = `# 欢迎使用 AI Markdown Reader
+  const welcomeContent = `# 欢迎使用 Markdown Reader
 
 一款沉浸式的 Markdown 阅读器，支持丰富的功能特性。
 

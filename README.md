@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.1-blue)
+![Version](https://img.shields.io/badge/Version-1.5.2-blue)
 
 ## 功能特性
 
@@ -220,6 +220,7 @@ markdown-reader/
 ├── electron/           # Electron 主进程
 │   ├── main.ts         # 主进程入口（多窗口、托盘）
 │   └── preload.ts      # 预加载脚本
+├── examples/           # 发布前手动验收文档
 ├── dist-electron/      # Electron 编译输出（本地生成，不提交）
 └── release/           # 构建输出
 ```
