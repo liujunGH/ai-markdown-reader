@@ -11,7 +11,8 @@ import 'prismjs/components/prism-markup'
 import 'prismjs/components/prism-markdown'
 import 'prismjs/components/prism-jsx'
 import 'prismjs/components/prism-tsx'
-import mk from 'markdown-it-katex'
+import texmath from 'markdown-it-texmath'
+import * as katex from 'katex'
 import { full } from 'markdown-it-emoji'
 
 const loadedLanguages = new Set<string>()
@@ -92,7 +93,15 @@ const md: MarkdownIt = new MarkdownIt({
   highlight: highlightCode
 })
 
-md.use(mk)
+md.use(texmath, {
+  engine: katex,
+  delimiters: 'dollars',
+  katexOptions: {
+    output: 'html',
+    throwOnError: false,
+    trust: false,
+  },
+})
 md.use(full)
 
 function postProcessHtml(rawHtml: string): string {

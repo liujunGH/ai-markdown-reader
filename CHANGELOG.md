@@ -2,37 +2,36 @@
 
 ## v1.5.1
 
-### 🤖 AI 原生能力
-- **AI 对话助手** - 悬浮聊天面板，支持流式对话，自动带入当前文档作为上下文
-- **选中内容提问** - 在文档中选中任意文本，浮动 🤖 按钮一键向 AI 提问
-- **语义搜索** - 基于 transformers.js 本地 embedding（`Xenova/all-MiniLM-L6-v2`），支持自然语言搜索文件夹内所有 Markdown 文档
-- **知识图谱** - 基于语义 embedding 的力导向图可视化（D3.js），展示文档间的语义聚类关系，支持点击跳转
-- **自动标签提取** - AI 自动提取当前文档关键词，生成标签云，结果缓存到 localStorage
-- **AI 配置面板** - 可配置任意 OpenAI 兼容 API（默认 MiMo），支持 API Key、模型名、Base URL
+### 产品收敛
+- 按纯 Markdown 阅读器路线收敛功能范围
+- 移除未落地的 AI、语义搜索、知识图谱、自动标签等文档承诺
+- 移除代码块执行、诊断面板、数据备份、自定义 CSS、阅读统计等偏高级/偏开发能力
+- 移除 `@xenova/transformers` 依赖，降低安装体积与维护复杂度
 
 ### 🧪 测试覆盖
 - React 组件测试从 27 个扩展至 **99 个**
-- 新增 Outline、ResizableSidebar、useOutline、useSearch、tabStore、aiStore 测试
+- 新增 Outline、ResizableSidebar、useOutline、useSearch、tabStore 测试
 - 新增 MarkdownRenderer 组件测试（10 个测试用例）
 - E2E 测试扩展至 **7 个**，新增 reading-flow 场景（文件打开、搜索、标签管理、主题切换、大纲导航）
 
 ### 🎨 界面与交互
 - **启动画面** - Electron 主进程添加 splash window，提升应用启动体验
-- **数据备份面板** - 支持一键导出/导入所有应用数据（书签、阅读进度、文件设置、应用设置）为 JSON
 - **虚拟滚动优化** - 大文件（>300KB 或 >5000 行）自动启用虚拟滚动，显著降低内存占用
 - **i18n 多语言支持** - 集成 i18next + react-i18next，支持中文/英文界面切换，自动检测系统语言
 
 ### ⌨️ 交互增强
-- 快捷键 `Ctrl+Shift+A` 打开/关闭 AI 助手面板
-- 快捷键 `Ctrl+Shift+S` 打开语义搜索
-- 快捷键 `Ctrl+Shift+B` 打开数据备份面板
-- 命令面板新增 "AI 助手"、"语义搜索"、"数据备份" 命令
-- 打开文件夹时自动在后台触发语义索引
+- 命令面板保留阅读器核心命令：打开文件/文件夹、搜索、主题、导出、分屏、快速跳转
+
+### 🔒 安全加固
+- 替换 `markdown-it-katex` 为 `markdown-it-texmath + katex`，移除旧插件携带的高危 XSS 审计项
+- KaTeX 渲染保持 `trust: false`，公式错误降级显示而不是中断渲染
+- IPC 路径校验改为 realpath 边界判断，拒绝通过符号链接跳出用户安全目录
 
 ### ⚡ 性能优化
 - **内存清理** - 关闭标签页时自动 strip 内容后再存入 `closedTabs`，降低历史标签内存占用
 - **Worker 清理** - `useMarkdownWorker` 添加取消和 pending 任务清理机制
 - **打包压缩** - `electron-builder.yml` 全平台启用 `compression: maximum`，减小安装包体积
+- **构建提示降噪** - Mermaid 高级图表按需加载 ELK 异步 chunk，Vite chunk warning 阈值调整为匹配该已知产物，减少非首屏大 chunk 噪音
 
 ---
 

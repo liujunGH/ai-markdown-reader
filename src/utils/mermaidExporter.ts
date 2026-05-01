@@ -1,15 +1,7 @@
-export async function exportMermaidToSvg(code: string): Promise<string> {
-  const mermaid = (await import('mermaid')).default
-  
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
-    securityLevel: 'loose',
-  })
+import { renderMermaidSvg } from './mermaidLoader'
 
-  const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
-  const { svg } = await mermaid.render(id, code)
-  return svg
+export async function exportMermaidToSvg(code: string): Promise<string> {
+  return renderMermaidSvg(code, { securityLevel: 'loose' })
 }
 
 export async function exportMermaidToPng(code: string): Promise<string> {

@@ -13,7 +13,6 @@
 - **专注模式** - 隐藏所有界面元素，只保留内容，带来沉浸式阅读体验
 - **滚动高亮** - 目录自动跟踪当前阅读位置
 - **阅读进度记忆** - 每个文件独立保存阅读滚动位置，切换标签无缝衔接
-- **阅读统计** - 自动追踪阅读时长，生成周阅读热力图（GitHub Contribution Graph 风格）
 - **阅读速度估算** - 状态栏显示预计阅读时间，进度条悬停显示剩余时间
 
 ### 多标签页
@@ -41,7 +40,6 @@
 - **强调色** - 多种强调色供选择
 - **跟随系统** - 自动跟随 macOS/Windows 系统主题切换
 - **自动深色** - 按时间段（22:00-07:00）自动切换深色模式
-- **自定义 CSS** - 支持用户注入自定义 CSS 样式，实时生效
 
 ### 强大的编辑辅助
 - **Mermaid 图表** - 支持流程图、时序图、甘特图等，支持导出 SVG/PNG
@@ -70,14 +68,6 @@
 - **在 Finder 中显示** - 右键菜单中可选择在文件管理器中显示当前文件
 - **复制文件路径** - 方便复制当前文件的完整路径
 
-### AI 原生能力
-- **AI 对话助手** - 悬浮聊天面板，支持流式对话，自动带入当前文档作为上下文
-- **选中内容提问** - 在文档中选中任意文本，浮动 🤖 按钮一键向 AI 提问
-- **语义搜索** - 基于本地 embedding（`Xenova/all-MiniLM-L6-v2`）的自然语言搜索，跨文档语义匹配
-- **知识图谱** - 基于语义 embedding 的力导向图可视化，展示文档间的语义聚类关系
-- **自动标签提取** - AI 自动提取当前文档关键词，生成标签云（本地缓存）
-- **AI 配置面板** - 可配置任意 OpenAI 兼容 API（默认 MiMo）
-
 ### 导航与大纲
 - **目录导航** - 大纲自动跟踪当前阅读位置，支持章节折叠/展开
 - **迷你地图（Minimap）** - 右侧缩略导航条，色块高度反映章节长度
@@ -94,7 +84,6 @@
 ### 搜索功能
 - **内容搜索** - `Ctrl+F` 快速查找
 - **全局跨标签搜索** - 在所有已打开标签中搜索
-- **语义搜索** - 基于本地 embedding 的自然语言跨文档搜索
 - **正则支持** - 支持正则表达式搜索
 - **搜索历史** - 记住最近5条搜索记录，支持下拉选择和键盘导航
 - **高亮导航** - 点击上下箭头跳转匹配位置
@@ -107,7 +96,6 @@
 - **Mermaid 导出** - SVG/PNG 图片导出
 
 ### 数据与设置
-- **数据备份** - 一键导出/导入所有应用数据（书签、阅读进度、设置等）为 JSON
 - **i18n 多语言** - 支持中文/英文界面切换，自动检测系统语言
 - **会话恢复** - 关闭应用后自动恢复标签页和文件夹状态
 
@@ -124,9 +112,6 @@
 | `Ctrl + O` | 快速切换器 |
 | `Ctrl + Shift + O` | 打开文件夹 |
 | `Ctrl + G` | 快速跳转 |
-| `Ctrl + Shift + A` | AI 助手 |
-| `Ctrl + Shift + S` | 语义搜索 |
-| `Ctrl + Shift + B` | 数据备份 |
 | `Ctrl + Shift + P` | 命令面板 |
 | `Ctrl + Shift + N` | 新建窗口 |
 | `Ctrl + Shift + R` | 打开最近文件页面 |
@@ -170,6 +155,11 @@ npm run electron:build:mac  # macOS
 npm run electron:build:linux # Linux
 ```
 
+### 构建说明
+
+- Mermaid 图表渲染在运行时动态加载，普通文档不会把 Mermaid/ELK 放进首屏同步路径。
+- Mermaid 高级图表布局可能按需拉取 ELK 相关的大体积异步 chunk；这是已知构建产物。Vite 的 chunk warning 阈值已调高到匹配该策略，减少这类按需 chunk 带来的构建噪音，同时仍保留异常体积增长的提示。
+
 ## 技术栈
 
 - **前端框架**: React 18 + TypeScript
@@ -180,8 +170,6 @@ npm run electron:build:linux # Linux
 - **数学公式**: KaTeX
 - **桌面打包**: Electron 35
 - **XSS 防护**: DOMPurify
-- **本地 Embedding**: transformers.js (`Xenova/all-MiniLM-L6-v2`)
-- **本地向量存储**: Dexie (IndexedDB)
 - **国际化**: i18next + react-i18next
 
 ## 项目结构
@@ -199,7 +187,7 @@ markdown-reader/
 │   │   ├── Outline/          # 目录导航（支持折叠）
 │   │   ├── Bookmark/         # 书签
 │   │   ├── SearchBox/        # 搜索框（含历史、键盘导航）
-│   │   ├── ThemeToggle/      # 主题切换（含自定义 CSS）
+│   │   ├── ThemeToggle/      # 主题切换
 │   │   ├── StatusBar/        # 状态栏
 │   │   ├── MarkdownRenderer/ # Markdown 渲染（代码折叠、Diff、TTS）
 │   │   ├── SourceView/       # 源码模式（带行号）
@@ -208,8 +196,6 @@ markdown-reader/
 │   │   ├── CommandPalette/   # 命令面板
 │   │   ├── GlobalSearch/     # 全局搜索
 │   │   ├── QuickJump/        # 快速跳转
-│   │   ├── ReadingStatsPanel/# 阅读统计面板
-│   │   ├── CustomStylePanel/ # 自定义 CSS 面板
 │   │   ├── ExportPanel/      # 导出面板
 │   │   ├── ErrorBoundary/    # 错误边界
 │   │   └── Skeleton/         # 骨架屏

@@ -1,21 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme, ACCENT_COLORS, CODE_THEMES } from '../../context/ThemeContext'
-import { getStorageItem, setStorageItem } from '../../utils/storage'
 import styles from './ThemeToggle.module.css'
 
-interface ThemeToggleProps {
-  onOpenCustomStyle?: () => void
-}
-
-export function ThemeToggle({ onOpenCustomStyle }: ThemeToggleProps) {
+export function ThemeToggle() {
   const {
     theme, toggleTheme, setTheme, accentColor, setAccentColor, codeTheme, setCodeTheme,
     followSystem, setFollowSystem, autoDark, setAutoDark
   } = useTheme()
   const [showPicker, setShowPicker] = useState(false)
-  const [codeExecutionEnabled, setCodeExecutionEnabled] = useState(() => {
-    return getStorageItem('enable-code-execution') === 'true'
-  })
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -153,41 +145,6 @@ export function ThemeToggle({ onOpenCustomStyle }: ThemeToggleProps) {
                 </button>
               ))}
             </div>
-          </div>
-          <div className={styles.divider} />
-          <div className={styles.section}>
-            <div className={styles.pickerTitle}>安全设置</div>
-            <div className={styles.switches}>
-              <button
-                className={`${styles.switchRow} ${codeExecutionEnabled ? styles.switchRowOn : ''}`}
-                onClick={() => {
-                  const next = !codeExecutionEnabled
-                  setCodeExecutionEnabled(next)
-                  setStorageItem('enable-code-execution', String(next))
-                }}
-              >
-                <span className={styles.switchLabel}>▶ 启用代码执行</span>
-                <span className={`${styles.switchTrack} ${codeExecutionEnabled ? styles.switchTrackOn : ''}`}>
-                  <span className={styles.switchThumb} />
-                </span>
-              </button>
-            </div>
-            <div className={styles.autoHint}>
-              启用后可在 bash/sh/shell 代码块上运行命令（仅限白名单命令）
-            </div>
-          </div>
-          <div className={styles.divider} />
-          <div className={styles.section}>
-            <div className={styles.pickerTitle}>自定义</div>
-            <button
-              className={styles.themeBtn}
-              onClick={() => {
-                setShowPicker(false)
-                onOpenCustomStyle?.()
-              }}
-            >
-              🎨 自定义 CSS
-            </button>
           </div>
         </div>
       )}

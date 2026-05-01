@@ -45,6 +45,10 @@ function validateFilePath(filePath) {
     // Reject null bytes
     if (filePath.includes('\0'))
         return false;
+    // Require an absolute input path before resolving. path.resolve() would
+    // otherwise turn relative renderer input into a cwd-relative absolute path.
+    if (!path_1.default.isAbsolute(filePath))
+        return false;
     // Resolve and ensure it's absolute
     const resolved = path_1.default.resolve(filePath);
     if (!path_1.default.isAbsolute(resolved))
@@ -57,7 +61,43 @@ function validateFilePath(filePath) {
     const documentsDir = electron_1.app.getPath('documents');
     const downloadsDir = electron_1.app.getPath('downloads');
     const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir, '/tmp'];
-    return safeRoots.some(root => resolved.startsWith(root));
+    const safeRootRealPaths = safeRoots.map(root => getRealPathOrResolved(root));
+    const targetRealPath = getTargetRealPath(resolved);
+    if (!targetRealPath)
+        return false;
+    return safeRootRealPaths.some(root => isPathWithinRoot(root, targetRealPath));
+}
+function getRealPathOrResolved(filePath) {
+    try {
+        return fs_1.default.realpathSync.native(filePath);
+    }
+    catch {
+        return path_1.default.resolve(filePath);
+    }
+}
+function getTargetRealPath(resolvedPath) {
+    try {
+        return fs_1.default.realpathSync.native(resolvedPath);
+    }
+    catch {
+        const parentPath = path_1.default.dirname(resolvedPath);
+        try {
+            const parentStats = fs_1.default.statSync(parentPath);
+            if (!parentStats.isDirectory())
+                return null;
+            return path_1.default.join(fs_1.default.realpathSync.native(parentPath), path_1.default.basename(resolvedPath));
+        }
+        catch {
+            return null;
+        }
+    }
+}
+function isPathWithinRoot(root, targetPath) {
+    const resolvedRoot = path_1.default.resolve(root);
+    const resolvedTarget = path_1.default.resolve(targetPath);
+    const relativePath = path_1.default.relative(resolvedRoot, resolvedTarget);
+    return (relativePath === '' ||
+        (!!relativePath && !relativePath.startsWith('..') && !path_1.default.isAbsolute(relativePath)));
 }
 function validateFileSize(filePath, maxBytes) {
     try {

@@ -36,7 +36,6 @@ import { useRecentFiles } from './hooks/useRecentFiles'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useDragAndDrop } from './hooks/useDragAndDrop'
 import { useScrollHistory } from './hooks/useScrollHistory'
-import { useReadingStats } from './hooks/useReadingStats'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { basename, dirname, join } from './utils/path'
 import { RecentFile } from './types/electron'
@@ -47,10 +46,6 @@ import { Skeleton } from './components/Skeleton'
 
 const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m => ({ default: m.ExportPanel })))
 const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
-const ReadingStatsPanel = React.lazy(() => import('./components/ReadingStatsPanel').then(m => ({ default: m.ReadingStatsPanel })))
-const CustomStylePanel = React.lazy(() => import('./components/CustomStylePanel').then(m => ({ default: m.CustomStylePanel })))
-const DiagnosticsPanel = React.lazy(() => import('./components/DiagnosticsPanel').then(m => ({ default: m.DiagnosticsPanel })))
-const DataBackupPanel = React.lazy(() => import('./components/DataBackupPanel').then(m => ({ default: m.DataBackupPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
@@ -61,14 +56,14 @@ const SEARCH_HISTORY_KEY = 'search-history'
 
 function AppInner() {
   const { t } = useTranslation()
-  const { theme, accentColor, toggleTheme, customCSS, setCustomCSS } = useTheme()
+  const { theme, accentColor, toggleTheme } = useTheme()
 
   // ── Stores ──
   const {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showReadingStats, showCustomStyle, showDiagnostics, showDataBackup, fontSize, isSplitView, secondaryTabId,
+    fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
   } = useUIStore()
@@ -109,7 +104,6 @@ function AppInner() {
   const markdownRef = useRef<MarkdownRendererRef>(null)
   const mainRef = useRef<HTMLElement>(null)
 
-  const { totalStats } = useReadingStats(activeTab?.filePath)
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
   const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
 
@@ -547,21 +541,6 @@ function AppInner() {
               <div className={styles.toolbar}>
                 <FileOpener onFileOpen={handleFileOpen} onError={showToast} />
                 <button
-                  onClick={() => togglePanel('recent')}
-                  data-guide="recent-files"
-                  className={`${styles.toolbarBtn} ${showRecent ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.recentFiles')} data-tooltip={t('toolbar.recentFilesTooltip')}
-                >
-                  📜
-                </button>
-                <button
-                  onClick={toggleSplitView}
-                  className={`${styles.toolbarBtn} ${isSplitView ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.splitView')} data-tooltip={t('toolbar.splitViewTooltip')}
-                >
-                  ⚡
-                </button>
-                <button
                   onClick={handleOpenFolder}
                   className={styles.toolbarBtn}
                   aria-label={t('toolbar.openFolder')} data-tooltip={t('toolbar.openFolder')}
@@ -661,42 +640,6 @@ function AppInner() {
                     A+
                   </button>
                 </div>
-                <button
-                  onClick={() => openPanel('keyboardShortcuts')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.shortcuts')} data-tooltip={t('toolbar.shortcutsTooltip')}
-                >
-                  ⌨️
-                </button>
-                <button
-                  onClick={() => openPanel('fileInfo')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.fileInfo')} data-tooltip={t('toolbar.fileInfo')}
-                >
-                  ℹ️
-                </button>
-                <button
-                  onClick={() => openPanel('readingStats')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.readingStats')} data-tooltip={t('toolbar.readingStats')}
-                >
-                  📊
-                </button>
-                <button
-                  onClick={() => openPanel('diagnostics')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.diagnostics')} data-tooltip={t('toolbar.diagnostics')}
-                >
-                  🛠️
-                </button>
-
-                <button
-                  onClick={() => openPanel('dataBackup')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.dataBackup')} data-tooltip={t('toolbar.dataBackup')}
-                >
-                  💾
-                </button>
                 <BookmarkPanel
                   bookmarks={bookmarks}
                   onAdd={addBookmark}
@@ -704,7 +647,7 @@ function AppInner() {
                   onNavigate={handleBookmarkNavigate}
                   currentHeading={currentHeading}
                 />
-                <ThemeToggle onOpenCustomStyle={() => openPanel('customStyle')} />
+                <ThemeToggle />
               </div>
             </header>
           </>
@@ -904,42 +847,6 @@ function AppInner() {
               />
             </Suspense>
           )}
-          {showReadingStats && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <ReadingStatsPanel
-                isOpen={showReadingStats}
-                onClose={() => closePanel('readingStats')}
-                stats={totalStats}
-              />
-            </Suspense>
-          )}
-          {showCustomStyle && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <CustomStylePanel
-                isOpen={showCustomStyle}
-                onClose={() => closePanel('customStyle')}
-                customCSS={customCSS}
-                onChange={setCustomCSS}
-              />
-            </Suspense>
-          )}
-          {showDiagnostics && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <DiagnosticsPanel
-                isOpen={showDiagnostics}
-                onClose={() => closePanel('diagnostics')}
-              />
-            </Suspense>
-          )}
-          {showDataBackup && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <DataBackupPanel
-                isOpen={showDataBackup}
-                onClose={() => closePanel('dataBackup')}
-              />
-            </Suspense>
-          )}
-
           {changedFilePath && (
             <div className={styles.fileChangeBanner}>
               <span className={styles.fileChangeBannerIcon}>📄</span>
@@ -1054,17 +961,11 @@ function AppInner() {
             case 'toggle-theme':
               toggleTheme()
               break
-            case 'reading-stats':
-              openPanel('readingStats')
-              break
-            case 'custom-style':
-              openPanel('customStyle')
-              break
             case 'quick-jump':
               openPanel('quickJump')
               break
-            case 'data-backup':
-              openPanel('dataBackup')
+            case 'file-info':
+              openPanel('fileInfo')
               break
             default:
               break

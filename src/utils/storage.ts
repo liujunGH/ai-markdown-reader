@@ -13,10 +13,6 @@ export type ExactStorageKey =
   | 'followSystem'
   | 'autoDark'
   | 'folder-bookmarks'
-  | 'reading-stats'
-  | 'custom-css'
-  | 'enable-code-execution'
-  | 'llm-config'
 
 export type PatternStorageKey =
   | `scroll-position-${string}`

@@ -16,10 +16,6 @@ export type PanelName =
   | 'commandPalette'
   | 'globalSearch'
   | 'quickJump'
-  | 'readingStats'
-  | 'customStyle'
-  | 'diagnostics'
-  | 'dataBackup'
 
 interface UIState {
   showOutline: boolean
@@ -36,10 +32,6 @@ interface UIState {
   showCommandPalette: boolean
   showGlobalSearch: boolean
   showQuickJump: boolean
-  showReadingStats: boolean
-  showCustomStyle: boolean
-  showDiagnostics: boolean
-  showDataBackup: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -76,10 +68,6 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'commandPalette': return { showCommandPalette: value }
     case 'globalSearch': return { showGlobalSearch: value }
     case 'quickJump': return { showQuickJump: value }
-    case 'readingStats': return { showReadingStats: value }
-    case 'customStyle': return { showCustomStyle: value }
-    case 'diagnostics': return { showDiagnostics: value }
-    case 'dataBackup': return { showDataBackup: value }
     default:
       return {}
   }
@@ -101,10 +89,6 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'commandPalette': return state.showCommandPalette
     case 'globalSearch': return state.showGlobalSearch
     case 'quickJump': return state.showQuickJump
-    case 'readingStats': return state.showReadingStats
-    case 'customStyle': return state.showCustomStyle
-    case 'diagnostics': return state.showDiagnostics
-    case 'dataBackup': return state.showDataBackup
     default:
       return false
   }
@@ -127,10 +111,6 @@ export const useUIStore = create<UIStore>()(
       showCommandPalette: false,
       showGlobalSearch: false,
       showQuickJump: false,
-      showReadingStats: false,
-      showCustomStyle: false,
-      showDiagnostics: false,
-      showDataBackup: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -151,10 +131,6 @@ export const useUIStore = create<UIStore>()(
         showCommandPalette: false,
         showQuickJump: false,
         showGlobalSearch: false,
-        showReadingStats: false,
-        showCustomStyle: false,
-        showDiagnostics: false,
-        showDataBackup: false,
         showFileInfo: false,
         showFilePreview: false,
         showRecent: false,

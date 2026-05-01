@@ -61,7 +61,6 @@ export interface ElectronAPI {
   setTitle: (title: string) => Promise<void>
   onSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
   offSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
-  executeShellCommand: (code: string, language: string) => Promise<{ success: boolean; stdout?: string; stderr?: string; exitCode?: number; error?: string }>
   // Multi-window APIs
   getWindowId: () => Promise<number>
   focusWindow: (id: number) => Promise<void>
@@ -76,21 +75,6 @@ export interface ElectronAPI {
   offUpdateDownloaded: (callback: (info: { version: string }) => void) => void
   onUpdateError: (callback: (info: { error: string }) => void) => void
   offUpdateError: (callback: (info: { error: string }) => void) => void
-  // Diagnostics
-  getDiagnosticsInfo: () => Promise<{
-    appVersion: string
-    electronVersion: string
-    chromiumVersion: string
-    nodeVersion: string
-    v8Version: string
-    platform: string
-    arch: string
-    processMemory: { rss: number; heapTotal: number; heapUsed: number; external: number }
-    uptime: number
-    pid: number
-  }>
-  getRecentLogs: () => Promise<string[]>
-  clearLogs: () => Promise<{ success: boolean }>
   showSaveDialog: (options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string } | null>
   showOpenDialog: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePaths: string[] } | null>
 }

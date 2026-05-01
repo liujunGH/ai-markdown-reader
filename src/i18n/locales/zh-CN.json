@@ -150,24 +150,6 @@
     "zoomIn": "放大字体",
     "shortcuts": "快捷键",
     "shortcutsTooltip": "快捷键 (Ctrl+/)",
-    "fileInfo": "文件信息",
-    "readingStats": "阅读统计",
-    "diagnostics": "诊断面板",
-    "dataBackup": "数据备份"
-  },
-  "dataBackup": {
-    "title": "数据备份",
-    "export": "导出数据",
-    "import": "导入数据",
-    "exportDescription": "将所有应用数据导出为 JSON 文件",
-    "importDescription": "从 JSON 文件恢复应用数据",
-    "exportSuccess": "数据导出成功",
-    "exportError": "数据导出失败",
-    "importSuccess": "数据导入成功，请重启应用",
-    "importError": "数据导入失败：{{error}}",
-    "invalidFile": "无效的数据文件",
-    "confirmImport": "导入将覆盖现有数据，确定要继续吗？",
-    "importing": "正在导入...",
-    "selectFile": "选择备份文件"
+    "fileInfo": "文件信息"
   }
 }

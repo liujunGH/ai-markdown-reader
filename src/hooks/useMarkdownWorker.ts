@@ -33,11 +33,18 @@ export function cancelPendingWorkerOperations(): void {
 export function useMarkdownWorker(content: string): { html: string; loading: boolean } {
   const [html, setHtml] = useState('')
   const [loading, setLoading] = useState(false)
-  const contentRef = useRef(content)
   const idRef = useRef<number>(0)
   const mountedRef = useRef(true)
 
+  const cancelCurrentOperation = useCallback(() => {
+    if (idRef.current !== 0) {
+      pending.delete(idRef.current)
+      idRef.current = 0
+    }
+  }, [])
+
   const parse = useCallback((text: string) => {
+    cancelCurrentOperation()
     setLoading(true)
     const currentId = ++messageId
     idRef.current = currentId
@@ -52,20 +59,18 @@ export function useMarkdownWorker(content: string): { html: string; loading: boo
         setLoading(false)
       }
     })
-  }, [])
+  }, [cancelCurrentOperation])
 
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      cancelCurrentOperation()
     }
-  }, [])
+  }, [cancelCurrentOperation])
 
   useEffect(() => {
-    if (contentRef.current !== content) {
-      contentRef.current = content
-      parse(content)
-    }
+    parse(content)
   }, [content, parse])
 
   return { html, loading }

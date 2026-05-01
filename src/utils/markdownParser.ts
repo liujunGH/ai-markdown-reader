@@ -12,7 +12,8 @@ import 'prismjs/components/prism-markup'
 import 'prismjs/components/prism-markdown'
 import 'prismjs/components/prism-jsx'
 import 'prismjs/components/prism-tsx'
-import mk from 'markdown-it-katex'
+import texmath from 'markdown-it-texmath'
+import * as katex from 'katex'
 import { full } from 'markdown-it-emoji'
 
 const loadedLanguages = new Set<string>()
@@ -93,7 +94,15 @@ const md: MarkdownIt = new MarkdownIt({
   highlight: highlightCode
 })
 
-md.use(mk)
+md.use(texmath, {
+  engine: katex,
+  delimiters: 'dollars',
+  katexOptions: {
+    output: 'html',
+    throwOnError: false,
+    trust: false,
+  },
+})
 md.use(full)
 
 function postProcessHtml(rawHtml: string): string {
@@ -108,7 +117,7 @@ function postProcessHtml(rawHtml: string): string {
   return DOMPurify.sanitize(rawHtml, {
     ALLOWED_TAGS: [
       // Markdown 标准标签
-      'p', 'br', 'hr', 'div', 'span',
+      'p', 'br', 'hr', 'div', 'span', 'section', 'eq', 'eqn',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'ul', 'ol', 'li', 'dl', 'dt', 'dd',
       'strong', 'b', 'em', 'i', 'strike', 'del', 's',

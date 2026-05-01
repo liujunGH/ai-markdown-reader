@@ -1,7 +1,7 @@
 {
   "name": "markdown-reader",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "A Markdown Reader",
   "author": "liujun",
   "main": "electron/main.js",
@@ -21,7 +21,6 @@
     "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@xenova/transformers": "^2.17.2",
     "dexie": "^4.4.2",
     "dompurify": "^3.4.0",
     "electron-updater": "^6.8.3",
@@ -31,7 +30,7 @@
     "katex": "^0.16.45",
     "markdown-it": "^14.0.0",
     "markdown-it-emoji": "^3.0.0",
-    "markdown-it-katex": "^2.0.3",
+    "markdown-it-texmath": "^1.0.0",
     "mermaid": "^10.6.0",
     "prismjs": "^1.29.0",
     "react": "^18.2.0",
@@ -41,9 +40,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@testing-library/user-event": "^14.6.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/dompurify": "^3.0.5",
     "@types/katex": "^0.16.8",
     "@types/markdown-it": "^14.0.0",

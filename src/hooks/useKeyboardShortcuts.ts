@@ -20,7 +20,7 @@ export function useKeyboardShortcuts(
       const {
         fontSize, showSource, showSearch, showKeyboardShortcuts, showFocusMode,
         showQuickSwitcher, showExportPanel, showCommandPalette, showQuickJump,
-        showGlobalSearch, showReadingStats, showCustomStyle, openPanel, closePanel,
+        showGlobalSearch, openPanel, closePanel,
         togglePanel, setFontSize, setShowSource
       } = useUIStore.getState()
 
@@ -167,10 +167,6 @@ export function useKeyboardShortcuts(
       if (e.key === 'Escape') {
         if (showCommandPalette) {
           closePanel('commandPalette')
-        } else if (showReadingStats) {
-          closePanel('readingStats')
-        } else if (showCustomStyle) {
-          closePanel('customStyle')
         } else if (showQuickJump) {
           closePanel('quickJump')
         } else if (showGlobalSearch) {

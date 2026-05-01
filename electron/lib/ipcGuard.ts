@@ -40,6 +40,10 @@ export function validateFilePath(filePath: string): boolean {
   if (filePath.includes('..')) return false
   // Reject null bytes
   if (filePath.includes('\0')) return false
+  // Require an absolute input path before resolving. path.resolve() would
+  // otherwise turn relative renderer input into a cwd-relative absolute path.
+  if (!path.isAbsolute(filePath)) return false
+
   // Resolve and ensure it's absolute
   const resolved = path.resolve(filePath)
   if (!path.isAbsolute(resolved)) return false
@@ -51,7 +55,47 @@ export function validateFilePath(filePath: string): boolean {
   const documentsDir = app.getPath('documents')
   const downloadsDir = app.getPath('downloads')
   const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir, '/tmp']
-  return safeRoots.some(root => resolved.startsWith(root))
+
+  const safeRootRealPaths = safeRoots.map(root => getRealPathOrResolved(root))
+  const targetRealPath = getTargetRealPath(resolved)
+  if (!targetRealPath) return false
+
+  return safeRootRealPaths.some(root => isPathWithinRoot(root, targetRealPath))
+}
+
+function getRealPathOrResolved(filePath: string): string {
+  try {
+    return fs.realpathSync.native(filePath)
+  } catch {
+    return path.resolve(filePath)
+  }
+}
+
+function getTargetRealPath(resolvedPath: string): string | null {
+  try {
+    return fs.realpathSync.native(resolvedPath)
+  } catch {
+    const parentPath = path.dirname(resolvedPath)
+
+    try {
+      const parentStats = fs.statSync(parentPath)
+      if (!parentStats.isDirectory()) return null
+
+      return path.join(fs.realpathSync.native(parentPath), path.basename(resolvedPath))
+    } catch {
+      return null
+    }
+  }
+}
+
+function isPathWithinRoot(root: string, targetPath: string): boolean {
+  const resolvedRoot = path.resolve(root)
+  const resolvedTarget = path.resolve(targetPath)
+  const relativePath = path.relative(resolvedRoot, resolvedTarget)
+  return (
+    relativePath === '' ||
+    (!!relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath))
+  )
 }
 
 export function validateFileSize(

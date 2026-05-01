@@ -150,24 +150,6 @@
     "zoomIn": "Zoom In",
     "shortcuts": "Shortcuts",
     "shortcutsTooltip": "Shortcuts (Ctrl+/)",
-    "fileInfo": "File Info",
-    "readingStats": "Reading Stats",
-    "diagnostics": "Diagnostics",
-    "dataBackup": "Data Backup"
-  },
-  "dataBackup": {
-    "title": "Data Backup",
-    "export": "Export Data",
-    "import": "Import Data",
-    "exportDescription": "Export all application data as a JSON file",
-    "importDescription": "Restore application data from a JSON file",
-    "exportSuccess": "Data exported successfully",
-    "exportError": "Data export failed",
-    "importSuccess": "Data imported successfully, please restart the app",
-    "importError": "Data import failed: {{error}}",
-    "invalidFile": "Invalid data file",
-    "confirmImport": "Import will overwrite existing data. Are you sure you want to continue?",
-    "importing": "Importing...",
-    "selectFile": "Select backup file"
+    "fileInfo": "File Info"
   }
 }

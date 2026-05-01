@@ -52,10 +52,6 @@ beforeEach(() => {
     writable: true,
   })
 
-  vi.stubGlobal('electronAPI', {
-    executeShellCommand: vi.fn().mockResolvedValue({ success: true, stdout: 'ok' }),
-  })
-
   vi.stubGlobal('speechSynthesis', {
     speak: vi.fn(),
     cancel: vi.fn(),

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { getStorageItem, setStorageItem } from '../utils/storage'
 
 function hexToRgb(hex: string): string {
@@ -40,8 +40,6 @@ interface ThemeContextType {
   setFollowSystem: (value: boolean) => void
   autoDark: boolean
   setAutoDark: (value: boolean) => void
-  customCSS: string
-  setCustomCSS: (css: string) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -88,15 +86,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [autoDark, setAutoDarkState] = useState<boolean>(() => {
     return getStorageItem('autoDark') === 'true'
   })
-
-  const [customCSS, setCustomCSSState] = useState<string>(() => {
-    return getStorageItem('custom-css', '') ?? ''
-  })
-
-  const setCustomCSS = useCallback((css: string) => {
-    setCustomCSSState(css)
-    setStorageItem('custom-css', css)
-  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -162,17 +151,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [autoDark, followSystem])
 
-  // Inject custom CSS
-  useEffect(() => {
-    let styleEl = document.getElementById('user-custom-css') as HTMLStyleElement | null
-    if (!styleEl) {
-      styleEl = document.createElement('style')
-      styleEl.id = 'user-custom-css'
-      document.head.appendChild(styleEl)
-    }
-    styleEl.textContent = customCSS
-  }, [customCSS])
-
   const toggleTheme = () => {
     if (followSystem || autoDark) return
     if (theme === 'light') setThemeState('dark')
@@ -193,7 +171,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, accentColor, setAccentColor, codeTheme, setCodeTheme, followSystem, setFollowSystem, autoDark, setAutoDark, customCSS, setCustomCSS }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, accentColor, setAccentColor, codeTheme, setCodeTheme, followSystem, setFollowSystem, autoDark, setAutoDark }}>
       {children}
     </ThemeContext.Provider>
   )
