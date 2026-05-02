@@ -145,6 +145,8 @@
     "sourceTooltip": "Source (Ctrl+S)",
     "export": "Export",
     "exportTooltip": "Export (Ctrl+E)",
+    "tools": "Tools",
+    "toolsTooltip": "Document Tools",
     "documentHealth": "Document Health",
     "documentHealthTooltip": "Document Health",
     "imageInventory": "Image Inventory",

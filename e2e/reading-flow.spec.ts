@@ -9,6 +9,7 @@ test.describe('Reading Flow', () => {
   let fixturePath: string
   let fixturePath2: string
   let fixturePath3: string
+  let inspectionPath: string
   let smokeTestPath: string
 
   test.beforeAll(() => {
@@ -16,11 +17,20 @@ test.describe('Reading Flow', () => {
     fixturePath = path.join(tmpDir, 'ai-markdown-reader-sample.md')
     fixturePath2 = path.join(tmpDir, 'ai-markdown-reader-sample2.md')
     fixturePath3 = path.join(tmpDir, 'ai-markdown-reader-sample3.md')
+    inspectionPath = path.join(tmpDir, 'ai-markdown-reader-inspection.md')
     smokeTestPath = path.join(__dirname, '../examples/smoke-test.md')
 
     fs.writeFileSync(fixturePath, fs.readFileSync(path.join(__dirname, 'fixtures/sample.md'), 'utf-8'))
     fs.writeFileSync(fixturePath2, '# Second Document\n\nThis is the second test document.\n\n## Section A\n\nContent for section A.\n\n## Section B\n\nContent for section B.\n')
     fs.writeFileSync(fixturePath3, '# Third Document\n\nThis is the third test document.\n')
+    fs.writeFileSync(inspectionPath, [
+      '# Inspection Document',
+      '',
+      '[bad](javascript:alert(1))',
+      '',
+      '![Remote](https://example.com/image.png)',
+      '![Local](images/missing.png)'
+    ].join('\n'))
   })
 
   test.beforeEach(async ({}, testInfo) => {
@@ -36,13 +46,7 @@ test.describe('Reading Flow', () => {
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
 
-    // Dismiss first-use guide if it appears
-    const skipGuide = window.getByRole('button', { name: '跳过引导' })
-    try {
-      await skipGuide.click({ timeout: 3000 })
-    } catch {
-      // Guide may not appear
-    }
+    await dismissFirstUseGuide()
   })
 
   test.afterEach(async () => {
@@ -55,6 +59,7 @@ test.describe('Reading Flow', () => {
     try { fs.unlinkSync(fixturePath) } catch {}
     try { fs.unlinkSync(fixturePath2) } catch {}
     try { fs.unlinkSync(fixturePath3) } catch {}
+    try { fs.unlinkSync(inspectionPath) } catch {}
   })
 
   async function mockOpenFileDialog(filePaths: string[]) {
@@ -73,6 +78,14 @@ test.describe('Reading Flow', () => {
         dialog.showOpenDialog = originalShowOpenDialog
       }
     }, filePaths)
+  }
+
+  async function dismissFirstUseGuide() {
+    try {
+      await window.getByText('跳过引导', { exact: true }).click({ timeout: 6000 })
+    } catch {
+      // Guide may not appear
+    }
   }
 
   test('should open file and render content', async () => {
@@ -100,21 +113,28 @@ test.describe('Reading Flow', () => {
     await expect(marks.first()).toBeVisible()
   })
 
-  test('should expose document health and image inventory from the toolbar', async () => {
-    await mockOpenFileDialog([fixturePath])
+  test('should expose inspection tools, jump to health issues, and filter images', async () => {
+    await mockOpenFileDialog([inspectionPath])
 
+    await dismissFirstUseGuide()
     await window.locator('[data-guide="file-opener"]').click()
-    await expect(window.getByRole('heading', { name: 'Sample Document' })).toBeVisible()
+    await expect(window.getByRole('heading', { name: 'Inspection Document' })).toBeVisible()
 
-    await window.getByRole('button', { name: '文档健康检查' }).click()
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /文档健康检查/ }).click()
     const healthPanel = window.locator('section[aria-label="文档健康检查"]')
     await expect(healthPanel).toBeVisible()
-    await healthPanel.getByRole('button', { name: '关闭' }).click()
+    await healthPanel.getByRole('button', { name: /行 3/ }).click()
     await expect(healthPanel).not.toBeVisible()
+    await expect(window.locator('[class*="highlighted"]').filter({ hasText: '[bad](javascript:alert(1))' }).first()).toBeVisible()
 
-    await window.getByRole('button', { name: '图片检查面板' }).click()
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /图片检查面板/ }).click()
     const imagePanel = window.locator('section[aria-label="图片检查面板"]')
     await expect(imagePanel).toBeVisible()
+    await imagePanel.getByRole('button', { name: /网络/ }).click()
+    await expect(imagePanel.getByText('https://example.com/image.png')).toBeVisible()
+    await expect(imagePanel.getByText('images/missing.png')).not.toBeVisible()
   })
 
   test('should manage tabs', async () => {
@@ -178,7 +198,8 @@ test.describe('Reading Flow', () => {
     await expect(window.locator('pre.language-diff')).toBeVisible()
     await expect(window.locator('.katex').first()).toBeVisible()
     await expect(window.locator('.katex-display').first()).toBeVisible()
-    await expect(window.locator('.mermaid-svg-wrapper svg').first()).toBeVisible({ timeout: 10000 })
+    await expect(window.locator('.mermaid-wrapper[data-mermaid-rendered="true"]').first()).toBeVisible({ timeout: 15000 })
+    await expect(window.locator('.mermaid-wrapper[data-mermaid-rendered="true"] .mermaid-svg-wrapper svg').first()).toBeVisible()
     await expect(window.locator('table').first()).toBeVisible()
     await expect(window.locator('input.task-checkbox').first()).toBeVisible()
     await expect(window.locator('a.wikilink').first()).toBeVisible()

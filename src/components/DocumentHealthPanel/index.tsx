@@ -5,6 +5,7 @@ import styles from './DocumentHealthPanel.module.css'
 interface Props {
   content: string
   filePath?: string
+  onIssueSelect?: (line: number) => void
   onClose: () => void
 }
 
@@ -14,7 +15,7 @@ const SEVERITY_LABELS: Record<HealthSeverity, string> = {
   info: '提示',
 }
 
-export function DocumentHealthPanel({ content, filePath, onClose }: Props) {
+export function DocumentHealthPanel({ content, filePath, onIssueSelect, onClose }: Props) {
   const result = useMemo(() => analyzeDocumentHealth(content, filePath), [content, filePath])
   const grouped = useMemo(() => ({
     error: result.issues.filter(issue => issue.severity === 'error'),
@@ -46,7 +47,7 @@ export function DocumentHealthPanel({ content, filePath, onClose }: Props) {
           ) : (
             (Object.keys(grouped) as HealthSeverity[]).map(severity => (
               grouped[severity].length > 0 && (
-                <IssueGroup key={severity} severity={severity} issues={grouped[severity]} />
+                <IssueGroup key={severity} severity={severity} issues={grouped[severity]} onIssueSelect={onIssueSelect} />
               )
             ))
           )}
@@ -65,20 +66,25 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   )
 }
 
-function IssueGroup({ severity, issues }: { severity: HealthSeverity; issues: DocumentHealthIssue[] }) {
+function IssueGroup({ severity, issues, onIssueSelect }: { severity: HealthSeverity; issues: DocumentHealthIssue[]; onIssueSelect?: (line: number) => void }) {
   return (
     <section className={styles.group}>
       <h4>{SEVERITY_LABELS[severity]} · {issues.length}</h4>
       <div className={styles.issueList}>
         {issues.map((issue, index) => (
-          <article key={`${issue.type}-${issue.line}-${index}`} className={styles.issue}>
+          <button
+            key={`${issue.type}-${issue.line}-${index}`}
+            type="button"
+            className={styles.issue}
+            onClick={() => onIssueSelect?.(issue.line)}
+          >
             <div className={styles.issueTop}>
               <span className={styles.line}>行 {issue.line}</span>
               <span className={styles.type}>{issue.type}</span>
             </div>
             <div className={styles.message}>{issue.message}</div>
             {issue.target && <div className={styles.target} title={issue.target}>{issue.target}</div>}
-          </article>
+          </button>
         ))}
       </div>
     </section>

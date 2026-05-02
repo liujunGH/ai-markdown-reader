@@ -76,6 +76,39 @@
   font-size: 18px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filters button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.filters button span {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.filters .activeFilter {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.filters .activeFilter span {
+  color: white;
+}
+
 .content {
   overflow: auto;
   padding: 16px 20px 20px;

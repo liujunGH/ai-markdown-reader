@@ -228,16 +228,19 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       const code = decodeURIComponent(el.getAttribute('data-code') || '')
       const wrapper = el.parentElement
       try {
+        wrapper?.setAttribute('data-mermaid-rendered', 'pending')
         const id = createMermaidRenderId()
         const { svg } = await mermaid.render(id, code)
         if (wrapper) {
           wrapper.setAttribute('data-mermaid-code', encodeURIComponent(code))
+          wrapper.setAttribute('data-mermaid-rendered', 'true')
           const containerDiv = buildMermaidContainer(svg)
           wrapper.innerHTML = ''
           wrapper.appendChild(containerDiv)
         }
       } catch (err) {
         if (wrapper) {
+          wrapper.setAttribute('data-mermaid-rendered', 'error')
           wrapper.innerHTML = `<div class="mermaid-error">Mermaid 渲染错误: ${err instanceof Error ? err.message : '未知错误'}</div>`
         }
       }
@@ -255,12 +258,15 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       if (!codeAttr) return
       const code = decodeURIComponent(codeAttr)
       try {
+        wrapper.setAttribute('data-mermaid-rendered', 'pending')
         const id = createMermaidRenderId()
         const { svg } = await mermaid.render(id, code)
         const containerDiv = buildMermaidContainer(svg)
+        wrapper.setAttribute('data-mermaid-rendered', 'true')
         wrapper.innerHTML = ''
         wrapper.appendChild(containerDiv)
       } catch (err) {
+        wrapper.setAttribute('data-mermaid-rendered', 'error')
         wrapper.innerHTML = `<div class="mermaid-error">Mermaid 渲染错误: ${err instanceof Error ? err.message : '未知错误'}</div>`
       }
     })
@@ -353,6 +359,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       wrapper.className = 'mermaid-wrapper'
       wrapper.id = `mermaid-${index}`
       wrapper.setAttribute('data-mermaid-code', encodeURIComponent(code))
+      wrapper.setAttribute('data-mermaid-rendered', 'pending')
       wrapper.innerHTML = `<div class="mermaid" data-code="${encodeURIComponent(code)}"></div>`
       el.parentNode?.replaceChild(wrapper, el)
     })

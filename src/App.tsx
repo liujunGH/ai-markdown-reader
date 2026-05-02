@@ -56,6 +56,7 @@ import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
+const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
 
 function AppInner() {
   const { t } = useTranslation()
@@ -102,6 +103,7 @@ function AppInner() {
       return []
     }
   })
+  const [showToolsMenu, setShowToolsMenu] = useState(false)
 
   // ── Hooks ──
   const scrollHistory = useScrollHistory()
@@ -117,6 +119,12 @@ function AppInner() {
   useEffect(() => {
     useTabStore.getState().restoreSession()
   }, [])
+
+  useEffect(() => {
+    if (getStorageItem(HAS_SEEN_INSPECTION_TOOLS_KEY)) return
+    showToast('新增工具：文档健康检查、图片检查面板，外部链接会用系统浏览器打开')
+    setStorageItem(HAS_SEEN_INSPECTION_TOOLS_KEY, 'true')
+  }, [showToast])
 
   // Sync file settings to global UI state
   useEffect(() => {
@@ -276,6 +284,12 @@ function AppInner() {
       element.scrollIntoView({ behavior: 'smooth' })
     }
   }, [scrollHistory])
+
+  const handleJumpToLine = useCallback((line: number) => {
+    closePanel('documentHealth')
+    setShowSource(true)
+    window.setTimeout(() => setHighlightedLine(line), 0)
+  }, [closePanel, setHighlightedLine, setShowSource])
 
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string) => {
@@ -622,22 +636,43 @@ function AppInner() {
                 >
                   📤
                 </button>
-                <button
-                  onClick={() => openPanel('documentHealth')}
-                  className={`${styles.toolbarBtn} ${showDocumentHealth ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.documentHealth')}
-                  data-tooltip={t('toolbar.documentHealthTooltip')}
-                >
-                  ✓
-                </button>
-                <button
-                  onClick={() => openPanel('imageInventory')}
-                  className={`${styles.toolbarBtn} ${showImageInventory ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.imageInventory')}
-                  data-tooltip={t('toolbar.imageInventoryTooltip')}
-                >
-                  ▣
-                </button>
+                <div className={styles.toolsMenu}>
+                  <button
+                    onClick={() => setShowToolsMenu(open => !open)}
+                    className={`${styles.toolbarBtn} ${showDocumentHealth || showImageInventory ? styles.toolbarBtnActive : ''}`}
+                    aria-label={t('toolbar.tools')}
+                    aria-expanded={showToolsMenu}
+                    data-tooltip={t('toolbar.toolsTooltip')}
+                  >
+                    🧰
+                  </button>
+                  {showToolsMenu && (
+                    <div className={styles.toolsDropdown} role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('documentHealth')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>✓</span>
+                        {t('toolbar.documentHealth')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('imageInventory')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>▣</span>
+                        {t('toolbar.imageInventory')}
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => togglePanel('focusMode')}
                   className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
@@ -840,6 +875,7 @@ function AppInner() {
               <DocumentHealthPanel
                 content={activeTab?.content || ''}
                 filePath={activeTab?.filePath}
+                onIssueSelect={handleJumpToLine}
                 onClose={() => closePanel('documentHealth')}
               />
             </Suspense>

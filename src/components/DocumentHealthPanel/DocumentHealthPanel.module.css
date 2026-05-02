@@ -108,10 +108,23 @@
 }
 
 .issue {
+  display: block;
+  width: 100%;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.issue:hover {
+  border-color: var(--accent);
+}
+
+.issue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .issueTop {

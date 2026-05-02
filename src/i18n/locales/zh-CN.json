@@ -145,6 +145,8 @@
     "sourceTooltip": "源码 (Ctrl+S)",
     "export": "导出",
     "exportTooltip": "导出 (Ctrl+E)",
+    "tools": "工具",
+    "toolsTooltip": "文档工具",
     "documentHealth": "文档健康检查",
     "documentHealthTooltip": "文档健康检查",
     "imageInventory": "图片检查面板",

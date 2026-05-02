@@ -6,6 +6,7 @@ export type ExactStorageKey =
   | 'accentColor'
   | 'codeTheme'
   | 'has-seen-guide'
+  | 'has-seen-inspection-tools'
   | 'session-tabs'
   | 'session-active-tab'
   | 'max-tabs'
