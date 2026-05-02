@@ -46,6 +46,8 @@ import { Skeleton } from './components/Skeleton'
 
 const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m => ({ default: m.ExportPanel })))
 const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
+const DocumentHealthPanel = React.lazy(() => import('./components/DocumentHealthPanel').then(m => ({ default: m.DocumentHealthPanel })))
+const ImageInventoryPanel = React.lazy(() => import('./components/ImageInventoryPanel').then(m => ({ default: m.ImageInventoryPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
@@ -64,6 +66,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
+    showDocumentHealth, showImageInventory,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -620,6 +623,22 @@ function AppInner() {
                   📤
                 </button>
                 <button
+                  onClick={() => openPanel('documentHealth')}
+                  className={`${styles.toolbarBtn} ${showDocumentHealth ? styles.toolbarBtnActive : ''}`}
+                  aria-label={t('toolbar.documentHealth')}
+                  data-tooltip={t('toolbar.documentHealthTooltip')}
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={() => openPanel('imageInventory')}
+                  className={`${styles.toolbarBtn} ${showImageInventory ? styles.toolbarBtnActive : ''}`}
+                  aria-label={t('toolbar.imageInventory')}
+                  data-tooltip={t('toolbar.imageInventoryTooltip')}
+                >
+                  ▣
+                </button>
+                <button
                   onClick={() => togglePanel('focusMode')}
                   className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
                   aria-label={t('toolbar.focusMode')} data-tooltip={t('toolbar.focusModeTooltip')}
@@ -816,6 +835,24 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showDocumentHealth && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <DocumentHealthPanel
+                content={activeTab?.content || ''}
+                filePath={activeTab?.filePath}
+                onClose={() => closePanel('documentHealth')}
+              />
+            </Suspense>
+          )}
+          {showImageInventory && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ImageInventoryPanel
+                content={activeTab?.content || ''}
+                filePath={activeTab?.filePath}
+                onClose={() => closePanel('imageInventory')}
+              />
+            </Suspense>
+          )}
           {showGuide && !isRestoringSession && tabs.length === 1 && tabs[0].name === '欢迎使用.md' && (
             <FirstUseGuide
               onComplete={() => {
@@ -978,6 +1015,12 @@ function AppInner() {
               break
             case 'file-info':
               openPanel('fileInfo')
+              break
+            case 'document-health':
+              openPanel('documentHealth')
+              break
+            case 'image-inventory':
+              openPanel('imageInventory')
               break
             default:
               break

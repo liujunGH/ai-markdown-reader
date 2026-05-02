@@ -4,6 +4,7 @@ import path from 'path'
 import fs from 'fs'
 import { createLogger } from './lib/logger'
 import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFileSize } from './lib/ipcGuard'
+import { isExternalUrl } from './lib/externalLinks'
 
 const logger = createLogger('main')
 
@@ -242,6 +243,21 @@ function createWindow(filePath?: string, windowState?: WindowState) {
 
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
     logger.error('Page failed to load', { errorCode, errorDescription })
+  })
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isExternalUrl(url)) {
+      void shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  win.webContents.on('will-navigate', (event, url) => {
+    if (url === win.webContents.getURL()) return
+    event.preventDefault()
+    if (isExternalUrl(url)) {
+      void shell.openExternal(url)
+    }
   })
 
   if (filePath) {

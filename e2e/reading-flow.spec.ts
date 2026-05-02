@@ -100,6 +100,23 @@ test.describe('Reading Flow', () => {
     await expect(marks.first()).toBeVisible()
   })
 
+  test('should expose document health and image inventory from the toolbar', async () => {
+    await mockOpenFileDialog([fixturePath])
+
+    await window.locator('[data-guide="file-opener"]').click()
+    await expect(window.getByRole('heading', { name: 'Sample Document' })).toBeVisible()
+
+    await window.getByRole('button', { name: '文档健康检查' }).click()
+    const healthPanel = window.locator('section[aria-label="文档健康检查"]')
+    await expect(healthPanel).toBeVisible()
+    await healthPanel.getByRole('button', { name: '关闭' }).click()
+    await expect(healthPanel).not.toBeVisible()
+
+    await window.getByRole('button', { name: '图片检查面板' }).click()
+    const imagePanel = window.locator('section[aria-label="图片检查面板"]')
+    await expect(imagePanel).toBeVisible()
+  })
+
   test('should manage tabs', async () => {
     await mockOpenFileDialog([fixturePath, fixturePath2, fixturePath3])
 

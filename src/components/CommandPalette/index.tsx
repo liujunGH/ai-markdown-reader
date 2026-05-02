@@ -35,6 +35,8 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'toggle-split', label: '双栏对比', shortcut: 'Ctrl+\\', category: '视图', icon: '⚡', action: () => {} },
   { id: 'quick-jump', label: '快速跳转', shortcut: 'Ctrl+G', category: '视图', icon: '↗', action: () => {} },
   { id: 'file-info', label: '文件信息', category: '视图', icon: 'ℹ️', action: () => {} },
+  { id: 'document-health', label: '文档健康检查', category: '工具', icon: '✓', action: () => {} },
+  { id: 'image-inventory', label: '图片检查面板', category: '工具', icon: '▣', action: () => {} },
 
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },
@@ -60,6 +62,7 @@ const PINYIN_INITIAL_MAP: Record<string, string> = {
   '快': 'k', '捷': 'j', '键': 'j',
   '帮': 'b', '助': 'z',
   '跳': 't', '转': 'z',
+  '健': 'j', '康': 'k', '检': 'j', '查': 'c', '工': 'g', '具': 'j', '片': 'p', '板': 'b',
   '阅': 'y', '读': 'd', '统': 't', '计': 'j',
   '自': 'z', '定': 'd', '义': 'y',
   '智': 'z', '能': 'n', '手': 's',

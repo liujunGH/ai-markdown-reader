@@ -16,6 +16,8 @@ export type PanelName =
   | 'commandPalette'
   | 'globalSearch'
   | 'quickJump'
+  | 'documentHealth'
+  | 'imageInventory'
 
 interface UIState {
   showOutline: boolean
@@ -32,6 +34,8 @@ interface UIState {
   showCommandPalette: boolean
   showGlobalSearch: boolean
   showQuickJump: boolean
+  showDocumentHealth: boolean
+  showImageInventory: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -68,6 +72,8 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'commandPalette': return { showCommandPalette: value }
     case 'globalSearch': return { showGlobalSearch: value }
     case 'quickJump': return { showQuickJump: value }
+    case 'documentHealth': return { showDocumentHealth: value }
+    case 'imageInventory': return { showImageInventory: value }
     default:
       return {}
   }
@@ -89,6 +95,8 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'commandPalette': return state.showCommandPalette
     case 'globalSearch': return state.showGlobalSearch
     case 'quickJump': return state.showQuickJump
+    case 'documentHealth': return state.showDocumentHealth
+    case 'imageInventory': return state.showImageInventory
     default:
       return false
   }
@@ -111,6 +119,8 @@ export const useUIStore = create<UIStore>()(
       showCommandPalette: false,
       showGlobalSearch: false,
       showQuickJump: false,
+      showDocumentHealth: false,
+      showImageInventory: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -134,6 +144,8 @@ export const useUIStore = create<UIStore>()(
         showFileInfo: false,
         showFilePreview: false,
         showRecent: false,
+        showDocumentHealth: false,
+        showImageInventory: false,
       }),
       setFontSize: (size) => set({ fontSize: size }),
       setSplitView: (enabled, secondaryId = null) => set({ isSplitView: enabled, secondaryTabId: secondaryId }),
