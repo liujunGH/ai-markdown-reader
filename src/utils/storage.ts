@@ -14,6 +14,8 @@ export type ExactStorageKey =
   | 'followSystem'
   | 'autoDark'
   | 'folder-bookmarks'
+  | 'workspaces'
+  | 'reading-history'
 
 export type PatternStorageKey =
   | `scroll-position-${string}`
@@ -22,6 +24,7 @@ export type PatternStorageKey =
   | `code-fold-${string}`
   | `task-checks-${string}`
   | `bookmarks-${string}`
+  | `workspace-session-${string}`
 
 export type StorageKey = ExactStorageKey | PatternStorageKey
 

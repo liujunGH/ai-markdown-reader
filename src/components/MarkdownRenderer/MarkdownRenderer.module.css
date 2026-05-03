@@ -158,6 +158,16 @@
   font-size: 14px;
 }
 
+.renderer :global(.mermaid-empty) {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
 .renderer :global(.copy-button) {
   position: absolute;
   top: 8px;

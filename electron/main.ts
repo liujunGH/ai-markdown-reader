@@ -767,10 +767,15 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 // IPC handlers with timeout and rate limiting
 const DEFAULT_TIMEOUT = 10000 // 10s
+const DIALOG_TIMEOUT = 5 * 60 * 1000 // Users may spend time in native file pickers.
 const fileDialogLimiter = createRateLimiter(5, 1000) // 5 calls per second
 
-function wrapHandler(channel: string, handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any): void {
-  ipcMain.handle(channel, createTimeoutHandler(handler, DEFAULT_TIMEOUT, channel))
+function wrapHandler(
+  channel: string,
+  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any,
+  timeoutMs = DEFAULT_TIMEOUT
+): void {
+  ipcMain.handle(channel, createTimeoutHandler(handler, timeoutMs, channel))
 }
 
 wrapHandler('open-file-dialog', async () => {
@@ -833,7 +838,7 @@ wrapHandler('open-file-dialog', async () => {
     logger.error('open-file-dialog error', { error: String(err) })
     throw err
   }
-})
+}, DIALOG_TIMEOUT)
 
 wrapHandler('open-folder-dialog', async () => {
   if (!fileDialogLimiter()) {
@@ -860,7 +865,7 @@ wrapHandler('open-folder-dialog', async () => {
     logger.error('open-folder-dialog error', { error: String(err) })
     throw err
   }
-})
+}, DIALOG_TIMEOUT)
 
 wrapHandler('read-folder', async (_event, folderPath: string) => {
   if (!isPathSafe(folderPath)) {
@@ -910,6 +915,25 @@ wrapHandler('read-file', async (_event, filePath: string) => {
     }
     const content = fs.readFileSync(filePath, 'utf-8')
     return { success: true, content }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
+wrapHandler('write-file', async (_event, filePath: string, content: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext !== '.md' && ext !== '.markdown') {
+    return { success: false, error: '只能创建 Markdown 文件' }
+  }
+  if (fs.existsSync(filePath)) {
+    return { success: false, error: '文件已存在' }
+  }
+  try {
+    fs.writeFileSync(filePath, content, { encoding: 'utf-8', flag: 'wx' })
+    return { success: true }
   } catch (error) {
     return { success: false, error: String(error) }
   }

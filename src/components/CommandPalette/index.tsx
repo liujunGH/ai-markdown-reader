@@ -37,6 +37,11 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'file-info', label: '文件信息', category: '视图', icon: 'ℹ️', action: () => {} },
   { id: 'document-health', label: '文档健康检查', category: '工具', icon: '✓', action: () => {} },
   { id: 'image-inventory', label: '图片检查面板', category: '工具', icon: '▣', action: () => {} },
+  { id: 'backlinks', label: '反向引用', category: '工具', icon: '↩', action: () => {} },
+  { id: 'markdown-graph', label: '文档图谱', category: '工具', icon: '◎', action: () => {} },
+  { id: 'missing-links', label: '缺失链接', category: '工具', icon: '⊕', action: () => {} },
+  { id: 'workspaces', label: '工作区', category: '工具', icon: '▤', action: () => {} },
+  { id: 'reading-timeline', label: '阅读时间线', category: '工具', icon: '◷', action: () => {} },
 
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },

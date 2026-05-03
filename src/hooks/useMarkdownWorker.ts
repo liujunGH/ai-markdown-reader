@@ -4,14 +4,23 @@ let workerInstance: Worker | null = null
 let messageId = 0
 const pending = new Map<number, (html: string) => void>()
 
+type WorkerResponse = {
+  id: number
+  html: string
+  error?: string
+}
+
 function getWorker(): Worker {
   if (!workerInstance) {
     workerInstance = new Worker(
       new URL('../workers/markdown.worker.ts', import.meta.url),
       { type: 'module' }
     )
-    workerInstance.onmessage = (e: MessageEvent<{ id: number; html: string }>) => {
-      const { id, html } = e.data
+    workerInstance.onmessage = (e: MessageEvent<WorkerResponse>) => {
+      const { id, html, error } = e.data
+      if (error) {
+        console.error('Markdown worker parse error:', error)
+      }
       const resolve = pending.get(id)
       if (resolve) {
         pending.delete(id)

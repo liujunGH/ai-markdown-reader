@@ -1,24 +1,39 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import styles from './GlobalSearch.module.css'
-import { searchInFolder, getIndexedFileCount } from '../../utils/searchIndex'
+import { searchInFolder, getIndexedFileCount, SearchScope, SearchResult, IndexProgress } from '../../utils/searchIndex'
 import { basename } from '../../utils/path'
 
 interface GlobalSearchProps {
   isOpen: boolean
   onClose: () => void
   folderPath: string | null
-  onOpenFile: (filePath: string) => void
+  onOpenFile: (filePath: string, line?: number) => void
+  onReindex?: () => Promise<void> | void
+  isIndexing?: boolean
+  indexProgress?: IndexProgress | null
+  onCancelIndex?: () => void
 }
 
-interface SearchResult {
-  path: string
-  name: string
-  matches: Array<{ line: number; text: string }>
+const SCOPE_LABELS: Record<SearchScope, string> = {
+  all: '全部',
+  filename: '文件名',
+  heading: '标题',
+  content: '正文',
 }
 
-export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: GlobalSearchProps) {
+export function GlobalSearch({
+  isOpen,
+  onClose,
+  folderPath,
+  onOpenFile,
+  onReindex,
+  isIndexing = false,
+  indexProgress,
+  onCancelIndex,
+}: GlobalSearchProps) {
   const [query, setQuery] = useState('')
   const [isRegex, setIsRegex] = useState(false)
+  const [scope, setScope] = useState<SearchScope>('all')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [indexedCount, setIndexedCount] = useState(0)
@@ -31,14 +46,20 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
     return basename(folderPath) || folderPath
   }, [folderPath])
 
+  const refreshIndexedCount = useCallback(() => {
+    if (folderPath) {
+      getIndexedFileCount(folderPath).then(setIndexedCount)
+    } else {
+      setIndexedCount(0)
+    }
+  }, [folderPath])
+
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50)
-      if (folderPath) {
-        getIndexedFileCount(folderPath).then(setIndexedCount)
-      }
+      refreshIndexedCount()
     }
-  }, [isOpen, folderPath])
+  }, [isOpen, refreshIndexedCount])
 
   useEffect(() => {
     if (!isOpen) {
@@ -46,10 +67,11 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
       setResults([])
       setHasSearched(false)
       setIsRegex(false)
+      setScope('all')
     }
   }, [isOpen])
 
-  const performSearch = useCallback(async (searchQuery: string, regex: boolean) => {
+  const performSearch = useCallback(async (searchQuery: string, regex: boolean, nextScope: SearchScope) => {
     if (!folderPath || !searchQuery.trim()) {
       setResults([])
       setHasSearched(false)
@@ -59,7 +81,7 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
     setLoading(true)
     setHasSearched(true)
     try {
-      const searchResults = await searchInFolder(folderPath, searchQuery, regex)
+      const searchResults = await searchInFolder(folderPath, searchQuery, regex, nextScope)
       setResults(searchResults)
     } catch (err) {
       console.error('Search failed:', err)
@@ -74,14 +96,14 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
       clearTimeout(searchTimeoutRef.current)
     }
     searchTimeoutRef.current = setTimeout(() => {
-      performSearch(query, isRegex)
+      performSearch(query, isRegex, scope)
     }, 200)
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current)
       }
     }
-  }, [query, isRegex, performSearch])
+  }, [query, isRegex, scope, performSearch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -90,17 +112,29 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
     }
     if (e.key === 'Enter') {
       const firstResult = results[0]
-      if (firstResult) {
-        onOpenFile(firstResult.path)
+      const firstMatch = firstResult?.matches[0]
+      if (firstResult && firstMatch) {
+        onOpenFile(firstResult.path, firstMatch.line)
         onClose()
       }
       return
     }
   }
 
-  const handleOpenResult = (filePath: string) => {
-    onOpenFile(filePath)
+  const handleOpenResult = (filePath: string, line?: number) => {
+    onOpenFile(filePath, line)
     onClose()
+  }
+
+  const handleReindex = async () => {
+    if (!onReindex) return
+    try {
+      await onReindex()
+      refreshIndexedCount()
+      await performSearch(query, isRegex, scope)
+    } catch (error) {
+      console.error('Reindex failed:', error)
+    }
   }
 
   const highlightMatch = (text: string, searchQuery: string, regex: boolean) => {
@@ -154,6 +188,11 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
   }
 
   const totalMatches = useMemo(() => results.reduce((sum, r) => sum + r.matches.length, 0), [results])
+  const indexStatusText = isIndexing && indexProgress
+    ? `索引中：发现 ${indexProgress.discoveredFiles}，已处理 ${indexProgress.indexedFiles}，跳过 ${indexProgress.skippedFiles}`
+    : loading
+      ? '正在搜索...'
+      : `已索引 ${indexedCount} 个文件`
 
   if (!isOpen) return null
 
@@ -194,9 +233,31 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
             />
             正则表达式
           </label>
+          <div className={styles.scopeFilters} aria-label="搜索范围">
+            {(Object.keys(SCOPE_LABELS) as SearchScope[]).map(item => (
+              <button
+                key={item}
+                type="button"
+                className={scope === item ? styles.activeScope : ''}
+                onClick={() => setScope(item)}
+              >
+                {SCOPE_LABELS[item]}
+              </button>
+            ))}
+          </div>
           <span className={styles.indexStatus}>
-            {loading ? '正在搜索...' : `已索引 ${indexedCount} 个文件`}
+            {indexStatusText}
           </span>
+          {folderPath && onReindex && (
+            <button type="button" className={styles.reindexBtn} onClick={handleReindex} disabled={isIndexing}>
+              重建索引
+            </button>
+          )}
+          {isIndexing && onCancelIndex && (
+            <button type="button" className={styles.reindexBtn} onClick={onCancelIndex}>
+              取消
+            </button>
+          )}
         </div>
 
         <div className={styles.results}>
@@ -217,11 +278,12 @@ export function GlobalSearch({ isOpen, onClose, folderPath, onOpenFile }: Global
                 <button
                   key={idx}
                   className={styles.resultItem}
-                  onClick={() => handleOpenResult(result.path)}
+                  onClick={() => handleOpenResult(result.path, match.line)}
                   title={`${result.name} - 第 ${match.line} 行`}
                 >
-                  <span className={styles.lineNumber}>行 {match.line}:</span>
+                  <span className={styles.lineNumber}>行 {match.line}</span>
                   <span className={styles.matchText}>
+                    <span className={styles.scopeBadge}>{SCOPE_LABELS[match.scope]}</span>
                     {highlightMatch(match.text, query, isRegex)}
                   </span>
                 </button>

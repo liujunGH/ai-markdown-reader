@@ -125,6 +125,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 8px 20px;
   border-bottom: 1px solid var(--border);
 }
@@ -145,6 +146,52 @@
 .indexStatus {
   font-size: 12px;
   color: var(--text-secondary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.reindexBtn {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.reindexBtn:hover {
+  border-color: var(--accent);
+}
+
+.reindexBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.scopeFilters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.scopeFilters button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.scopeFilters .activeScope {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
 }
 
 .results {
@@ -240,8 +287,20 @@
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.5;
   flex: 1;
+}
+
+.scopeBadge {
+  display: inline-flex;
+  margin-right: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
 }
 
 .highlight {

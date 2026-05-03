@@ -266,7 +266,7 @@ export const useTabStore = create<TabStore>()(
       openRecentFile: async (file) => {
         if (!window.electronAPI) return false
         const result = await window.electronAPI.readFile(file.filePath)
-        if (result.success && result.content) {
+        if (result.success && result.content !== undefined) {
           const content = result.content
           set(produce(state => {
             const existingTab = state.tabs.find((t: Tab) => t.filePath === file.filePath && !t.isModified)
@@ -350,7 +350,7 @@ export const useTabStore = create<TabStore>()(
           tabs: restoredTabs,
           activeTabId: restoredActiveTabId,
           isRestoringSession: false,
-          failedRestores: [],
+          failedRestores,
         })
 
         persistSessionSnapshot(restoredTabs, restoredActiveTabId)

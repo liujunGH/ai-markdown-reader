@@ -19,7 +19,7 @@ interface Props {
   searchRegex?: boolean
   currentMatch?: number
   matchCount?: number
-  onWikiLinkClick?: (target: string) => void
+  onWikiLinkClick?: (target: string, altTarget?: string) => void
 }
 
 function simpleHash(str: string): string {
@@ -210,8 +210,9 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         'href', 'title', 'target', 'rel',
         'src', 'alt', 'width', 'height',
         'class', 'id',
-        'data-content', 'data-code', 'data-lines', 'data-code-hash',
+        'data-content', 'data-code', 'data-lines', 'data-code-hash', 'data-alt-target',
       ],
+      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|wikilink):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     })
   }, [workerHtml, content])
 
@@ -227,6 +228,13 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     mermaidEls.forEach(async (el) => {
       const code = decodeURIComponent(el.getAttribute('data-code') || '')
       const wrapper = el.parentElement
+      if (!code.trim()) {
+        if (wrapper) {
+          wrapper.setAttribute('data-mermaid-rendered', 'empty')
+          wrapper.innerHTML = '<div class="mermaid-empty">空 Mermaid 图表</div>'
+        }
+        return
+      }
       try {
         wrapper?.setAttribute('data-mermaid-rendered', 'pending')
         const id = createMermaidRenderId()
@@ -257,6 +265,11 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       const codeAttr = wrapper.getAttribute('data-mermaid-code')
       if (!codeAttr) return
       const code = decodeURIComponent(codeAttr)
+      if (!code.trim()) {
+        wrapper.setAttribute('data-mermaid-rendered', 'empty')
+        wrapper.innerHTML = '<div class="mermaid-empty">空 Mermaid 图表</div>'
+        return
+      }
       try {
         wrapper.setAttribute('data-mermaid-rendered', 'pending')
         const id = createMermaidRenderId()
@@ -359,8 +372,13 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       wrapper.className = 'mermaid-wrapper'
       wrapper.id = `mermaid-${index}`
       wrapper.setAttribute('data-mermaid-code', encodeURIComponent(code))
-      wrapper.setAttribute('data-mermaid-rendered', 'pending')
-      wrapper.innerHTML = `<div class="mermaid" data-code="${encodeURIComponent(code)}"></div>`
+      if (code.trim()) {
+        wrapper.setAttribute('data-mermaid-rendered', 'pending')
+        wrapper.innerHTML = `<div class="mermaid" data-code="${encodeURIComponent(code)}"></div>`
+      } else {
+        wrapper.setAttribute('data-mermaid-rendered', 'empty')
+        wrapper.innerHTML = '<div class="mermaid-empty">空 Mermaid 图表</div>'
+      }
       el.parentNode?.replaceChild(wrapper, el)
     })
 
@@ -543,10 +561,16 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         const href = link.getAttribute('href')
         if (!href) return
         const target = decodeURIComponent(href.replace('wikilink://', ''))
+        const altTargetAttr = link.getAttribute('data-alt-target')
+        const altTarget = altTargetAttr ? decodeURIComponent(altTargetAttr) : undefined
         if (onWikiLinkClick) {
-          onWikiLinkClick(target)
+          if (altTarget) {
+            onWikiLinkClick(target, altTarget)
+          } else {
+            onWikiLinkClick(target)
+          }
         } else {
-          window.dispatchEvent(new CustomEvent('wikilink-click', { detail: { target } }))
+          window.dispatchEvent(new CustomEvent('wikilink-click', { detail: { target, altTarget } }))
         }
       })
     })

@@ -26,6 +26,7 @@ export interface ElectronAPI {
   openFolderDialog: () => Promise<string | null>
   readFolder: (folderPath: string) => Promise<{ success: boolean; files?: FolderFile[]; error?: string }>
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+  writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   readImageAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>
   getFileInfo: (filePath: string) => Promise<{
     success: boolean

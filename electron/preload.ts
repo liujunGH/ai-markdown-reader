@@ -85,6 +85,7 @@ ipcRenderer.on('update-error', (_event, info: { error: string }) => {
 })
 
 const DEFAULT_RENDERER_TIMEOUT = 10000
+const DIALOG_RENDERER_TIMEOUT = 5 * 60 * 1000
 
 function makeCallKey(channel: string, args: unknown[]): string {
   try {
@@ -132,10 +133,11 @@ function createIPCCall<T extends (...args: any[]) => Promise<any>>(
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  openFileDialog: createIPCCall<() => Promise<{ filePath: string; content: string; error?: string } | null>>('open-file-dialog', { dedup: true }),
-  openFolderDialog: createIPCCall<() => Promise<string | null>>('open-folder-dialog', { dedup: true }),
+  openFileDialog: createIPCCall<() => Promise<{ filePath: string; content: string; error?: string } | null>>('open-file-dialog', { dedup: true, timeout: DIALOG_RENDERER_TIMEOUT }),
+  openFolderDialog: createIPCCall<() => Promise<string | null>>('open-folder-dialog', { dedup: true, timeout: DIALOG_RENDERER_TIMEOUT }),
   readFolder: createIPCCall<(folderPath: string) => Promise<{ success: boolean; files?: { name: string; filePath: string; size?: number; lastModified?: number; isDirectory?: boolean }[]; error?: string }>>('read-folder'),
   readFile: createIPCCall<(filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>>('read-file'),
+  writeFile: createIPCCall<(filePath: string, content: string) => Promise<{ success: boolean; error?: string }>>('write-file'),
   readImageAsDataUrl: createIPCCall<(filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>>('read-image-as-data-url', { dedup: true }),
   getFileInfo: createIPCCall<(filePath: string) => Promise<{ success: boolean; info?: { name: string; size: number; lastModified: number; created: number }; error?: string }>>('get-file-info'),
   showInFolder: createIPCCall<(filePath: string) => Promise<void>>('show-in-folder'),

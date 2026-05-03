@@ -48,15 +48,45 @@ const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m =
 const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
 const DocumentHealthPanel = React.lazy(() => import('./components/DocumentHealthPanel').then(m => ({ default: m.DocumentHealthPanel })))
 const ImageInventoryPanel = React.lazy(() => import('./components/ImageInventoryPanel').then(m => ({ default: m.ImageInventoryPanel })))
+const BacklinksPanel = React.lazy(() => import('./components/BacklinksPanel').then(m => ({ default: m.BacklinksPanel })))
+const MarkdownGraphPanel = React.lazy(() => import('./components/MarkdownGraphPanel').then(m => ({ default: m.MarkdownGraphPanel })))
+const MissingLinksPanel = React.lazy(() => import('./components/MissingLinksPanel').then(m => ({ default: m.MissingLinksPanel })))
+const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
+const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFiles, FileIndex, IndexProgress } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
+import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
+import { getWorkspaceSession, getWorkspaces, saveWorkspace, saveWorkspaceSession, removeWorkspace, Workspace } from './utils/workspaces'
+import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
+const MAX_INDEX_FILE_SIZE = 50 * 1024 * 1024
+
+function wikiPathCandidates(dir: string, target: string): string[] {
+  const trimmed = target.trim()
+  if (!trimmed) return []
+  const withoutAnchor = trimmed.split('#')[0]
+  if (!withoutAnchor) return []
+  const withoutExtension = withoutAnchor.replace(/\.(md|markdown)$/i, '')
+  return [
+    join(dir, withoutAnchor),
+    join(dir, `${withoutAnchor}.md`),
+    join(dir, `${withoutExtension}.md`),
+    join(dir, `${withoutExtension}.markdown`),
+  ]
+}
+
+function markdownFileNameForTarget(target: string): string {
+  const withoutAnchor = target.trim().split('#')[0].replace(/^\.?\//, '')
+  if (!withoutAnchor) return 'Untitled.md'
+  if (/\.(md|markdown)$/i.test(withoutAnchor)) return withoutAnchor
+  return `${withoutAnchor}.md`
+}
 
 function AppInner() {
   const { t } = useTranslation()
@@ -67,7 +97,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showImageInventory,
+    showDocumentHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showWorkspaces, showReadingTimeline,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -104,6 +134,13 @@ function AppInner() {
     }
   })
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [indexedFiles, setIndexedFiles] = useState<FileIndex[]>([])
+  const [isIndexing, setIsIndexing] = useState(false)
+  const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
+  const hasRestoredLastFolderRef = useRef(false)
+  const indexAbortControllerRef = useRef<AbortController | null>(null)
 
   // ── Hooks ──
   const scrollHistory = useScrollHistory()
@@ -112,6 +149,11 @@ function AppInner() {
 
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
   const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
+  const wikiGraph = useMemo(() => buildWikiGraph(indexedFiles), [indexedFiles])
+  const backlinks = useMemo(() => (
+    activeTab?.filePath ? findBacklinks(indexedFiles, activeTab.filePath, activeTab.name) : []
+  ), [activeTab?.filePath, activeTab?.name, indexedFiles])
+  const missingLinks = useMemo(() => findMissingWikiLinks(indexedFiles), [indexedFiles])
 
   // ── Effects ──
 
@@ -125,6 +167,96 @@ function AppInner() {
     showToast('新增工具：文档健康检查、图片检查面板，外部链接会用系统浏览器打开')
     setStorageItem(HAS_SEEN_INSPECTION_TOOLS_KEY, 'true')
   }, [showToast])
+
+  const refreshIndexedFiles = useCallback(async (folderPath: string | null) => {
+    if (!folderPath) {
+      setIndexedFiles([])
+      return
+    }
+    try {
+      setIndexedFiles(await getIndexedFiles(folderPath))
+    } catch (error) {
+      console.error('Failed to load indexed files:', error)
+      setIndexedFiles([])
+    }
+  }, [])
+
+  const rebuildFolderIndex = useCallback(async (
+    folderPath = currentFolderPath,
+    options: { silent?: boolean } = {}
+  ) => {
+    if (!folderPath) {
+      if (!options.silent) {
+        showToast('请先打开一个文件夹', 'error')
+      }
+      return
+    }
+    indexAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    indexAbortControllerRef.current = controller
+    setIsIndexing(true)
+    setIndexProgress({
+      phase: 'scanning',
+      discoveredFiles: 0,
+      indexedFiles: 0,
+      skippedFiles: 0,
+      currentPath: folderPath,
+    })
+    try {
+      const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
+      const allFiles = await getAllMarkdownFiles(folderPath, {
+        signal: controller.signal,
+        onProgress: handleProgress,
+        maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
+      })
+      await indexFolder(folderPath, allFiles, {
+        signal: controller.signal,
+        onProgress: handleProgress,
+      })
+      await refreshIndexedFiles(folderPath)
+      if (!options.silent) {
+        showToast(`索引已更新：${allFiles.length} 个 Markdown 文件`)
+      }
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setIndexProgress(prev => ({
+          phase: 'cancelled',
+          discoveredFiles: prev?.discoveredFiles ?? 0,
+          indexedFiles: prev?.indexedFiles ?? 0,
+          skippedFiles: prev?.skippedFiles ?? 0,
+          currentPath: prev?.currentPath,
+        }))
+        if (!options.silent) {
+          showToast('索引已取消')
+        }
+        return
+      }
+      console.error('Failed to rebuild index:', error)
+      if (!options.silent) {
+        showToast(`索引失败：${String(error)}`, 'error')
+      }
+      throw error
+    } finally {
+      if (indexAbortControllerRef.current === controller) {
+        indexAbortControllerRef.current = null
+      }
+      setIsIndexing(false)
+    }
+  }, [currentFolderPath, refreshIndexedFiles, showToast])
+
+  const cancelFolderIndex = useCallback(() => {
+    indexAbortControllerRef.current?.abort()
+  }, [])
+
+  const scheduleFolderIndex = useCallback((folderPath: string) => {
+    void rebuildFolderIndex(folderPath, { silent: true }).catch(error => {
+      console.error('Background folder indexing failed:', error)
+    })
+  }, [rebuildFolderIndex])
+
+  useEffect(() => {
+    void refreshIndexedFiles(currentFolderPath)
+  }, [currentFolderPath, refreshIndexedFiles])
 
   // Sync file settings to global UI state
   useEffect(() => {
@@ -197,6 +329,20 @@ function AppInner() {
     })
   }, [openFile, loadRecentFiles, setFileInfo])
 
+  const openFileAtLine = useCallback(async (filePath: string, line?: number) => {
+    if (!window.electronAPI) return
+    const result = await window.electronAPI.readFile(filePath)
+    if (result.success && result.content !== undefined) {
+      handleFileOpen(result.content, basename(filePath) || filePath, filePath)
+      if (line) {
+        setShowSource(true)
+        window.setTimeout(() => setHighlightedLine(line), 0)
+      }
+    } else {
+      showToast(result.error || t('app.readFileFailed'), 'error')
+    }
+  }, [handleFileOpen, setHighlightedLine, setShowSource, showToast, t])
+
   // Recent file select handler
   const handleRecentSelect = useCallback(async (file: RecentFile) => {
     const opened = await openRecentFile(file)
@@ -207,6 +353,86 @@ function AppInner() {
       showToast(t('app.recentFileRemoved'), 'error')
     }
   }, [openRecentFile, loadRecentFiles, closePanel, showToast, t])
+
+  const saveCurrentWorkspaceSession = useCallback(() => {
+    if (!currentFolderPath) return
+    const workspace = saveWorkspace(currentFolderName || basename(currentFolderPath) || currentFolderPath, currentFolderPath)
+    saveWorkspaceSession(workspace.id, {
+      tabs: tabs
+        .filter(tab => !tab.filePath || tab.filePath.startsWith(currentFolderPath))
+        .map(tab => ({
+          name: tab.name,
+          filePath: tab.filePath,
+          content: tab.filePath ? undefined : tab.content,
+          isPinned: tab.isPinned,
+        })),
+      activeFilePath: activeTab?.filePath,
+      updatedAt: Date.now(),
+    })
+    setWorkspaces(getWorkspaces())
+  }, [activeTab?.filePath, currentFolderName, currentFolderPath, tabs])
+
+  const handleOpenWorkspace = useCallback(async (folderPath: string) => {
+    if (!window.electronAPI) return
+    saveCurrentWorkspaceSession()
+    const result = await window.electronAPI.readFolder(folderPath)
+    if (!result.success || !result.files) {
+      showToast(result.error || t('app.readFolderFailed'), 'error')
+      return
+    }
+    setFolder(folderPath, basename(folderPath) || folderPath)
+    await window.electronAPI.setLastFolder(folderPath)
+    openPanel('fileSidebar')
+    closePanel('workspaces')
+    scheduleFolderIndex(folderPath)
+
+    const workspace = getWorkspaces().find(item => item.folderPath === folderPath)
+    const session = workspace ? getWorkspaceSession(workspace.id) : null
+    const sessionTabs = session?.tabs.filter(tab => tab.filePath) || []
+    if (sessionTabs.length > 0) {
+      closeAllTabs()
+      const inactiveTabs = sessionTabs.filter(tab => tab.filePath !== session?.activeFilePath)
+      const activeSessionTab = sessionTabs.find(tab => tab.filePath === session?.activeFilePath) || sessionTabs[0]
+      for (const tab of [...inactiveTabs, activeSessionTab]) {
+        if (tab.filePath) await openFileAtLine(tab.filePath)
+      }
+    } else {
+      const firstFile = result.files.find(file => !file.isDirectory)
+      if (firstFile) {
+        await openFileAtLine(firstFile.filePath)
+      }
+    }
+  }, [closeAllTabs, closePanel, openFileAtLine, openPanel, saveCurrentWorkspaceSession, scheduleFolderIndex, setFolder, showToast, t])
+
+  const handleSaveWorkspace = useCallback(() => {
+    if (!currentFolderPath) return
+    saveCurrentWorkspaceSession()
+    showToast('工作区已保存')
+  }, [currentFolderPath, saveCurrentWorkspaceSession, showToast])
+
+  const handleRemoveWorkspace = useCallback((id: string) => {
+    removeWorkspace(id)
+    setWorkspaces(getWorkspaces())
+  }, [])
+
+  const handleCreateMissingLink = useCallback(async (target: string) => {
+    if (!window.electronAPI || !currentFolderPath) {
+      showToast('请先打开一个文件夹', 'error')
+      return
+    }
+    const relativeName = markdownFileNameForTarget(target)
+    const filePath = join(currentFolderPath, relativeName)
+    const title = basename(relativeName).replace(/\.(md|markdown)$/i, '') || target
+    const result = await window.electronAPI.writeFile(filePath, `# ${title}\n\n`)
+    if (!result.success) {
+      showToast(result.error || '创建文档失败', 'error')
+      return
+    }
+    await openFileAtLine(filePath)
+    scheduleFolderIndex(currentFolderPath)
+    closePanel('missingLinks')
+    showToast(`已创建 ${basename(filePath)}`)
+  }, [closePanel, currentFolderPath, openFileAtLine, scheduleFolderIndex, showToast])
 
   // Open folder
   const handleOpenFolder = useCallback(async () => {
@@ -229,18 +455,12 @@ function AppInner() {
         return
       }
       const fileResult = await window.electronAPI.readFile(firstFile.filePath)
-      if (fileResult.success && fileResult.content) {
+      if (fileResult.success && fileResult.content !== undefined) {
         handleFileOpen(fileResult.content, firstFile.name, firstFile.filePath)
         setFolder(folderPath, basename(folderPath) || folderPath)
         await window.electronAPI.setLastFolder(folderPath)
         openPanel('fileSidebar')
-        try {
-          const allFiles = await getAllMarkdownFiles(folderPath)
-          await indexFolder(folderPath, allFiles)
-
-        } catch (err) {
-          console.error('Failed to index folder:', err)
-        }
+        scheduleFolderIndex(folderPath)
       } else {
         showToast(fileResult.error || t('app.readFileFailed'), 'error')
       }
@@ -248,7 +468,34 @@ function AppInner() {
       console.error('[handleOpenFolder] error:', err)
       showToast(t('app.openFolderFailedWithError', { error: String(err) }), 'error')
     }
-  }, [handleFileOpen, setFolder, openPanel, showToast])
+  }, [handleFileOpen, setFolder, openPanel, scheduleFolderIndex, showToast, t])
+
+  useEffect(() => {
+    if (!window.electronAPI || isRestoringSession || hasRestoredLastFolderRef.current) return
+    hasRestoredLastFolderRef.current = true
+
+    const restoreLastFolder = async () => {
+      const folderPath = await window.electronAPI?.getLastFolder()
+      if (!folderPath) return
+
+      const result = await window.electronAPI?.readFolder(folderPath)
+      if (!result?.success || !result.files || result.files.length === 0) return
+
+      setFolder(folderPath, basename(folderPath) || folderPath)
+      openPanel('fileSidebar')
+      scheduleFolderIndex(folderPath)
+
+      const hasRestoredFile = tabs.some(tab => tab.filePath?.startsWith(folderPath))
+      if (!hasRestoredFile) {
+        const firstFile = result.files.find(file => !file.isDirectory)
+        if (firstFile) {
+          await openFileAtLine(firstFile.filePath)
+        }
+      }
+    }
+
+    void restoreLastFolder()
+  }, [isRestoringSession, openFileAtLine, openPanel, scheduleFolderIndex, setFolder, tabs])
 
   // Folder file select
   const handleFolderFileSelect = useCallback((fileContent: string, fileName: string, filePath: string) => {
@@ -263,15 +510,10 @@ function AppInner() {
   }, [closePanel, clearFolder])
 
   // Global search open file
-  const handleGlobalSearchOpenFile = useCallback(async (filePath: string) => {
-    if (!window.electronAPI) return
-    const result = await window.electronAPI.readFile(filePath)
-    if (result.success && result.content !== undefined) {
-      const name = basename(filePath) || t('app.unknownFile')
-      handleFileOpen(result.content, name, filePath)
-      setCurrentFilePath(filePath)
-    }
-  }, [handleFileOpen, setCurrentFilePath])
+  const handleGlobalSearchOpenFile = useCallback(async (filePath: string, line?: number) => {
+    await openFileAtLine(filePath, line)
+    setCurrentFilePath(filePath)
+  }, [openFileAtLine, setCurrentFilePath])
 
   // Outline click
   const handleOutlineClick = useCallback((id: string) => {
@@ -292,17 +534,21 @@ function AppInner() {
   }, [closePanel, setHighlightedLine, setShowSource])
 
   // Wiki link click
-  const handleWikiLinkClick = useCallback(async (target: string) => {
+  const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
     if (!activeTab?.filePath || !window.electronAPI) {
       showToast(t('app.wikiLinkNoPath'), 'error')
       return
     }
+    const indexedMatch = resolveWikiTargetFile(indexedFiles, target, altTarget)
+    if (indexedMatch) {
+      await openFileAtLine(indexedMatch.path)
+      return
+    }
     const dir = dirname(activeTab.filePath)
     const candidates = [
-      join(dir, target),
-      join(dir, target + '.md'),
-      join(dir, target.replace(/\.md$/i, '') + '.md'),
-    ]
+      ...wikiPathCandidates(dir, target),
+      ...(altTarget ? wikiPathCandidates(dir, altTarget) : []),
+    ].filter((filePath, index, list) => list.indexOf(filePath) === index)
     for (const filePath of candidates) {
       const result = await window.electronAPI.readFile(filePath)
       if (result.success && result.content !== undefined) {
@@ -312,7 +558,7 @@ function AppInner() {
       }
     }
     showToast(t('app.fileNotFound', { name: target }), 'error')
-  }, [activeTab?.filePath, handleFileOpen, showToast])
+  }, [activeTab?.filePath, handleFileOpen, indexedFiles, openFileAtLine, showToast, t])
 
   // Toggle split view
   const toggleSplitView = useCallback(() => {
@@ -420,33 +666,7 @@ function AppInner() {
     if (!window.electronAPI) return
     const listener = async (folderPath: string) => {
       try {
-        const result = await window.electronAPI!.readFolder(folderPath)
-        if (!result.success || !result.files || result.files.length === 0) {
-          if (!result.success) {
-            showToast(result.error || t('app.readFolderFailed'), 'error')
-          }
-          return
-        }
-        const firstFile = result.files.find(f => !f.isDirectory)
-        if (!firstFile) {
-          showToast(t('app.noMarkdownFiles'), 'error')
-          return
-        }
-        const fileResult = await window.electronAPI!.readFile(firstFile.filePath)
-        if (fileResult.success && fileResult.content) {
-          handleFileOpenRef.current(fileResult.content, firstFile.name, firstFile.filePath)
-          setFolder(folderPath, basename(folderPath) || folderPath)
-          await window.electronAPI!.setLastFolder(folderPath)
-          openPanel('fileSidebar')
-          try {
-            const allFiles = await getAllMarkdownFiles(folderPath)
-            await indexFolder(folderPath, allFiles)
-          } catch (err) {
-            console.error('Failed to index folder:', err)
-          }
-        } else {
-          showToast(fileResult.error || t('app.readFileFailed'), 'error')
-        }
+        await handleOpenWorkspace(folderPath)
       } catch {
         showToast(t('app.openFolderFailed'), 'error')
       }
@@ -455,7 +675,7 @@ function AppInner() {
     return () => {
       window.electronAPI!.offOpenFolder(listener)
     }
-  }, [showToast, setFolder, openPanel])
+  }, [handleOpenWorkspace, showToast, t])
 
   // Focus mode body class
   useEffect(() => {
@@ -512,6 +732,37 @@ function AppInner() {
       if (scrollTimeout) clearTimeout(scrollTimeout)
     }
   }, [activeTabId, tabs, isRestoringSession])
+
+  useEffect(() => {
+    const main = mainRef.current
+    if (!main || !activeTab?.filePath || isRestoringSession) return
+    let timeout: ReturnType<typeof setTimeout> | null = null
+
+    const record = () => {
+      const maxScroll = Math.max(1, main.scrollHeight - main.clientHeight)
+      const progress = Math.min(1, Math.max(0, main.scrollTop / maxScroll))
+      const lineCount = activeTab.content.split('\n').length
+      recordReadingHistory({
+        filePath: activeTab.filePath || '',
+        name: activeTab.name,
+        progress,
+        line: Math.max(1, Math.round(progress * lineCount)),
+      })
+      setReadingHistory(getReadingHistory())
+    }
+
+    const onScroll = () => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(record, 500)
+    }
+
+    main.addEventListener('scroll', onScroll)
+    record()
+    return () => {
+      if (timeout) clearTimeout(timeout)
+      main.removeEventListener('scroll', onScroll)
+    }
+  }, [activeTab?.content, activeTab?.filePath, activeTab?.name, isRestoringSession])
 
   // Keyboard shortcuts
   useKeyboardShortcuts(
@@ -669,6 +920,61 @@ function AppInner() {
                       >
                         <span>▣</span>
                         {t('toolbar.imageInventory')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('backlinks')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>↩</span>
+                        {t('toolbar.backlinks')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('markdownGraph')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>◎</span>
+                        {t('toolbar.markdownGraph')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('missingLinks')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>⊕</span>
+                        {t('toolbar.missingLinks')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('workspaces')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>▤</span>
+                        {t('toolbar.workspaces')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('readingTimeline')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>◷</span>
+                        {t('toolbar.readingTimeline')}
                       </button>
                     </div>
                   )}
@@ -889,6 +1195,63 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showBacklinks && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <BacklinksPanel
+                backlinks={backlinks}
+                filePath={activeTab?.filePath}
+                onOpenFile={openFileAtLine}
+                onClose={() => closePanel('backlinks')}
+              />
+            </Suspense>
+          )}
+          {showMarkdownGraph && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <MarkdownGraphPanel
+                graph={wikiGraph}
+                folderPath={currentFolderPath || undefined}
+                onOpenFile={openFileAtLine}
+                onReindex={() => rebuildFolderIndex()}
+                isIndexing={isIndexing}
+                indexProgress={indexProgress}
+                onCancelIndex={cancelFolderIndex}
+                onClose={() => closePanel('markdownGraph')}
+              />
+            </Suspense>
+          )}
+          {showMissingLinks && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <MissingLinksPanel
+                links={missingLinks}
+                folderPath={currentFolderPath || undefined}
+                onCreateFile={handleCreateMissingLink}
+                onOpenSource={openFileAtLine}
+                onClose={() => closePanel('missingLinks')}
+              />
+            </Suspense>
+          )}
+          {showWorkspaces && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <WorkspacePanel
+                workspaces={workspaces}
+                currentFolderPath={currentFolderPath}
+                currentFolderName={currentFolderName}
+                onSaveCurrent={handleSaveWorkspace}
+                onOpenWorkspace={handleOpenWorkspace}
+                onRemoveWorkspace={handleRemoveWorkspace}
+                onClose={() => closePanel('workspaces')}
+              />
+            </Suspense>
+          )}
+          {showReadingTimeline && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ReadingTimelinePanel
+                items={readingHistory}
+                onOpenFile={openFileAtLine}
+                onClose={() => closePanel('readingTimeline')}
+              />
+            </Suspense>
+          )}
           {showGuide && !isRestoringSession && tabs.length === 1 && tabs[0].name === '欢迎使用.md' && (
             <FirstUseGuide
               onComplete={() => {
@@ -926,6 +1289,10 @@ function AppInner() {
                 onClose={() => closePanel('globalSearch')}
                 folderPath={currentFolderPath}
                 onOpenFile={handleGlobalSearchOpenFile}
+                onReindex={() => rebuildFolderIndex()}
+                isIndexing={isIndexing}
+                indexProgress={indexProgress}
+                onCancelIndex={cancelFolderIndex}
               />
             </Suspense>
           )}
@@ -1057,6 +1424,24 @@ function AppInner() {
               break
             case 'image-inventory':
               openPanel('imageInventory')
+              break
+            case 'global-search':
+              openPanel('globalSearch')
+              break
+            case 'backlinks':
+              openPanel('backlinks')
+              break
+            case 'markdown-graph':
+              openPanel('markdownGraph')
+              break
+            case 'missing-links':
+              openPanel('missingLinks')
+              break
+            case 'workspaces':
+              openPanel('workspaces')
+              break
+            case 'reading-timeline':
+              openPanel('readingTimeline')
               break
             default:
               break

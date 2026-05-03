@@ -8,6 +8,9 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  worker: {
+    format: 'es',
+  },
   build: {
     // Mermaid is loaded with dynamic import in the renderer. Advanced diagram
     // layouts can pull in ELK as a large async chunk, so keep the warning limit

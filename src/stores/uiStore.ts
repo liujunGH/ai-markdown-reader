@@ -18,6 +18,11 @@ export type PanelName =
   | 'quickJump'
   | 'documentHealth'
   | 'imageInventory'
+  | 'backlinks'
+  | 'markdownGraph'
+  | 'missingLinks'
+  | 'workspaces'
+  | 'readingTimeline'
 
 interface UIState {
   showOutline: boolean
@@ -36,6 +41,11 @@ interface UIState {
   showQuickJump: boolean
   showDocumentHealth: boolean
   showImageInventory: boolean
+  showBacklinks: boolean
+  showMarkdownGraph: boolean
+  showMissingLinks: boolean
+  showWorkspaces: boolean
+  showReadingTimeline: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -74,6 +84,11 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'quickJump': return { showQuickJump: value }
     case 'documentHealth': return { showDocumentHealth: value }
     case 'imageInventory': return { showImageInventory: value }
+    case 'backlinks': return { showBacklinks: value }
+    case 'markdownGraph': return { showMarkdownGraph: value }
+    case 'missingLinks': return { showMissingLinks: value }
+    case 'workspaces': return { showWorkspaces: value }
+    case 'readingTimeline': return { showReadingTimeline: value }
     default:
       return {}
   }
@@ -97,6 +112,11 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'quickJump': return state.showQuickJump
     case 'documentHealth': return state.showDocumentHealth
     case 'imageInventory': return state.showImageInventory
+    case 'backlinks': return state.showBacklinks
+    case 'markdownGraph': return state.showMarkdownGraph
+    case 'missingLinks': return state.showMissingLinks
+    case 'workspaces': return state.showWorkspaces
+    case 'readingTimeline': return state.showReadingTimeline
     default:
       return false
   }
@@ -121,6 +141,11 @@ export const useUIStore = create<UIStore>()(
       showQuickJump: false,
       showDocumentHealth: false,
       showImageInventory: false,
+      showBacklinks: false,
+      showMarkdownGraph: false,
+      showMissingLinks: false,
+      showWorkspaces: false,
+      showReadingTimeline: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -146,6 +171,11 @@ export const useUIStore = create<UIStore>()(
         showRecent: false,
         showDocumentHealth: false,
         showImageInventory: false,
+        showBacklinks: false,
+        showMarkdownGraph: false,
+        showMissingLinks: false,
+        showWorkspaces: false,
+        showReadingTimeline: false,
       }),
       setFontSize: (size) => set({ fontSize: size }),
       setSplitView: (enabled, secondaryId = null) => set({ isSplitView: enabled, secondaryTabId: secondaryId }),

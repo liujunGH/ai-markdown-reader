@@ -185,6 +185,21 @@ describe('MarkdownRenderer', () => {
     expect(container).toHaveTextContent('Outro')
   })
 
+  it('shows empty Mermaid blocks without calling Mermaid render', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={"Before\n\n```mermaid\n\n```\n\nAfter"} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.mermaid-empty')).toHaveTextContent('空 Mermaid 图表')
+    })
+
+    expect(mermaidMock.render).not.toHaveBeenCalled()
+    expect(container.querySelector('.mermaid-error')).not.toBeInTheDocument()
+    expect(container).toHaveTextContent('Before')
+    expect(container).toHaveTextContent('After')
+  })
+
   it('isolates Mermaid render failures from the rest of the document', async () => {
     mermaidMock.render.mockRejectedValueOnce(new Error('diagram exploded'))
 
@@ -266,7 +281,7 @@ describe('MarkdownRenderer', () => {
 
   it('renders wiki links as links', async () => {
     const { container } = render(
-      <MarkdownRenderer content="[[AnotherFile]] and [[Display|AnotherFile]]" />
+      <MarkdownRenderer content="[[AnotherFile]] and [[AnotherFile|Display]]" />
     )
 
     await waitFor(() => {
@@ -277,8 +292,9 @@ describe('MarkdownRenderer', () => {
     const links = container.querySelectorAll('a.wikilink')
     expect(links[0]).toHaveAttribute('href', 'wikilink://AnotherFile')
     expect(links[0]).toHaveTextContent('AnotherFile')
-    expect(links[1]).toHaveAttribute('href', 'wikilink://Display')
-    expect(links[1]).toHaveTextContent('AnotherFile')
+    expect(links[1]).toHaveAttribute('href', 'wikilink://AnotherFile')
+    expect(links[1]).toHaveAttribute('data-alt-target', 'Display')
+    expect(links[1]).toHaveTextContent('Display')
   })
 
   it('renders task lists as checkboxes', async () => {

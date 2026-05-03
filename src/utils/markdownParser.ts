@@ -107,12 +107,13 @@ md.use(texmath, {
 md.use(full)
 
 function postProcessHtml(rawHtml: string): string {
-  // WikiLink: [[filename]] 或 [[display|filename]]
+  // WikiLink: [[filename]] 或 [[filename|display]]
   rawHtml = rawHtml.replace(
     /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
     (_match, target, display) => {
       const text = display || target
-      return `<a href="wikilink://${encodeURIComponent(target)}" class="wikilink">${escapeHtml(text)}</a>`
+      const altTarget = display ? ` data-alt-target="${encodeURIComponent(display)}"` : ''
+      return `<a href="wikilink://${encodeURIComponent(target)}" class="wikilink"${altTarget}>${escapeHtml(text)}</a>`
     }
   )
   return DOMPurify.sanitize(rawHtml, {
@@ -131,8 +132,9 @@ function postProcessHtml(rawHtml: string): string {
       'href', 'title', 'target', 'rel',
       'src', 'alt', 'width', 'height',
       'class', 'id',
-      'data-content', 'data-code', 'data-lines', 'data-code-hash',
+      'data-content', 'data-code', 'data-lines', 'data-code-hash', 'data-alt-target',
     ],
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|wikilink):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   })
 }
 

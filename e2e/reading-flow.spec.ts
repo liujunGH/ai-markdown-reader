@@ -11,6 +11,8 @@ test.describe('Reading Flow', () => {
   let fixturePath3: string
   let inspectionPath: string
   let smokeTestPath: string
+  let wikiFolderPath: string
+  let userDataDir: string
 
   test.beforeAll(() => {
     const tmpDir = os.tmpdir()
@@ -19,6 +21,7 @@ test.describe('Reading Flow', () => {
     fixturePath3 = path.join(tmpDir, 'ai-markdown-reader-sample3.md')
     inspectionPath = path.join(tmpDir, 'ai-markdown-reader-inspection.md')
     smokeTestPath = path.join(__dirname, '../examples/smoke-test.md')
+    wikiFolderPath = path.join(tmpDir, 'ai-markdown-reader-wiki-fixture')
 
     fs.writeFileSync(fixturePath, fs.readFileSync(path.join(__dirname, 'fixtures/sample.md'), 'utf-8'))
     fs.writeFileSync(fixturePath2, '# Second Document\n\nThis is the second test document.\n\n## Section A\n\nContent for section A.\n\n## Section B\n\nContent for section B.\n')
@@ -31,10 +34,22 @@ test.describe('Reading Flow', () => {
       '![Remote](https://example.com/image.png)',
       '![Local](images/missing.png)'
     ].join('\n'))
+    fs.rmSync(wikiFolderPath, { recursive: true, force: true })
+    fs.mkdirSync(wikiFolderPath, { recursive: true })
+    fs.writeFileSync(path.join(wikiFolderPath, '00-index.md'), [
+      '# Wiki Index',
+      '',
+      'Open [[Target Note|目标文档]].',
+      '',
+      'Open legacy [[旧显示名|Target Note]].',
+      '',
+      'Create [[Missing Note]].',
+    ].join('\n'))
+    fs.writeFileSync(path.join(wikiFolderPath, 'Target Note.md'), '# Target Note\n\nJump worked.\n')
   })
 
   test.beforeEach(async ({}, testInfo) => {
-    const userDataDir = path.join(os.tmpdir(), `playwright-e2e-reading-${testInfo.workerIndex}-${Date.now()}`)
+    userDataDir = path.join(os.tmpdir(), `playwright-e2e-reading-${testInfo.workerIndex}-${Date.now()}`)
     electronApp = await _electron.launch({
       args: [
         path.join(__dirname, '../dist-electron/main.js'),
@@ -60,6 +75,7 @@ test.describe('Reading Flow', () => {
     try { fs.unlinkSync(fixturePath2) } catch {}
     try { fs.unlinkSync(fixturePath3) } catch {}
     try { fs.unlinkSync(inspectionPath) } catch {}
+    try { fs.rmSync(wikiFolderPath, { recursive: true, force: true }) } catch {}
   })
 
   async function mockOpenFileDialog(filePaths: string[]) {
@@ -135,6 +151,29 @@ test.describe('Reading Flow', () => {
     await imagePanel.getByRole('button', { name: /网络/ }).click()
     await expect(imagePanel.getByText('https://example.com/image.png')).toBeVisible()
     await expect(imagePanel.getByText('images/missing.png')).not.toBeVisible()
+
+    await imagePanel.getByRole('button', { name: '关闭' }).click()
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /反向引用/ }).click()
+    const backlinksPanel = window.locator('section[aria-label="反向链接面板"]')
+    await expect(backlinksPanel).toBeVisible()
+    await backlinksPanel.getByRole('button', { name: '关闭' }).click()
+
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /文档图谱/ }).click()
+    const graphPanel = window.locator('section[aria-label="Markdown 图谱"]')
+    await expect(graphPanel).toBeVisible()
+    await graphPanel.getByRole('button', { name: '关闭' }).click()
+
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /工作区/ }).click()
+    const workspacePanel = window.locator('section[aria-label="工作区"]')
+    await expect(workspacePanel).toBeVisible()
+    await workspacePanel.getByRole('button', { name: '关闭' }).click()
+
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /阅读时间线/ }).click()
+    await expect(window.locator('section[aria-label="阅读时间线"]')).toBeVisible()
   })
 
   test('should manage tabs', async () => {
@@ -208,5 +247,59 @@ test.describe('Reading Flow', () => {
     await expect(image).toBeVisible()
     await expect.poll(async () => image.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
     await expect(window.getByRole('heading', { name: '发布前检查清单' })).toBeVisible()
+  })
+
+  test('should open workspace wiki links to matching markdown files', async () => {
+    await mockOpenFileDialog([wikiFolderPath])
+
+    await window.getByRole('button', { name: '打开文件夹' }).click()
+    await expect(window.getByRole('heading', { name: 'Wiki Index' })).toBeVisible()
+
+    await window.getByRole('link', { name: '目标文档' }).click()
+    await expect(window.getByRole('heading', { name: 'Target Note' })).toBeVisible()
+    await expect(window.getByText('Jump worked.')).toBeVisible()
+    await expect(window.getByRole('tab', { name: 'Target Note.md' })).toBeVisible()
+
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /反向引用/ }).click()
+    const backlinksPanel = window.locator('section[aria-label="反向链接面板"]')
+    await expect(backlinksPanel).toBeVisible()
+    await expect(backlinksPanel.locator('[class*="sourceName"]', { hasText: '00-index.md' })).toHaveCount(2)
+    await expect(backlinksPanel.getByText('Open [[Target Note|目标文档]].')).toBeVisible()
+    await expect(backlinksPanel.getByText('Open legacy [[旧显示名|Target Note]].')).toBeVisible()
+
+    await backlinksPanel.getByRole('button', { name: '关闭' }).click()
+    await window.getByRole('button', { name: '工具' }).click()
+    await window.getByRole('menuitem', { name: /缺失链接/ }).click()
+    const missingLinksPanel = window.locator('section[aria-label="缺失链接面板"]')
+    await expect(missingLinksPanel).toBeVisible()
+    await expect(missingLinksPanel.getByRole('heading', { name: 'Missing Note' })).toBeVisible()
+    await missingLinksPanel.getByRole('button', { name: '创建' }).click()
+    await expect(window.getByRole('heading', { name: 'Missing Note' })).toBeVisible()
+    await expect(window.getByRole('tab', { name: 'Missing Note.md' })).toBeVisible()
+  })
+
+  test('should restore the last opened folder on restart', async () => {
+    await mockOpenFileDialog([wikiFolderPath])
+
+    await window.getByRole('button', { name: '打开文件夹' }).click()
+    await expect(window.getByRole('heading', { name: 'Wiki Index' })).toBeVisible()
+    await expect(window.getByText(path.basename(wikiFolderPath))).toBeVisible()
+
+    await electronApp.close()
+    electronApp = await _electron.launch({
+      args: [
+        path.join(__dirname, '../dist-electron/main.js'),
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        `--user-data-dir=${userDataDir}`,
+      ],
+    })
+    window = await electronApp.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+
+    await expect(window.getByText(path.basename(wikiFolderPath))).toBeVisible()
+    await expect(window.getByRole('button', { name: '打开文件：00-index.md' })).toBeVisible()
+    await expect(window.getByRole('heading', { name: 'Wiki Index' })).toBeVisible()
   })
 })
