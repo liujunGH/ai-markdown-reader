@@ -58,6 +58,7 @@ const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').th
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
 const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
+const WorkspaceDashboardPanel = React.lazy(() => import('./components/WorkspaceDashboardPanel').then(m => ({ default: m.WorkspaceDashboardPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
@@ -69,6 +70,7 @@ import { analyzeMarkdownImages } from './utils/imageInventory'
 import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
 import { buildMaintenanceTasks, formatMaintenanceTasksMarkdown, type MaintenanceTask } from './utils/maintenanceTasks'
 import { buildReleasePreflightReport, formatReleasePreflightMarkdown } from './utils/releasePreflight'
+import { buildImageAssetPlan, buildLinkRenamePreview, buildReadingAssistant, buildReleasePackageChecks, buildWorkspaceDashboard, type DashboardSection } from './utils/workspaceEnhancements'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -87,6 +89,7 @@ import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveInd
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
+const PACKAGE_HISTORY_KEY = 'package-history'
 
 function wikiPathCandidates(dir: string, target: string): string[] {
   const trimmed = target.trim()
@@ -118,7 +121,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -217,6 +220,32 @@ function AppInner() {
     indexedFileCount,
     indexSkippedCount: indexSkippedItems.length,
   }), [indexedFileCount, indexSkippedItems.length, knowledgeHealthReport.score, knowledgeHealthReport.status, maintenanceTasks])
+  const imageAssetPlan = useMemo(() => buildImageAssetPlan(activeImageInventory), [activeImageInventory])
+  const linkRenamePreview = useMemo(() => (
+    activeTab?.filePath
+      ? buildLinkRenamePreview(indexedFiles, activeTab.filePath, join(dirname(activeTab.filePath), `${basename(activeTab.filePath).replace(/\.(md|markdown)$/i, '')}-renamed.md`))
+      : buildLinkRenamePreview(indexedFiles, 'Old.md', 'New.md')
+  ), [activeTab?.filePath, indexedFiles])
+  const readingAssistant = useMemo(() => buildReadingAssistant({
+    activeFilePath: activeTab?.filePath || null,
+    activeFileName: activeTab?.name || '',
+    readingHistory,
+    readLaterCount: Number(getStorageItem('read-later-count', '0') || 0),
+  }), [activeTab?.filePath, activeTab?.name, readingHistory])
+  const releasePackageChecks = useMemo(() => buildReleasePackageChecks({
+    preflightStatus: releasePreflightReport.status,
+    version: '1.5.4',
+    hasBuildOutput: true,
+    packageHistoryCount: Number(getStorageItem(PACKAGE_HISTORY_KEY, '0') || 0),
+  }), [releasePreflightReport.status])
+  const workspaceDashboard = useMemo(() => buildWorkspaceDashboard({
+    healthScore: knowledgeHealthReport.score,
+    maintenanceTasks,
+    imagePlan: imageAssetPlan,
+    readingAssistant,
+    releaseChecks: releasePackageChecks,
+    linkRenamePreview,
+  }), [imageAssetPlan, knowledgeHealthReport.score, linkRenamePreview, maintenanceTasks, readingAssistant, releasePackageChecks])
 
   // ── Effects ──
 
@@ -748,6 +777,16 @@ function AppInner() {
     if (task.kind === 'index-skip') openPanel('indexDiagnostics')
   }, [closePanel, handleJumpToLine, openPanel])
 
+  const handleOpenDashboardSection = useCallback((sectionId: DashboardSection['id']) => {
+    closePanel('workspaceDashboard')
+    if (sectionId === 'quality') openPanel('knowledgeHealth')
+    if (sectionId === 'fixes') openPanel('maintenanceQueue')
+    if (sectionId === 'links') openPanel('markdownGraph')
+    if (sectionId === 'images') openPanel('imageInventory')
+    if (sectionId === 'reading') openPanel('readingTimeline')
+    if (sectionId === 'release') openPanel('releasePreflight')
+  }, [closePanel, openPanel])
+
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
     if (!activeTab?.filePath || !window.electronAPI) {
@@ -1107,7 +1146,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -1126,6 +1165,17 @@ function AppInner() {
                       >
                         <span>◉</span>
                         {t('toolbar.knowledgeHealth')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('workspaceDashboard')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>▦</span>
+                        运营仪表盘
                       </button>
                       <button
                         type="button"
@@ -1598,6 +1648,15 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showWorkspaceDashboard && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <WorkspaceDashboardPanel
+                dashboard={workspaceDashboard}
+                onOpenSection={handleOpenDashboardSection}
+                onClose={() => closePanel('workspaceDashboard')}
+              />
+            </Suspense>
+          )}
           {showWorkspaces && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <WorkspacePanel
@@ -1843,6 +1902,9 @@ function AppInner() {
               break
             case 'release-preflight':
               openPanel('releasePreflight')
+              break
+            case 'workspace-dashboard':
+              openPanel('workspaceDashboard')
               break
             default:
               break

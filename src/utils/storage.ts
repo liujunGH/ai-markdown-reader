@@ -17,6 +17,8 @@ export type ExactStorageKey =
   | 'workspaces'
   | 'reading-history'
   | 'index-settings'
+  | 'read-later-count'
+  | 'package-history'
 
 export type PatternStorageKey =
   | `index-diagnostics-${string}`
