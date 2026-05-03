@@ -1449,6 +1449,7 @@ function AppInner() {
                 skippedItems={indexSkippedItems}
                 isIndexing={isIndexing}
                 onReindex={() => rebuildFolderIndex()}
+                onClear={() => setIndexSkippedItems([])}
                 onClose={() => closePanel('indexDiagnostics')}
               />
             </Suspense>

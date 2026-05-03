@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { formatIndexSkippedItem, type IndexSkippedItem } from '../../utils/searchIndex'
 import styles from './IndexDiagnosticsPanel.module.css'
 
@@ -6,6 +7,7 @@ interface Props {
   skippedItems: IndexSkippedItem[]
   isIndexing: boolean
   onReindex: () => void
+  onClear: () => void
   onClose: () => void
 }
 
@@ -15,8 +17,23 @@ const REASON_LABELS: Record<IndexSkippedItem['reason'], string> = {
   'read-error': '读取失败',
 }
 
-export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, onReindex, onClose }: Props) {
+type ReasonFilter = 'all' | IndexSkippedItem['reason']
+
+const FILTERS: Array<{ value: ReasonFilter; label: string; ariaLabel: string }> = [
+  { value: 'all', label: '全部', ariaLabel: '查看全部跳过项' },
+  { value: 'ignored-directory', label: '忽略目录', ariaLabel: '只看忽略目录' },
+  { value: 'large-file', label: '文件过大', ariaLabel: '只看文件过大' },
+  { value: 'read-error', label: '读取失败', ariaLabel: '只看读取失败' },
+]
+
+export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, onReindex, onClear, onClose }: Props) {
+  const [reasonFilter, setReasonFilter] = useState<ReasonFilter>('all')
   const reasonCounts = countReasons(skippedItems)
+  const filteredItems = useMemo(() => (
+    reasonFilter === 'all'
+      ? skippedItems
+      : skippedItems.filter(item => item.reason === reasonFilter)
+  ), [reasonFilter, skippedItems])
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -37,9 +54,27 @@ export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, on
         </div>
 
         <div className={styles.actions}>
+          <button type="button" className={styles.secondaryBtn} onClick={onClear} disabled={skippedItems.length === 0} aria-label="清空诊断">
+            清空诊断
+          </button>
           <button type="button" onClick={onReindex} disabled={isIndexing || !folderPath} aria-label="重新扫描索引">
             {isIndexing ? '正在索引...' : '重新扫描'}
           </button>
+        </div>
+
+        <div className={styles.filters} aria-label="跳过原因筛选">
+          {FILTERS.map(filter => (
+            <button
+              key={filter.value}
+              type="button"
+              className={reasonFilter === filter.value ? styles.activeFilter : ''}
+              onClick={() => setReasonFilter(filter.value)}
+              aria-label={filter.ariaLabel}
+              aria-pressed={reasonFilter === filter.value}
+            >
+              {filter.label}
+            </button>
+          ))}
         </div>
 
         <div className={styles.content}>
@@ -48,15 +83,28 @@ export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, on
               <strong>没有跳过项</strong>
               <span>最近一次索引没有发现被忽略、过大或读取失败的项目。</span>
             </div>
+          ) : filteredItems.length === 0 ? (
+            <div className={styles.empty}>
+              <strong>当前筛选没有结果</strong>
+              <span>换一个跳过原因，或重新扫描索引刷新诊断。</span>
+            </div>
           ) : (
             <div className={styles.list}>
-              {skippedItems.map((item, index) => (
+              {filteredItems.map((item, index) => (
                 <article key={`${item.path}-${index}`} className={styles.item}>
                   <div className={styles.itemTop}>
                     <strong>{formatIndexSkippedItem(item)}</strong>
                     <span>{REASON_LABELS[item.reason]}</span>
                   </div>
                   <p title={item.path}>{item.path}</p>
+                  <div className={styles.itemActions}>
+                    <button type="button" onClick={() => void navigator.clipboard?.writeText(item.path)} aria-label={`复制路径 ${item.name}`}>
+                      复制路径
+                    </button>
+                    <button type="button" onClick={() => void window.electronAPI?.showInFolder(item.path)} aria-label={`在 Finder 中显示 ${item.name}`}>
+                      在 Finder 中显示
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

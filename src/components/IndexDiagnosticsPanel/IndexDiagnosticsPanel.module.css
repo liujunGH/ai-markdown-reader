@@ -80,6 +80,7 @@
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
 }
@@ -98,6 +99,40 @@
 .actions button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+.actions .secondaryBtn {
+  border-color: var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filters button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.filters button:hover {
+  border-color: var(--accent);
+}
+
+.filters .activeFilter {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
 }
 
 .content {
@@ -161,6 +196,26 @@
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.itemActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.itemActions button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.itemActions button:hover {
+  border-color: var(--accent);
 }
 
 @media (max-width: 640px) {
