@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styles from './MarkdownGraphPanel.module.css'
 import type { IndexProgress } from '../../utils/searchIndex'
 
@@ -53,6 +53,7 @@ export function MarkdownGraphPanel({
 }: Props) {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [reindexNotice, setReindexNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isLocalReindexing, setIsLocalReindexing] = useState(false)
   const positionedNodes = useMemo(() => layoutNodes(graph.nodes), [graph.nodes])
   const nodeById = useMemo(() => new Map(positionedNodes.map(node => [node.id, node])), [positionedNodes])
   const graphNodeById = useMemo(() => new Map(graph.nodes.map(node => [node.id, node])), [graph.nodes])
@@ -70,17 +71,31 @@ export function MarkdownGraphPanel({
     () => focusedNodeId ? graph.edges.filter(edge => edge.from === focusedNodeId) : [],
     [focusedNodeId, graph.edges],
   )
+  useEffect(() => {
+    if (isIndexing) {
+      setReindexNotice(null)
+    }
+  }, [isIndexing])
+
   const handleReindex = async () => {
-    if (!onReindex) return
+    if (!onReindex || isIndexing || isLocalReindexing) return
     setReindexNotice(null)
+    setIsLocalReindexing(true)
     try {
       await onReindex()
       setReindexNotice({ type: 'success', message: '索引已完成，图谱会自动刷新' })
     } catch (error) {
       console.error('Reindex failed:', error)
       setReindexNotice({ type: 'error', message: `索引失败：${formatErrorMessage(error)}` })
+    } finally {
+      setIsLocalReindexing(false)
     }
   }
+  const handleCancelIndex = () => {
+    onCancelIndex?.()
+    setReindexNotice({ type: 'success', message: '已请求取消索引，正在停止...' })
+  }
+  const isReindexBusy = isIndexing || isLocalReindexing
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -102,7 +117,7 @@ export function MarkdownGraphPanel({
           <div className={styles.indexProgress}>
             <span>索引中：发现 {indexProgress.discoveredFiles}，已处理 {indexProgress.indexedFiles}，跳过 {indexProgress.skippedFiles}</span>
             {onCancelIndex && (
-              <button type="button" onClick={onCancelIndex}>取消</button>
+              <button type="button" onClick={handleCancelIndex}>取消</button>
             )}
           </div>
         )}
@@ -122,9 +137,9 @@ export function MarkdownGraphPanel({
                   type="button"
                   className={styles.primaryBtn}
                   onClick={handleReindex}
-                  disabled={isIndexing}
+                  disabled={isReindexBusy}
                 >
-                  {isIndexing ? '正在重建索引...' : '重建索引'}
+                  {isReindexBusy ? '正在重建索引...' : '重建索引'}
                 </button>
               )}
             </div>

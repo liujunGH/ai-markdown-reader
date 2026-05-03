@@ -39,6 +39,7 @@ export function GlobalSearch({
   const [indexedCount, setIndexedCount] = useState(0)
   const [hasSearched, setHasSearched] = useState(false)
   const [reindexNotice, setReindexNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isLocalReindexing, setIsLocalReindexing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -70,8 +71,15 @@ export function GlobalSearch({
       setIsRegex(false)
       setScope('all')
       setReindexNotice(null)
+      setIsLocalReindexing(false)
     }
   }, [isOpen])
+
+  useEffect(() => {
+    if (isIndexing) {
+      setReindexNotice(null)
+    }
+  }, [isIndexing])
 
   const performSearch = useCallback(async (searchQuery: string, regex: boolean, nextScope: SearchScope) => {
     if (!folderPath || !searchQuery.trim()) {
@@ -129,8 +137,9 @@ export function GlobalSearch({
   }
 
   const handleReindex = async () => {
-    if (!onReindex) return
+    if (!onReindex || isIndexing || isLocalReindexing) return
     setReindexNotice(null)
+    setIsLocalReindexing(true)
     try {
       await onReindex()
       refreshIndexedCount()
@@ -139,7 +148,14 @@ export function GlobalSearch({
     } catch (error) {
       console.error('Reindex failed:', error)
       setReindexNotice({ type: 'error', message: `索引失败：${formatErrorMessage(error)}` })
+    } finally {
+      setIsLocalReindexing(false)
     }
+  }
+
+  const handleCancelIndex = () => {
+    onCancelIndex?.()
+    setReindexNotice({ type: 'success', message: '已请求取消索引，正在停止...' })
   }
 
   const highlightMatch = (text: string, searchQuery: string, regex: boolean) => {
@@ -193,6 +209,7 @@ export function GlobalSearch({
   }
 
   const totalMatches = useMemo(() => results.reduce((sum, r) => sum + r.matches.length, 0), [results])
+  const isReindexBusy = isIndexing || isLocalReindexing
   const hasEmptyIndex = Boolean(folderPath) && indexedCount === 0 && !isIndexing
   const indexStatusText = isIndexing && indexProgress
     ? `索引中：发现 ${indexProgress.discoveredFiles}，已处理 ${indexProgress.indexedFiles}，跳过 ${indexProgress.skippedFiles}`
@@ -255,12 +272,12 @@ export function GlobalSearch({
             {indexStatusText}
           </span>
           {folderPath && onReindex && (
-            <button type="button" className={styles.reindexBtn} onClick={handleReindex} disabled={isIndexing}>
+            <button type="button" className={styles.reindexBtn} onClick={handleReindex} disabled={isReindexBusy}>
               重建索引
             </button>
           )}
           {isIndexing && onCancelIndex && (
-            <button type="button" className={styles.reindexBtn} onClick={onCancelIndex}>
+            <button type="button" className={styles.reindexBtn} onClick={handleCancelIndex}>
               取消
             </button>
           )}
@@ -271,8 +288,8 @@ export function GlobalSearch({
             <strong>尚未建立索引</strong>
             <span>全文搜索、反链和图谱都需要先扫描当前文件夹。</span>
             {onReindex && (
-              <button type="button" className={styles.indexHintBtn} onClick={handleReindex}>
-                立即重建索引
+              <button type="button" className={styles.indexHintBtn} onClick={handleReindex} disabled={isReindexBusy}>
+                {isLocalReindexing ? '正在重建索引...' : '立即重建索引'}
               </button>
             )}
           </div>

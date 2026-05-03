@@ -51,6 +51,54 @@ describe('MarkdownGraphPanel', () => {
     }
   })
 
+  it('locks graph reindexing while a manual reindex is running', async () => {
+    const user = userEvent.setup()
+    let resolveReindex: () => void = () => {}
+    const onReindex = vi.fn(() => new Promise<void>(resolve => { resolveReindex = resolve }))
+
+    render(
+      <MarkdownGraphPanel
+        graph={{ nodes: [], edges: [], orphanNodes: [] }}
+        folderPath="/docs"
+        onOpenFile={vi.fn()}
+        onReindex={onReindex}
+        onClose={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: '重建索引' }))
+    await user.click(screen.getByRole('button', { name: '正在重建索引...' }))
+
+    expect(screen.getByRole('button', { name: '正在重建索引...' })).toBeDisabled()
+    expect(onReindex).toHaveBeenCalledTimes(1)
+
+    resolveReindex()
+    expect(await screen.findByText('索引已完成，图谱会自动刷新')).toBeInTheDocument()
+  })
+
+  it('acknowledges cancel requests from the graph panel', async () => {
+    const user = userEvent.setup()
+    const onCancelIndex = vi.fn()
+
+    render(
+      <MarkdownGraphPanel
+        graph={{ nodes: [], edges: [], orphanNodes: [] }}
+        folderPath="/docs"
+        onOpenFile={vi.fn()}
+        onReindex={vi.fn()}
+        onClose={vi.fn()}
+        isIndexing
+        indexProgress={{ phase: 'indexing', discoveredFiles: 10, indexedFiles: 4, skippedFiles: 1, currentPath: '/docs/a.md' }}
+        onCancelIndex={onCancelIndex}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: '取消' }))
+
+    expect(onCancelIndex).toHaveBeenCalled()
+    expect(screen.getByText('已请求取消索引，正在停止...')).toBeInTheDocument()
+  })
+
   it('focuses a node and exposes incoming and outgoing navigation', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
