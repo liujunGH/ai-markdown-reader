@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildWikiGraph, extractMarkdownFileLinks, extractWikiLinks, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from '../../utils/wikiGraph'
+import { buildWikiGraph, extractMarkdownFileLinks, extractWikiLinks, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile, suggestMissingWikiLinkTargets } from '../../utils/wikiGraph'
 
 describe('wikiGraph', () => {
   it('extracts wiki links with display text and line numbers', () => {
@@ -98,6 +98,19 @@ describe('wikiGraph', () => {
           },
         ],
       },
+    ])
+  })
+
+  it('suggests likely target files for missing wiki links', () => {
+    const files = [
+      { path: '/docs/projects/product-roadmap.md', name: 'product-roadmap.md', content: '# Roadmap' },
+      { path: '/docs/projects/product-research.md', name: 'product-research.md', content: '# Research' },
+      { path: '/docs/random.md', name: 'random.md', content: '# Random' },
+    ]
+
+    expect(suggestMissingWikiLinkTargets(files, 'product roadmap')).toEqual([
+      expect.objectContaining({ path: '/docs/projects/product-roadmap.md', label: 'product-roadmap', score: 4 }),
+      expect.objectContaining({ path: '/docs/projects/product-research.md', label: 'product-research', score: 2 }),
     ])
   })
 

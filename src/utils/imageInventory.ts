@@ -134,3 +134,25 @@ export function analyzeMarkdownImages(content: string, filePath?: string): Markd
 
   return images
 }
+
+export function getImageRepairSuggestion(image: MarkdownImageItem): string {
+  if (!image.src) {
+    return '补全图片地址，或删除这个空图片引用。'
+  }
+  if (image.type === 'local-relative' && !image.resolvedPath) {
+    return '本地相对图片没有解析到文件；检查路径拼写，或把图片放到 Markdown 同级/子目录。'
+  }
+  if (image.type === 'local-absolute') {
+    return '绝对路径只在当前电脑稳定；建议改成相对路径，方便迁移整个知识库。'
+  }
+  if (image.type === 'remote') {
+    return '网络图片依赖外部访问；离线使用时建议下载到本地并改成相对路径。'
+  }
+  if (image.type === 'unknown') {
+    return '图片协议无法识别；建议改成 http(s)、data 或本地相对路径。'
+  }
+  if (image.warnings.length > 0) {
+    return image.warnings[0]
+  }
+  return '图片引用看起来正常。'
+}

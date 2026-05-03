@@ -189,6 +189,16 @@
   font-size: 12px;
 }
 
+.repair {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

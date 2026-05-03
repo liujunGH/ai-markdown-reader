@@ -42,6 +42,15 @@ export function KnowledgeHealthPanel({ report, onOpenDetail, onOpenFirstIssue, o
           <button type="button" onClick={onCopyReport}>复制 Markdown 报告</button>
         </div>
 
+        <div className={styles.overview}>
+          {report.overview.map(item => (
+            <div key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+
         <div className={styles.grid}>
           {report.cards.map(card => (
             <button

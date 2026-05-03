@@ -11,6 +11,7 @@ export interface KnowledgeHealthInput {
   documentErrorCount: number
   imageWarningCount: number
   unresolvedImageCount: number
+  indexSkippedCount?: number
 }
 
 export interface KnowledgeHealthCard {
@@ -25,6 +26,7 @@ export interface KnowledgeHealthReport {
   score: number
   status: KnowledgeHealthStatus
   cards: KnowledgeHealthCard[]
+  overview: Array<{ label: string; value: string }>
 }
 
 export function buildKnowledgeHealthReport(input: KnowledgeHealthInput): KnowledgeHealthReport {
@@ -38,10 +40,16 @@ export function buildKnowledgeHealthReport(input: KnowledgeHealthInput): Knowled
     Math.max(0, input.imageWarningCount - input.unresolvedImageCount) * 2 +
     input.orphanNodeCount * 4
   const score = Math.max(0, Math.min(100, 100 - penalty))
+  const indexTotal = input.indexedFileCount + (input.indexSkippedCount ?? 0)
+  const indexCoverage = indexTotal > 0 ? `${Math.round((input.indexedFileCount / indexTotal) * 100)}%` : '暂无数据'
 
   return {
     score,
     status: score >= 90 ? 'healthy' : score >= 50 ? 'needs-attention' : 'critical',
+    overview: [
+      { label: '索引覆盖率', value: indexCoverage },
+      { label: '下一步', value: getNextAction(input) },
+    ],
     cards: [
       {
         id: 'missing-links',
@@ -75,6 +83,15 @@ export function buildKnowledgeHealthReport(input: KnowledgeHealthInput): Knowled
   }
 }
 
+function getNextAction(input: KnowledgeHealthInput): string {
+  if (input.documentErrorCount > 0) return '先处理当前文档错误'
+  if (input.missingLinks.length > 0) return '修复缺失链接'
+  if (input.unresolvedImageCount > 0) return '处理未解析图片'
+  if ((input.indexSkippedCount ?? 0) > 0) return '检查索引跳过项'
+  if (input.orphanNodeCount > 0) return '梳理孤立文档'
+  return '保持当前维护节奏'
+}
+
 export function formatKnowledgeHealthMarkdown(report: KnowledgeHealthReport): string {
   const statusLabel: Record<KnowledgeHealthStatus, string> = {
     healthy: '健康',
@@ -88,6 +105,8 @@ export function formatKnowledgeHealthMarkdown(report: KnowledgeHealthReport): st
     '',
     `- 健康分数：${report.score}`,
     `- 状态：${statusLabel[report.status]}`,
+    `- 索引覆盖率：${report.overview.find(item => item.label === '索引覆盖率')?.value ?? '暂无数据'}`,
+    `- 下一步：${report.overview.find(item => item.label === '下一步')?.value ?? '保持当前维护节奏'}`,
     '',
     '| 项目 | 数量 | 说明 | 级别 |',
     '|---|---:|---|---|',

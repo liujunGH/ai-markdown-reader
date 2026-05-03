@@ -37,9 +37,11 @@ describe('IndexDiagnosticsPanel', () => {
           extraSkipDirectoryNames: [],
         }}
         updatedAt={1710000000000}
+        indexedFileCount={7}
         onReindex={onReindex}
         onClear={onClear}
         onSaveSettings={vi.fn()}
+        onSaveSettingsAndReindex={vi.fn()}
         onResetSettings={vi.fn()}
         onClose={vi.fn()}
       />
@@ -51,6 +53,8 @@ describe('IndexDiagnosticsPanel', () => {
     expect(screen.getByText('索引规则')).toBeInTheDocument()
     expect(screen.getByText('最大文件：50 MB')).toBeInTheDocument()
     expect(screen.getByText('.git、node_modules、dist')).toBeInTheDocument()
+    expect(screen.getByText('索引覆盖率：70%')).toBeInTheDocument()
+    expect(screen.getByText('跳过热点：根目录')).toBeInTheDocument()
     expect(screen.getByText(`上次诊断：${new Date(1710000000000).toLocaleString('zh-CN')}`)).toBeInTheDocument()
     expect(screen.getAllByText('忽略目录').length).toBeGreaterThan(0)
     expect(screen.getAllByText('文件过大').length).toBeGreaterThan(0)
@@ -91,9 +95,11 @@ describe('IndexDiagnosticsPanel', () => {
           extraSkipDirectoryNames: [],
         }}
         updatedAt={null}
+        indexedFileCount={0}
         onReindex={vi.fn()}
         onClear={vi.fn()}
         onSaveSettings={vi.fn()}
+        onSaveSettingsAndReindex={vi.fn()}
         onResetSettings={vi.fn()}
         onClose={vi.fn()}
       />
@@ -107,6 +113,7 @@ describe('IndexDiagnosticsPanel', () => {
   it('edits and resets index settings', async () => {
     const user = userEvent.setup()
     const onSaveSettings = vi.fn()
+    const onSaveSettingsAndReindex = vi.fn()
     const onResetSettings = vi.fn()
 
     render(
@@ -123,9 +130,11 @@ describe('IndexDiagnosticsPanel', () => {
           extraSkipDirectoryNames: ['drafts'],
         }}
         updatedAt={null}
+        indexedFileCount={0}
         onReindex={vi.fn()}
         onClear={vi.fn()}
         onSaveSettings={onSaveSettings}
+        onSaveSettingsAndReindex={onSaveSettingsAndReindex}
         onResetSettings={onResetSettings}
         onClose={vi.fn()}
       />
@@ -139,6 +148,12 @@ describe('IndexDiagnosticsPanel', () => {
     await user.click(screen.getByRole('button', { name: '保存索引设置' }))
 
     expect(onSaveSettings).toHaveBeenCalledWith({
+      maxFileSizeMb: 80,
+      extraSkipDirectoryNames: ['drafts', 'exports'],
+    })
+
+    await user.click(screen.getByRole('button', { name: '保存并重新扫描索引' }))
+    expect(onSaveSettingsAndReindex).toHaveBeenCalledWith({
       maxFileSizeMb: 80,
       extraSkipDirectoryNames: ['drafts', 'exports'],
     })
@@ -160,8 +175,10 @@ describe('IndexDiagnosticsPanel', () => {
       onReindex: vi.fn(),
       onClear: vi.fn(),
       onSaveSettings: vi.fn(),
+      onSaveSettingsAndReindex: vi.fn(),
       onResetSettings: vi.fn(),
       onClose: vi.fn(),
+      indexedFileCount: 0,
     }
     const initialSettings: IndexSettings = {
       maxFileSizeMb: 75,

@@ -61,7 +61,7 @@ import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
-import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
+import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile, suggestMissingWikiLinkTargets } from './utils/wikiGraph'
 import { analyzeDocumentHealth } from './utils/documentHealth'
 import { analyzeMarkdownImages } from './utils/imageInventory'
 import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
@@ -178,6 +178,9 @@ function AppInner() {
     activeTab?.filePath ? findBacklinks(indexedFiles, activeTab.filePath, activeTab.name) : []
   ), [activeTab?.filePath, activeTab?.name, indexedFiles])
   const missingLinks = useMemo(() => findMissingWikiLinks(indexedFiles), [indexedFiles])
+  const missingLinkSuggestions = useMemo(() => Object.fromEntries(
+    missingLinks.map(link => [link.normalizedTarget, suggestMissingWikiLinkTargets(indexedFiles, link.target)])
+  ), [indexedFiles, missingLinks])
   const activeDocumentHealth = useMemo(
     () => analyzeDocumentHealth(activeTab?.content || '', activeTab?.filePath),
     [activeTab?.content, activeTab?.filePath],
@@ -194,7 +197,8 @@ function AppInner() {
     documentErrorCount: activeDocumentHealth.summary.errors,
     imageWarningCount: activeImageInventory.filter(image => image.warnings.length > 0).length,
     unresolvedImageCount: activeImageInventory.filter(image => image.type === 'local-relative' && !image.resolvedPath).length,
-  }), [activeDocumentHealth.summary.errors, activeDocumentHealth.summary.totalIssues, activeImageInventory, indexedFiles.length, missingLinks, wikiGraph.orphanNodes.length])
+    indexSkippedCount: indexSkippedItems.length,
+  }), [activeDocumentHealth.summary.errors, activeDocumentHealth.summary.totalIssues, activeImageInventory, indexSkippedItems.length, indexedFiles.length, missingLinks, wikiGraph.orphanNodes.length])
 
   // ── Effects ──
 
@@ -255,7 +259,7 @@ function AppInner() {
 
   const rebuildFolderIndex = useCallback(async (
     folderPath = currentFolderPath,
-    options: { silent?: boolean } = {}
+    options: { silent?: boolean; policy?: typeof indexPolicy } = {}
   ) => {
     if (!folderPath) {
       if (!options.silent) {
@@ -275,6 +279,7 @@ function AppInner() {
       currentPath: folderPath,
     })
     try {
+      const activeIndexPolicy = options.policy ?? indexPolicy
       const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
       const skippedItems: IndexSkippedItem[] = []
       const persistSkippedItems = (nextItems: IndexSkippedItem[]) => {
@@ -292,8 +297,8 @@ function AppInner() {
           skippedItems.push(item)
           persistSkippedItems(skippedItems)
         },
-        maxFileSizeBytes: indexPolicy.maxFileSizeBytes,
-        skipDirectoryNames: indexPolicy.skipDirectoryNames,
+        maxFileSizeBytes: activeIndexPolicy.maxFileSizeBytes,
+        skipDirectoryNames: activeIndexPolicy.skipDirectoryNames,
       })
       await indexFolder(folderPath, allFiles, {
         signal: controller.signal,
@@ -1456,8 +1461,10 @@ function AppInner() {
                 links={missingLinks}
                 folderPath={currentFolderPath || undefined}
                 focusedTarget={focusedMissingTarget}
+                suggestions={missingLinkSuggestions}
                 onCreateFile={handleCreateMissingLink}
                 onOpenSource={openFileAtLine}
+                onOpenSuggestion={path => openFileAtLine(path)}
                 onClose={() => {
                   setFocusedMissingTarget(null)
                   closePanel('missingLinks')
@@ -1473,6 +1480,7 @@ function AppInner() {
                 isIndexing={isIndexing}
                 policy={indexPolicy}
                 settings={indexSettings}
+                indexedFileCount={indexedFileCount}
                 updatedAt={indexDiagnosticsUpdatedAt}
                 onReindex={() => rebuildFolderIndex()}
                 onClear={() => {
@@ -1486,6 +1494,16 @@ function AppInner() {
                   const saved = saveIndexSettings(settings)
                   setIndexSettings(saved)
                   showToast('索引设置已保存，重新扫描后生效')
+                }}
+                onSaveSettingsAndReindex={settings => {
+                  const saved = saveIndexSettings(settings)
+                  const savedPolicy = getEffectiveIndexPolicy(saved)
+                  setIndexSettings(saved)
+                  showToast('索引设置已保存，开始重新扫描')
+                  void rebuildFolderIndex(currentFolderPath, { silent: true, policy: savedPolicy }).catch(error => {
+                    console.error('Failed to rebuild index after settings save:', error)
+                    showToast(`索引失败：${String(error)}`, 'error')
+                  })
                 }}
                 onResetSettings={() => {
                   const defaults = resetIndexSettings()

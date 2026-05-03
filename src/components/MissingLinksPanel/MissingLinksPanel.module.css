@@ -148,6 +148,41 @@
   font-weight: 600;
 }
 
+.suggestions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+}
+
+.suggestions strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.suggestions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestions button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.suggestions button:hover {
+  border-color: var(--accent);
+}
+
 .references {
   display: grid;
   gap: 8px;

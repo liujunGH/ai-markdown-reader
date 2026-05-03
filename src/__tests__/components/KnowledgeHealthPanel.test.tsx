@@ -16,6 +16,10 @@ describe('KnowledgeHealthPanel', () => {
         report={{
           score: 50,
           status: 'needs-attention',
+          overview: [
+            { label: '索引覆盖率', value: '67%' },
+            { label: '下一步', value: '先处理当前文档错误' },
+          ],
           cards: [
             { id: 'missing-links', label: '缺失链接', value: 1, detail: '1 处引用需要处理', severity: 'warning' },
             { id: 'orphan-docs', label: '孤立文档', value: 2, detail: '共 4 个已索引文档', severity: 'info' },
@@ -32,6 +36,9 @@ describe('KnowledgeHealthPanel', () => {
 
     expect(screen.getByText('50')).toBeInTheDocument()
     expect(screen.getByText('需要关注')).toBeInTheDocument()
+    expect(screen.getByText('索引覆盖率')).toBeInTheDocument()
+    expect(screen.getByText('67%')).toBeInTheDocument()
+    expect(screen.getByText('先处理当前文档错误')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '查看缺失链接' }))
     expect(onOpenDetail).toHaveBeenCalledWith('missing-links')

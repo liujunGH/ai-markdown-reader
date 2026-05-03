@@ -1,16 +1,18 @@
 import styles from './MissingLinksPanel.module.css'
-import { normalizeWikiTarget, type MissingWikiLink } from '../../utils/wikiGraph'
+import { normalizeWikiTarget, type MissingWikiLink, type MissingWikiLinkSuggestion } from '../../utils/wikiGraph'
 
 interface Props {
   links: MissingWikiLink[]
   folderPath?: string
   focusedTarget?: string | null
+  suggestions?: Record<string, MissingWikiLinkSuggestion[]>
   onCreateFile: (target: string) => void
   onOpenSource: (path: string, line?: number) => void
+  onOpenSuggestion: (path: string) => void
   onClose: () => void
 }
 
-export function MissingLinksPanel({ links, folderPath, focusedTarget, onCreateFile, onOpenSource, onClose }: Props) {
+export function MissingLinksPanel({ links, folderPath, focusedTarget, suggestions = {}, onCreateFile, onOpenSource, onOpenSuggestion, onClose }: Props) {
   const referenceCount = links.reduce((sum, link) => sum + link.references.length, 0)
   const normalizedFocus = focusedTarget ? normalizeWikiTarget(focusedTarget) : ''
   const sortedLinks = normalizedFocus
@@ -43,6 +45,7 @@ export function MissingLinksPanel({ links, folderPath, focusedTarget, onCreateFi
             <div className={styles.list}>
               {sortedLinks.map(link => {
                 const isFocused = link.normalizedTarget === normalizedFocus
+                const linkSuggestions = suggestions[link.normalizedTarget] ?? []
 
                 return (
                   <article
@@ -60,6 +63,23 @@ export function MissingLinksPanel({ links, folderPath, focusedTarget, onCreateFi
                         创建
                       </button>
                     </div>
+                    {linkSuggestions.length > 0 && (
+                      <div className={styles.suggestions}>
+                        <strong>可能匹配</strong>
+                        <div>
+                          {linkSuggestions.map(suggestion => (
+                            <button
+                              key={suggestion.path}
+                              type="button"
+                              onClick={() => onOpenSuggestion(suggestion.path)}
+                              aria-label={`打开候选 ${suggestion.label}`}
+                            >
+                              {suggestion.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className={styles.references}>
                       {link.references.slice(0, 5).map(reference => (
                         <button

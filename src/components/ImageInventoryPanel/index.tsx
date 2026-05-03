@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { analyzeMarkdownImages, MarkdownImageItem, MarkdownImageType } from '../../utils/imageInventory'
+import { analyzeMarkdownImages, getImageRepairSuggestion, MarkdownImageItem, MarkdownImageType } from '../../utils/imageInventory'
 import styles from './ImageInventoryPanel.module.css'
 
 interface Props {
@@ -135,6 +135,7 @@ function ImageRow({ image }: { image: MarkdownImageItem }) {
           {image.warnings.map(warning => <span key={warning}>{warning}</span>)}
         </div>
       )}
+      <div className={styles.repair}>{getImageRepairSuggestion(image)}</div>
       <div className={styles.actions}>
         <button type="button" onClick={() => void navigator.clipboard?.writeText(image.src)}>复制 src</button>
         {canOpenRemote && <button type="button" onClick={() => window.open(image.src, '_blank', 'noopener,noreferrer')}>打开链接</button>}

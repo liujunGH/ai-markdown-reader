@@ -10,10 +10,12 @@ interface Props {
   isIndexing: boolean
   policy: IndexPolicy
   settings: IndexSettings
+  indexedFileCount: number
   updatedAt: number | null
   onReindex: () => void
   onClear: () => void
   onSaveSettings: (settings: IndexSettings) => void
+  onSaveSettingsAndReindex: (settings: IndexSettings) => void
   onResetSettings: () => void
   onClose: () => void
 }
@@ -39,10 +41,12 @@ export function IndexDiagnosticsPanel({
   isIndexing,
   policy,
   settings,
+  indexedFileCount,
   updatedAt,
   onReindex,
   onClear,
   onSaveSettings,
+  onSaveSettingsAndReindex,
   onResetSettings,
   onClose,
 }: Props) {
@@ -50,6 +54,8 @@ export function IndexDiagnosticsPanel({
   const [draftMaxFileSizeMb, setDraftMaxFileSizeMb] = useState(String(settings.maxFileSizeMb))
   const [draftExtraDirectories, setDraftExtraDirectories] = useState(settings.extraSkipDirectoryNames.join('\n'))
   const reasonCounts = countReasons(skippedItems)
+  const coverage = getCoverage(indexedFileCount, skippedItems.length)
+  const skipHotspot = getSkipHotspot(skippedItems, folderPath)
   const formattedPolicy = useMemo(() => formatIndexPolicy(policy), [policy])
   const filteredItems = useMemo(() => (
     reasonFilter === 'all'
@@ -78,6 +84,7 @@ export function IndexDiagnosticsPanel({
           <SummaryCard label="忽略目录" value={reasonCounts['ignored-directory']} />
           <SummaryCard label="文件过大" value={reasonCounts['large-file']} />
           <SummaryCard label="读取失败" value={reasonCounts['read-error']} />
+          <SummaryCard label="已索引" value={indexedFileCount} />
         </div>
 
         <div className={styles.policy}>
@@ -86,6 +93,14 @@ export function IndexDiagnosticsPanel({
             <span>{updatedAt ? `上次诊断：${new Date(updatedAt).toLocaleString('zh-CN')}` : '还没有保存的诊断'}</span>
           </div>
           <dl>
+            <div>
+              <dt>覆盖率</dt>
+              <dd>索引覆盖率：{coverage}</dd>
+            </div>
+            <div>
+              <dt>跳过热点</dt>
+              <dd>跳过热点：{skipHotspot}</dd>
+            </div>
             <div>
               <dt>最大文件</dt>
               <dd>最大文件：{formattedPolicy.maxFileSize}</dd>
@@ -101,10 +116,7 @@ export function IndexDiagnosticsPanel({
           className={styles.settings}
           onSubmit={event => {
             event.preventDefault()
-            onSaveSettings({
-              maxFileSizeMb: Number(draftMaxFileSizeMb),
-              extraSkipDirectoryNames: draftExtraDirectories.split(/\r?\n|,/).map(name => name.trim()).filter(Boolean),
-            })
+            onSaveSettings(readDraftSettings(draftMaxFileSizeMb, draftExtraDirectories))
           }}
         >
           <div className={styles.settingsHeader}>
@@ -134,6 +146,13 @@ export function IndexDiagnosticsPanel({
           </div>
           <div className={styles.settingsActions}>
             <button type="submit" aria-label="保存索引设置">保存设置</button>
+            <button
+              type="button"
+              onClick={() => onSaveSettingsAndReindex(readDraftSettings(draftMaxFileSizeMb, draftExtraDirectories))}
+              aria-label="保存并重新扫描索引"
+            >
+              保存并重扫
+            </button>
             <button type="button" className={styles.secondaryBtn} onClick={onResetSettings} aria-label="恢复默认索引设置">
               恢复默认
             </button>
@@ -207,6 +226,35 @@ function countReasons(items: IndexSkippedItem[]): Record<IndexSkippedItem['reaso
     counts[item.reason] += 1
     return counts
   }, { 'ignored-directory': 0, 'large-file': 0, 'read-error': 0 })
+}
+
+function readDraftSettings(maxFileSizeMb: string, extraDirectories: string): IndexSettings {
+  return {
+    maxFileSizeMb: Number(maxFileSizeMb),
+    extraSkipDirectoryNames: extraDirectories.split(/\r?\n|,/).map(name => name.trim()).filter(Boolean),
+  }
+}
+
+function getCoverage(indexedFileCount: number, skippedCount: number): string {
+  const total = indexedFileCount + skippedCount
+  if (total === 0) return '暂无数据'
+  return `${Math.round((indexedFileCount / total) * 100)}%`
+}
+
+function getSkipHotspot(items: IndexSkippedItem[], folderPath?: string | null): string {
+  if (items.length === 0) return '暂无'
+  const counts = new Map<string, number>()
+  for (const item of items) {
+    const relativePath = folderPath && item.path.startsWith(`${folderPath}/`)
+      ? item.path.slice(folderPath.length + 1)
+      : item.path
+    const parts = relativePath.split('/').filter(Boolean)
+    const directory = parts.length <= 1
+      ? (item.reason === 'ignored-directory' ? parts[0] || item.name : '根目录')
+      : parts.slice(0, -1).join('/')
+    counts.set(directory, (counts.get(directory) || 0) + 1)
+  }
+  return Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || '暂无'
 }
 
 function SummaryCard({ label, value }: { label: string; value: number }) {

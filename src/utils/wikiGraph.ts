@@ -34,6 +34,12 @@ export interface MissingWikiLink {
   references: MissingWikiLinkReference[]
 }
 
+export interface MissingWikiLinkSuggestion {
+  path: string
+  label: string
+  score: number
+}
+
 export interface WikiGraphNode {
   id: string
   label: string
@@ -213,6 +219,35 @@ export function findMissingWikiLinks(files: IndexedMarkdownFile[]): MissingWikiL
 
   return Array.from(missingByTarget.values())
     .sort((a, b) => b.references.length - a.references.length || a.target.localeCompare(b.target))
+}
+
+export function suggestMissingWikiLinkTargets(files: IndexedMarkdownFile[], target: string, limit = 3): MissingWikiLinkSuggestion[] {
+  const targetTokens = tokenizeTarget(target)
+  if (targetTokens.length === 0) return []
+
+  return files
+    .map(file => {
+      const label = displayNameForPath(file.path)
+      const candidateTokens = tokenizeTarget(`${file.path} ${file.name} ${label}`)
+      const score = targetTokens.reduce((sum, token) => (
+        candidateTokens.some(candidate => candidate === token)
+          ? sum + 2
+          : candidateTokens.some(candidate => candidate.includes(token) || token.includes(candidate))
+            ? sum + 1
+            : sum
+      ), 0)
+      return { path: file.path, label, score }
+    })
+    .filter(suggestion => suggestion.score > 0)
+    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+    .slice(0, limit)
+}
+
+function tokenizeTarget(value: string): string[] {
+  return normalizeWikiTarget(value)
+    .replace(/[-_./]+/g, ' ')
+    .split(/\s+/)
+    .filter(token => token.length > 1)
 }
 
 export function buildWikiGraph(files: IndexedMarkdownFile[]): WikiGraph {

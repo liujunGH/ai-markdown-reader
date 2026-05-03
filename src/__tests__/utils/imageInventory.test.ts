@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeMarkdownImages } from '../../utils/imageInventory'
+import { analyzeMarkdownImages, getImageRepairSuggestion } from '../../utils/imageInventory'
 
 describe('analyzeMarkdownImages', () => {
   it('finds markdown images with alt text and line numbers', () => {
@@ -101,5 +101,33 @@ describe('analyzeMarkdownImages', () => {
       src: 'real.png',
       line: 5,
     })
+  })
+})
+
+describe('getImageRepairSuggestion', () => {
+  it('explains common image repair actions', () => {
+    expect(getImageRepairSuggestion({
+      alt: '',
+      src: '',
+      line: 1,
+      type: 'unknown',
+      warnings: ['图片 src 为空'],
+    })).toBe('补全图片地址，或删除这个空图片引用。')
+
+    expect(getImageRepairSuggestion({
+      alt: 'remote',
+      src: 'https://example.com/a.png',
+      line: 2,
+      type: 'remote',
+      warnings: [],
+    })).toBe('网络图片依赖外部访问；离线使用时建议下载到本地并改成相对路径。')
+
+    expect(getImageRepairSuggestion({
+      alt: 'local',
+      src: './missing.png',
+      line: 3,
+      type: 'local-relative',
+      warnings: [],
+    })).toBe('本地相对图片没有解析到文件；检查路径拼写，或把图片放到 Markdown 同级/子目录。')
   })
 })

@@ -13,6 +13,7 @@ describe('knowledgeHealth', () => {
       documentErrorCount: 1,
       imageWarningCount: 2,
       unresolvedImageCount: 1,
+      indexSkippedCount: 2,
     })
 
     expect(report.score).toBe(50)
@@ -22,6 +23,10 @@ describe('knowledgeHealth', () => {
       expect.objectContaining({ id: 'orphan-docs', value: 2, severity: 'info' }),
       expect.objectContaining({ id: 'document-issues', value: 3, severity: 'error' }),
       expect.objectContaining({ id: 'image-warnings', value: 2, severity: 'warning' }),
+    ])
+    expect(report.overview).toEqual([
+      { label: '索引覆盖率', value: '67%' },
+      { label: '下一步', value: '先处理当前文档错误' },
     ])
   })
 
@@ -34,6 +39,7 @@ describe('knowledgeHealth', () => {
       documentErrorCount: 0,
       imageWarningCount: 0,
       unresolvedImageCount: 0,
+      indexSkippedCount: 0,
     })
 
     expect(report.score).toBe(100)
@@ -49,6 +55,7 @@ describe('knowledgeHealth', () => {
       documentErrorCount: 0,
       imageWarningCount: 0,
       unresolvedImageCount: 0,
+      indexSkippedCount: 0,
     })
 
     expect(formatKnowledgeHealthMarkdown(report)).toContain('# 知识库健康报告')
