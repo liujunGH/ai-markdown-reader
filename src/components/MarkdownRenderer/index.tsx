@@ -19,6 +19,13 @@ interface Props {
   searchRegex?: boolean
   currentMatch?: number
   matchCount?: number
+  readingHighlights?: string[]
+  readingLayout?: 'single' | 'columns'
+  readingStyle?: {
+    lineHeight: number
+    lineWidth: number
+  }
+  onTextSelect?: (selection: { text: string; filePath?: string }) => void
   onWikiLinkClick?: (target: string, altTarget?: string) => void
 }
 
@@ -37,6 +44,10 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
+}
+
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function decodeBase64(str: string): string {
@@ -177,7 +188,7 @@ function buildMermaidContainer(svg: string): HTMLDivElement {
   return containerDiv
 }
 
-export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, onWikiLinkClick }, ref) => {
+export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, readingHighlights = [], readingLayout = 'single', readingStyle, onTextSelect, onWikiLinkClick }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string; originalSrc: string } | null>(null)
   const [scale, setScale] = useState(1)
@@ -316,11 +327,12 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       const range = selection.getRangeAt(0)
       if (container.contains(range.commonAncestorContainer)) {
         setTtsButton({ x: e.clientX, y: e.clientY - 44, text })
+        onTextSelect?.({ text, filePath })
       }
     }
     document.addEventListener('mouseup', handleMouseUp)
     return () => document.removeEventListener('mouseup', handleMouseUp)
-  }, [])
+  }, [filePath, onTextSelect])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -574,7 +586,51 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         }
       })
     })
-  }, [content, filePath, renderMermaidDiagrams, onWikiLinkClick])
+  }, [content, filePath, renderMermaidDiagrams, onTextSelect, onWikiLinkClick])
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const container = containerRef.current
+    const existingMarks = container.querySelectorAll('mark.reader-highlight')
+    existingMarks.forEach(mark => {
+      const parent = mark.parentNode
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent || ''), mark)
+        parent.normalize()
+      }
+    })
+
+    const uniqueHighlights = Array.from(new Set(readingHighlights.map(text => text.trim()).filter(text => text.length >= 2)))
+    if (uniqueHighlights.length === 0) return
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    const textNodes: Text[] = []
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode as Text)
+    }
+
+    textNodes.forEach(textNode => {
+      const parent = textNode.parentElement
+      if (!textNode.textContent || !parent) return
+      if (parent.closest('pre, code, mark, .katex, .mermaid-wrapper')) return
+
+      let html = escapeHtml(textNode.textContent)
+      let changed = false
+      uniqueHighlights.forEach(highlight => {
+        const escaped = escapeRegExp(escapeHtml(highlight))
+        const pattern = new RegExp(`(${escaped})`, 'gi')
+        if (pattern.test(html)) {
+          changed = true
+          html = html.replace(pattern, '<mark class="reader-highlight">$1</mark>')
+        }
+      })
+      if (changed) {
+        const span = document.createElement('span')
+        span.innerHTML = html
+        textNode.parentNode?.replaceChild(span, textNode)
+      }
+    })
+  }, [readingHighlights, html])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -747,7 +803,8 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     <>
       <div
         ref={containerRef}
-        className={styles.renderer}
+        className={`${styles.renderer} ${readingLayout === 'columns' ? styles.rendererColumns : ''}`}
+        style={readingStyle ? { maxWidth: `${readingStyle.lineWidth}px`, lineHeight: readingStyle.lineHeight } : undefined}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {ttsButton && (

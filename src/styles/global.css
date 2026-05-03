@@ -133,6 +133,13 @@ body, header, main, aside, nav, section, button, input, textarea, select, a, pre
   background-color: #ff6600;
 }
 
+.reader-highlight {
+  background: rgba(250, 204, 21, 0.38);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
 @media print {
   body {
     background: white !important;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { MarkdownRenderer } from '../../components/MarkdownRenderer'
@@ -366,6 +366,39 @@ describe('MarkdownRenderer', () => {
     })
 
     expect(container.querySelector('mark.search-highlight')).toHaveTextContent('test')
+  })
+
+  it('reports selected text from the rendered document', async () => {
+    const onTextSelect = vi.fn()
+    const { container } = render(
+      <MarkdownRenderer content="Selected reader text." onTextSelect={onTextSelect} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('p')).toBeInTheDocument()
+    })
+
+    const paragraph = container.querySelector('p')!
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    fireEvent.mouseUp(document, { clientX: 80, clientY: 80 })
+
+    expect(onTextSelect).toHaveBeenCalledWith(expect.objectContaining({
+      text: 'Selected reader text.',
+    }))
+  })
+
+  it('renders saved reader highlights', async () => {
+    const { container } = render(
+      <MarkdownRenderer content="Important reader text." readingHighlights={['reader']} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('mark.reader-highlight')).toHaveTextContent('reader')
+    })
   })
 
   it('calls onWikiLinkClick when wiki link is clicked', async () => {

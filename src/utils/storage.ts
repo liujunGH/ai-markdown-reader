@@ -20,6 +20,10 @@ export type ExactStorageKey =
   | 'read-later-count'
   | 'package-history'
   | 'operation-snapshots'
+  | 'reader-marks'
+  | 'reader-queue'
+  | 'reader-preset'
+  | 'reader-layout'
 
 export type PatternStorageKey =
   | `index-diagnostics-${string}`

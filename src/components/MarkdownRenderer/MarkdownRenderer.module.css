@@ -4,6 +4,22 @@
   padding: 40px 20px;
 }
 
+.rendererColumns {
+  max-width: 1180px;
+  column-count: 2;
+  column-gap: 48px;
+  column-rule: 1px solid var(--border);
+}
+
+.rendererColumns h1,
+.rendererColumns h2,
+.rendererColumns h3,
+.rendererColumns pre,
+.rendererColumns blockquote,
+.rendererColumns table {
+  break-inside: avoid;
+}
+
 .renderer h1 {
   font-size: 2em;
   margin: 0.67em 0;

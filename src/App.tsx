@@ -56,6 +56,7 @@ const MissingLinksPanel = React.lazy(() => import('./components/MissingLinksPane
 const IndexDiagnosticsPanel = React.lazy(() => import('./components/IndexDiagnosticsPanel').then(m => ({ default: m.IndexDiagnosticsPanel })))
 const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
+const ReadingToolsPanel = React.lazy(() => import('./components/ReadingToolsPanel').then(m => ({ default: m.ReadingToolsPanel })))
 const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
 const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
 const WorkspaceDashboardPanel = React.lazy(() => import('./components/WorkspaceDashboardPanel').then(m => ({ default: m.WorkspaceDashboardPanel })))
@@ -110,6 +111,21 @@ import {
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
 import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from './utils/indexDiagnostics'
 import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
+import {
+  addReaderMark,
+  buildReadingLandmarks,
+  buildResumePoint,
+  getDefaultReadingPresets,
+  normalizeLayoutMode,
+  updateReadLaterStatus,
+  upsertReadLaterItem,
+  type ReaderMark,
+  type ReadLaterItem,
+  type ReadLaterStatus,
+  type ReadingLandmark,
+  type ReadingLayoutMode,
+  type ReadingPreset,
+} from './utils/readingExperience'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
@@ -117,6 +133,20 @@ const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
 const PACKAGE_HISTORY_KEY = 'package-history'
 const OPERATION_SNAPSHOTS_KEY = 'operation-snapshots'
 const RELEASE_AUTOMATION_VERSION = '1.5.6'
+const READER_MARKS_KEY = 'reader-marks'
+const READER_QUEUE_KEY = 'reader-queue'
+const READER_PRESET_KEY = 'reader-preset'
+const READER_LAYOUT_KEY = 'reader-layout'
+
+function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
+  try {
+    const stored = getStorageItem(key, '[]')
+    const parsed = stored ? JSON.parse(stored) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 function loadOperationSnapshots(): OperationSnapshot[] {
   try {
@@ -190,7 +220,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard, showActionWorkbench,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showReadingTools, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard, showActionWorkbench,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -237,6 +267,14 @@ function AppInner() {
   const [indexSettings, setIndexSettings] = useState<IndexSettings>(() => loadIndexSettings())
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
+  const [readerMarks, setReaderMarks] = useState<ReaderMark[]>(() => loadJsonArray<ReaderMark>(READER_MARKS_KEY))
+  const [readLaterItems, setReadLaterItems] = useState<ReadLaterItem[]>(() => loadJsonArray<ReadLaterItem>(READER_QUEUE_KEY))
+  const [selectedReaderText, setSelectedReaderText] = useState('')
+  const [activeReaderPresetId, setActiveReaderPresetId] = useState<ReadingPreset['id']>(() => {
+    const stored = getStorageItem(READER_PRESET_KEY)
+    return stored === 'longform' || stored === 'code-doc' || stored === 'paper' ? stored : 'default'
+  })
+  const [readingLayoutMode, setReadingLayoutMode] = useState<ReadingLayoutMode>(() => normalizeLayoutMode(getStorageItem(READER_LAYOUT_KEY)))
   const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
   const hasRestoredLastFolderRef = useRef(false)
   const indexAbortControllerRef = useRef<AbortController | null>(null)
@@ -376,6 +414,30 @@ function AppInner() {
     RELEASE_AUTOMATION_VERSION,
     `docs/releases/v${RELEASE_AUTOMATION_VERSION}.md`,
   ), [])
+  const readingPresets = useMemo(() => getDefaultReadingPresets(), [])
+  const activeReadingPreset = useMemo(() => (
+    readingPresets.find(preset => preset.id === activeReaderPresetId) || readingPresets[0]
+  ), [activeReaderPresetId, readingPresets])
+  const activeReaderFileKey = activeTab?.filePath || activeTab?.id || ''
+  const activeReaderMarks = useMemo(() => (
+    readerMarks.filter(mark => mark.filePath === activeReaderFileKey)
+  ), [activeReaderFileKey, readerMarks])
+  const activeReadingHighlights = useMemo(() => (
+    activeReaderMarks.filter(mark => mark.kind === 'highlight').map(mark => mark.text)
+  ), [activeReaderMarks])
+  const activeResumePoint = useMemo(() => {
+    if (!activeTab) return null
+    const history = readingHistory.find(item => item.filePath === activeTab.filePath)
+    if (!history) return null
+    return buildResumePoint({
+      filePath: activeTab.filePath || activeTab.id,
+      fileName: activeTab.name,
+      content: activeTab.content || '',
+      progress: history.progress,
+      scrollTop: history.scrollTop || 0,
+    }, history.updatedAt)
+  }, [activeTab, readingHistory])
+  const readingLandmarks = useMemo(() => buildReadingLandmarks(activeTab?.content || ''), [activeTab?.content])
 
   // ── Effects ──
 
@@ -1164,6 +1226,118 @@ function AppInner() {
     })
   }, [])
 
+  const persistReaderMarks = useCallback((next: ReaderMark[]) => {
+    setReaderMarks(next)
+    setStorageItem(READER_MARKS_KEY, JSON.stringify(next))
+  }, [])
+
+  const persistReadLaterItems = useCallback((next: ReadLaterItem[]) => {
+    setReadLaterItems(next)
+    setStorageItem(READER_QUEUE_KEY, JSON.stringify(next))
+    setStorageItem('read-later-count', String(next.filter(item => item.status !== 'done').length))
+  }, [])
+
+  const getSelectedLine = useCallback((text: string): number | undefined => {
+    if (!activeTab?.content || !text) return undefined
+    const index = activeTab.content.indexOf(text)
+    if (index < 0) return undefined
+    return activeTab.content.slice(0, index).split('\n').length
+  }, [activeTab?.content])
+
+  const handleAddReaderMark = useCallback((kind: 'highlight' | 'excerpt') => {
+    if (!activeTab || !selectedReaderText.trim()) {
+      showToast('请先选中正文文本')
+      return
+    }
+    const next = addReaderMark(readerMarks, {
+      filePath: activeReaderFileKey,
+      fileName: activeTab.name,
+      text: selectedReaderText,
+      kind,
+      color: kind === 'highlight' ? 'yellow' : 'blue',
+      line: getSelectedLine(selectedReaderText),
+    })
+    persistReaderMarks(next)
+    showToast(kind === 'highlight' ? '高亮已保存' : '摘录已保存')
+  }, [activeReaderFileKey, activeTab, getSelectedLine, persistReaderMarks, readerMarks, selectedReaderText, showToast])
+
+  const handleRemoveReaderMark = useCallback((id: string) => {
+    persistReaderMarks(readerMarks.filter(mark => mark.id !== id))
+    showToast('阅读标记已删除')
+  }, [persistReaderMarks, readerMarks, showToast])
+
+  const handleAddReadLater = useCallback(() => {
+    if (!activeTab) {
+      showToast('当前没有可加入稍后读的文档')
+      return
+    }
+    const next = upsertReadLaterItem(readLaterItems, {
+      filePath: activeReaderFileKey,
+      fileName: activeTab.name,
+      heading: currentHeading || undefined,
+      status: 'unread',
+    })
+    persistReadLaterItems(next)
+    showToast('已加入稍后读')
+  }, [activeReaderFileKey, activeTab, currentHeading, persistReadLaterItems, readLaterItems, showToast])
+
+  const handleOpenReadLater = useCallback((item: ReadLaterItem) => {
+    void openFileAtLine(item.filePath)
+  }, [openFileAtLine])
+
+  const handleUpdateReadLaterStatus = useCallback((id: string, status: ReadLaterStatus) => {
+    persistReadLaterItems(updateReadLaterStatus(readLaterItems, id, status))
+    showToast(status === 'done' ? '已标记为已读' : '阅读状态已更新')
+  }, [persistReadLaterItems, readLaterItems, showToast])
+
+  const handleResumeReading = useCallback(() => {
+    if (!activeResumePoint) {
+      showToast('当前文档暂无可恢复位置')
+      return
+    }
+    if (activeTab?.filePath === activeResumePoint.filePath && mainRef.current) {
+      mainRef.current.scrollTop = activeResumePoint.scrollTop
+      return
+    }
+    void openFileAtLine(activeResumePoint.filePath, undefined, activeResumePoint.scrollTop)
+  }, [activeResumePoint, activeTab?.filePath, openFileAtLine, showToast])
+
+  const handleApplyReadingPreset = useCallback((preset: ReadingPreset) => {
+    setActiveReaderPresetId(preset.id)
+    setStorageItem(READER_PRESET_KEY, preset.id)
+    setFontSize(preset.fontSize)
+    setShowOutline(preset.showOutline)
+    if (activeTab?.filePath) {
+      updateFileSetting('fontSize', preset.fontSize)
+      updateFileSetting('showOutline', preset.showOutline)
+    }
+    const nextLayout = preset.columns ? 'columns' : readingLayoutMode
+    setReadingLayoutMode(nextLayout)
+    setStorageItem(READER_LAYOUT_KEY, nextLayout)
+    if (nextLayout !== 'split') setSplitView(false, null)
+    showToast(`已应用阅读预设：${preset.name}`)
+  }, [activeTab?.filePath, readingLayoutMode, setFontSize, setShowOutline, setSplitView, showToast, updateFileSetting])
+
+  const handleJumpToReadingLandmark = useCallback((landmark: ReadingLandmark) => {
+    const element = document.querySelector(`[data-line="${landmark.line}"]`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    setShowSource(true)
+    window.setTimeout(() => setHighlightedLine(landmark.line), 0)
+  }, [setHighlightedLine, setShowSource])
+
+  const handleSetReadingLayoutMode = useCallback((mode: ReadingLayoutMode) => {
+    setReadingLayoutMode(mode)
+    setStorageItem(READER_LAYOUT_KEY, mode)
+    if (mode === 'split') {
+      if (!isSplitView) toggleSplitView()
+    } else {
+      setSplitView(false, null)
+    }
+  }, [isSplitView, setSplitView, toggleSplitView])
+
   // Electron file open listener
   const handleFileOpenRef = useRef(handleFileOpen)
   handleFileOpenRef.current = handleFileOpen
@@ -1422,7 +1596,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard || showActionWorkbench ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showReadingTools || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard || showActionWorkbench ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -1574,6 +1748,17 @@ function AppInner() {
                         <span>◷</span>
                         {t('toolbar.readingTimeline')}
                       </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('readingTools')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>◫</span>
+                        阅读工具
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1688,6 +1873,10 @@ function AppInner() {
                         searchRegex={isRegex}
                         currentMatch={currentMatch}
                         matchCount={matches.length}
+                        readingHighlights={activeReadingHighlights}
+                        readingLayout={readingLayoutMode === 'columns' ? 'columns' : 'single'}
+                        readingStyle={activeReadingPreset ? { lineHeight: activeReadingPreset.lineHeight, lineWidth: activeReadingPreset.lineWidth } : undefined}
+                        onTextSelect={({ text }) => setSelectedReaderText(text)}
                         onWikiLinkClick={handleWikiLinkClick}
                       />
                     )
@@ -1704,6 +1893,8 @@ function AppInner() {
                     <MarkdownRenderer
                       content={secondaryTab.content || ''}
                       filePath={secondaryTab.filePath}
+                      readingLayout="single"
+                      readingStyle={activeReadingPreset ? { lineHeight: activeReadingPreset.lineHeight, lineWidth: activeReadingPreset.lineWidth } : undefined}
                       onWikiLinkClick={handleWikiLinkClick}
                     />
                   )}
@@ -2017,6 +2208,32 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showReadingTools && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ReadingToolsPanel
+                fileName={activeTab?.name || '未打开文档'}
+                selectedText={selectedReaderText}
+                marks={activeReaderMarks}
+                readLaterItems={readLaterItems}
+                resumePoint={activeResumePoint}
+                presets={readingPresets}
+                activePresetId={activeReaderPresetId}
+                landmarks={readingLandmarks}
+                layoutMode={readingLayoutMode}
+                onAddHighlight={() => handleAddReaderMark('highlight')}
+                onAddExcerpt={() => handleAddReaderMark('excerpt')}
+                onAddReadLater={handleAddReadLater}
+                onOpenReadLater={handleOpenReadLater}
+                onUpdateReadLaterStatus={handleUpdateReadLaterStatus}
+                onResume={handleResumeReading}
+                onApplyPreset={handleApplyReadingPreset}
+                onJumpToLandmark={handleJumpToReadingLandmark}
+                onSetLayoutMode={handleSetReadingLayoutMode}
+                onRemoveMark={handleRemoveReaderMark}
+                onClose={() => closePanel('readingTools')}
+              />
+            </Suspense>
+          )}
           {showGuide && !isRestoringSession && tabs.length === 1 && tabs[0].name === '欢迎使用.md' && (
             <FirstUseGuide
               onComplete={() => {
@@ -2213,6 +2430,9 @@ function AppInner() {
               break
             case 'reading-timeline':
               openPanel('readingTimeline')
+              break
+            case 'reading-tools':
+              openPanel('readingTools')
               break
             case 'maintenance-queue':
               openPanel('maintenanceQueue')
