@@ -16,6 +16,7 @@ export type ExactStorageKey =
   | 'folder-bookmarks'
   | 'workspaces'
   | 'reading-history'
+  | 'index-settings'
 
 export type PatternStorageKey =
   | `index-diagnostics-${string}`

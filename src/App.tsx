@@ -58,7 +58,7 @@ const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').th
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getDefaultIndexSkipDirectoryNames, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
@@ -78,15 +78,11 @@ import {
 } from './utils/workspaces'
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
 import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from './utils/indexDiagnostics'
+import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
-const MAX_INDEX_FILE_SIZE = 50 * 1024 * 1024
-const INDEX_POLICY = {
-  maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
-  skipDirectoryNames: getDefaultIndexSkipDirectoryNames(),
-}
 
 function wikiPathCandidates(dir: string, target: string): string[] {
   const trimmed = target.trim()
@@ -162,6 +158,7 @@ function AppInner() {
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
   const [indexSkippedItems, setIndexSkippedItems] = useState<IndexSkippedItem[]>([])
   const [indexDiagnosticsUpdatedAt, setIndexDiagnosticsUpdatedAt] = useState<number | null>(null)
+  const [indexSettings, setIndexSettings] = useState<IndexSettings>(() => loadIndexSettings())
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
   const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
@@ -175,6 +172,7 @@ function AppInner() {
 
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
   const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
+  const indexPolicy = useMemo(() => getEffectiveIndexPolicy(indexSettings), [indexSettings])
   const wikiGraph = useMemo(() => buildWikiGraph(indexedFiles), [indexedFiles])
   const backlinks = useMemo(() => (
     activeTab?.filePath ? findBacklinks(indexedFiles, activeTab.filePath, activeTab.name) : []
@@ -294,7 +292,8 @@ function AppInner() {
           skippedItems.push(item)
           persistSkippedItems(skippedItems)
         },
-        maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
+        maxFileSizeBytes: indexPolicy.maxFileSizeBytes,
+        skipDirectoryNames: indexPolicy.skipDirectoryNames,
       })
       await indexFolder(folderPath, allFiles, {
         signal: controller.signal,
@@ -339,7 +338,7 @@ function AppInner() {
       }
       setIsIndexing(false)
     }
-  }, [currentFolderPath, refreshIndexedFiles, showToast])
+  }, [currentFolderPath, indexPolicy.maxFileSizeBytes, indexPolicy.skipDirectoryNames, refreshIndexedFiles, showToast])
 
   const cancelFolderIndex = useCallback(() => {
     indexAbortControllerRef.current?.abort()
@@ -1472,7 +1471,8 @@ function AppInner() {
                 folderPath={currentFolderPath}
                 skippedItems={indexSkippedItems}
                 isIndexing={isIndexing}
-                policy={INDEX_POLICY}
+                policy={indexPolicy}
+                settings={indexSettings}
                 updatedAt={indexDiagnosticsUpdatedAt}
                 onReindex={() => rebuildFolderIndex()}
                 onClear={() => {
@@ -1481,6 +1481,16 @@ function AppInner() {
                   if (currentFolderPath) {
                     clearSavedIndexDiagnostics(currentFolderPath)
                   }
+                }}
+                onSaveSettings={settings => {
+                  const saved = saveIndexSettings(settings)
+                  setIndexSettings(saved)
+                  showToast('索引设置已保存，重新扫描后生效')
+                }}
+                onResetSettings={() => {
+                  const defaults = resetIndexSettings()
+                  setIndexSettings(defaults)
+                  showToast('索引设置已恢复默认')
                 }}
                 onClose={() => closePanel('indexDiagnostics')}
               />

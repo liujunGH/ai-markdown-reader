@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatIndexPolicy, type IndexPolicy } from '../../utils/indexDiagnostics'
+import type { IndexSettings } from '../../utils/indexSettings'
 import { formatIndexSkippedItem, type IndexSkippedItem } from '../../utils/searchIndex'
 import styles from './IndexDiagnosticsPanel.module.css'
 
@@ -8,9 +9,12 @@ interface Props {
   skippedItems: IndexSkippedItem[]
   isIndexing: boolean
   policy: IndexPolicy
+  settings: IndexSettings
   updatedAt: number | null
   onReindex: () => void
   onClear: () => void
+  onSaveSettings: (settings: IndexSettings) => void
+  onResetSettings: () => void
   onClose: () => void
 }
 
@@ -29,8 +33,22 @@ const FILTERS: Array<{ value: ReasonFilter; label: string; ariaLabel: string }> 
   { value: 'read-error', label: '读取失败', ariaLabel: '只看读取失败' },
 ]
 
-export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, policy, updatedAt, onReindex, onClear, onClose }: Props) {
+export function IndexDiagnosticsPanel({
+  folderPath,
+  skippedItems,
+  isIndexing,
+  policy,
+  settings,
+  updatedAt,
+  onReindex,
+  onClear,
+  onSaveSettings,
+  onResetSettings,
+  onClose,
+}: Props) {
   const [reasonFilter, setReasonFilter] = useState<ReasonFilter>('all')
+  const [draftMaxFileSizeMb, setDraftMaxFileSizeMb] = useState(String(settings.maxFileSizeMb))
+  const [draftExtraDirectories, setDraftExtraDirectories] = useState(settings.extraSkipDirectoryNames.join('\n'))
   const reasonCounts = countReasons(skippedItems)
   const formattedPolicy = useMemo(() => formatIndexPolicy(policy), [policy])
   const filteredItems = useMemo(() => (
@@ -38,6 +56,11 @@ export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, po
       ? skippedItems
       : skippedItems.filter(item => item.reason === reasonFilter)
   ), [reasonFilter, skippedItems])
+
+  useEffect(() => {
+    setDraftMaxFileSizeMb(String(settings.maxFileSizeMb))
+    setDraftExtraDirectories(settings.extraSkipDirectoryNames.join('\n'))
+  }, [settings])
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -73,6 +96,49 @@ export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, po
             </div>
           </dl>
         </div>
+
+        <form
+          className={styles.settings}
+          onSubmit={event => {
+            event.preventDefault()
+            onSaveSettings({
+              maxFileSizeMb: Number(draftMaxFileSizeMb),
+              extraSkipDirectoryNames: draftExtraDirectories.split(/\r?\n|,/).map(name => name.trim()).filter(Boolean),
+            })
+          }}
+        >
+          <div className={styles.settingsHeader}>
+            <strong>索引设置</strong>
+            <span>保存后下次扫描生效，可直接点击重新扫描。</span>
+          </div>
+          <div className={styles.settingsGrid}>
+            <label>
+              <span>最大索引文件大小 MB</span>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                step="1"
+                value={draftMaxFileSizeMb}
+                onChange={event => setDraftMaxFileSizeMb(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>额外忽略目录</span>
+              <textarea
+                value={draftExtraDirectories}
+                onChange={event => setDraftExtraDirectories(event.target.value)}
+                placeholder="每行一个目录名，如 drafts"
+              />
+            </label>
+          </div>
+          <div className={styles.settingsActions}>
+            <button type="submit" aria-label="保存索引设置">保存设置</button>
+            <button type="button" className={styles.secondaryBtn} onClick={onResetSettings} aria-label="恢复默认索引设置">
+              恢复默认
+            </button>
+          </div>
+        </form>
 
         <div className={styles.actions}>
           <button type="button" className={styles.secondaryBtn} onClick={onClear} disabled={skippedItems.length === 0} aria-label="清空诊断">

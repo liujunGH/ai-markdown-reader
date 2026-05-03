@@ -133,6 +133,85 @@
   white-space: nowrap;
 }
 
+.settings {
+  display: grid;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settingsHeader strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.settingsHeader span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1.45fr);
+  gap: 10px;
+}
+
+.settingsGrid label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settingsGrid input,
+.settingsGrid textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.settingsGrid textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+
+.settingsActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settingsActions button {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settingsActions .secondaryBtn {
+  border-color: var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -280,8 +359,11 @@
   }
 
   .policy > div:first-child,
-  .policy dl {
+  .policy dl,
+  .settingsHeader,
+  .settingsGrid {
     grid-template-columns: 1fr;
+    display: grid;
   }
 
   .itemTop {

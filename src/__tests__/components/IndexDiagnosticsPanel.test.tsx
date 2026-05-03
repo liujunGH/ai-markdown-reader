@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { IndexDiagnosticsPanel } from '../../components/IndexDiagnosticsPanel'
+import type { IndexSettings } from '../../utils/indexSettings'
 
 describe('IndexDiagnosticsPanel', () => {
   it('summarizes skipped index items by reason and exposes reindexing', async () => {
@@ -31,9 +32,15 @@ describe('IndexDiagnosticsPanel', () => {
           maxFileSizeBytes: 50 * 1024 * 1024,
           skipDirectoryNames: ['.git', 'node_modules', 'dist'],
         }}
+        settings={{
+          maxFileSizeMb: 50,
+          extraSkipDirectoryNames: [],
+        }}
         updatedAt={1710000000000}
         onReindex={onReindex}
         onClear={onClear}
+        onSaveSettings={vi.fn()}
+        onResetSettings={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -79,9 +86,15 @@ describe('IndexDiagnosticsPanel', () => {
           maxFileSizeBytes: 50 * 1024 * 1024,
           skipDirectoryNames: ['.git', 'node_modules'],
         }}
+        settings={{
+          maxFileSizeMb: 50,
+          extraSkipDirectoryNames: [],
+        }}
         updatedAt={null}
         onReindex={vi.fn()}
         onClear={vi.fn()}
+        onSaveSettings={vi.fn()}
+        onResetSettings={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -89,5 +102,93 @@ describe('IndexDiagnosticsPanel', () => {
     expect(screen.getByText('没有跳过项')).toBeInTheDocument()
     expect(screen.getByText('最近一次索引没有发现被忽略、过大或读取失败的项目。')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '清空诊断' })).toBeDisabled()
+  })
+
+  it('edits and resets index settings', async () => {
+    const user = userEvent.setup()
+    const onSaveSettings = vi.fn()
+    const onResetSettings = vi.fn()
+
+    render(
+      <IndexDiagnosticsPanel
+        folderPath="/docs"
+        skippedItems={[]}
+        isIndexing={false}
+        policy={{
+          maxFileSizeBytes: 75 * 1024 * 1024,
+          skipDirectoryNames: ['.git', 'node_modules', 'drafts'],
+        }}
+        settings={{
+          maxFileSizeMb: 75,
+          extraSkipDirectoryNames: ['drafts'],
+        }}
+        updatedAt={null}
+        onReindex={vi.fn()}
+        onClear={vi.fn()}
+        onSaveSettings={onSaveSettings}
+        onResetSettings={onResetSettings}
+        onClose={vi.fn()}
+      />
+    )
+
+    const maxSizeInput = screen.getByLabelText('最大索引文件大小 MB')
+    await user.clear(maxSizeInput)
+    await user.type(maxSizeInput, '80')
+    await user.clear(screen.getByLabelText('额外忽略目录'))
+    await user.type(screen.getByLabelText('额外忽略目录'), 'drafts\nexports')
+    await user.click(screen.getByRole('button', { name: '保存索引设置' }))
+
+    expect(onSaveSettings).toHaveBeenCalledWith({
+      maxFileSizeMb: 80,
+      extraSkipDirectoryNames: ['drafts', 'exports'],
+    })
+
+    await user.click(screen.getByRole('button', { name: '恢复默认索引设置' }))
+    expect(onResetSettings).toHaveBeenCalled()
+  })
+
+  it('syncs setting drafts when saved settings change outside the panel', () => {
+    const baseProps = {
+      folderPath: '/docs',
+      skippedItems: [],
+      isIndexing: false,
+      policy: {
+        maxFileSizeBytes: 75 * 1024 * 1024,
+        skipDirectoryNames: ['.git', 'node_modules', 'drafts'],
+      },
+      updatedAt: null,
+      onReindex: vi.fn(),
+      onClear: vi.fn(),
+      onSaveSettings: vi.fn(),
+      onResetSettings: vi.fn(),
+      onClose: vi.fn(),
+    }
+    const initialSettings: IndexSettings = {
+      maxFileSizeMb: 75,
+      extraSkipDirectoryNames: ['drafts'],
+    }
+    const { rerender } = render(
+      <IndexDiagnosticsPanel
+        {...baseProps}
+        settings={initialSettings}
+      />
+    )
+
+    rerender(
+      <IndexDiagnosticsPanel
+        {...baseProps}
+        policy={{
+          maxFileSizeBytes: 50 * 1024 * 1024,
+          skipDirectoryNames: ['.git', 'node_modules'],
+        }}
+        settings={{
+          maxFileSizeMb: 50,
+          extraSkipDirectoryNames: [],
+        }}
+      />
+    )
+
+    expect(screen.getByLabelText('最大索引文件大小 MB')).toHaveValue(50)
+    expect(screen.getByLabelText('额外忽略目录')).toHaveValue('')
   })
 })
