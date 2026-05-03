@@ -1,55 +1,43 @@
-# AI Markdown Reader
+# Markdown Reader
 
-> A modern, AI-powered Markdown reader for desktop and web.
+Markdown Reader 是一个基于 Electron + React + TypeScript 的桌面 Markdown 阅读器，面向本地文档、个人知识库和发布前自检场景。
 
-## Features
+## 核心能力
 
-- 🚀 **Fast & Lightweight** — Built with React and Vite for blazing performance
-- 🤖 **AI Assistant** — Chat with an AI about your document content
-- 🔍 **Semantic Search** — Natural language search across your Markdown files
-- 🌓 **Dark / Light / Sepia Themes** — Easy on the eyes, day or night
-- 📑 **Tabs & Split View** — Work on multiple files side by side
-- 🔖 **Bookmarks & Outline** — Navigate large documents with ease
-- 📤 **Export** — Export to HTML, PDF, or copy as rich text
-- ⌨️ **Keyboard Shortcuts** — Power-user friendly shortcuts for everything
-- 🗂️ **Folder Explorer** — Browse and open files from local folders
+- Markdown 阅读：支持 Mermaid、KaTeX、代码高亮、任务列表、WikiLink、图片预览和导出。
+- 文件夹工作区：打开本地文件夹后可浏览文件树、建立全文索引、跨文件搜索和恢复上次工作区。
+- 知识库维护：提供知识库健康报告、反向链接、文档图谱、缺失链接、索引诊断、图片检查和阅读时间线。
+- 运营仪表盘：集中展示工作区质量、可执行修复建议、链接重命名安全、图片资产计划、阅读助手和发布辅助。
+- 发布前检查：打包或分享前检查健康分、待处理任务和索引覆盖率，并复制 Markdown 报告。
 
-## Download
+## 推荐工作流
 
-Get the latest release for your platform:
+1. 打开一个 Markdown 文件夹。
+2. 在工具菜单中建立或刷新索引。
+3. 打开“运营仪表盘”查看整体状态。
+4. 进入“待处理队列”逐项处理缺失链接、图片问题、文档健康问题和索引跳过项。
+5. 使用“发布前检查”确认当前工作区适合打包或分享。
 
-- [Windows (.exe)](https://github.com/liujunGH/ai-markdown-reader/releases/latest)
-- [macOS (.dmg)](https://github.com/liujunGH/ai-markdown-reader/releases/latest)
-- [Linux (.AppImage)](https://github.com/liujunGH/ai-markdown-reader/releases/latest)
+## 本地下载
 
-Or use the web version directly in your browser.
+从 GitHub Releases 下载最新版：
 
-## Quick Start
+- [macOS DMG](https://github.com/liujunGH/ai-markdown-reader/releases/latest)
+- [Windows 安装包](https://github.com/liujunGH/ai-markdown-reader/releases/latest)
 
-1. **Open a file** — Click the open button or drag & drop a `.md` file
-2. **Navigate** — Use the outline or floating TOC to jump between sections
-3. **Search** — Press `Ctrl+F` for in-document search, or `Ctrl+Shift+F` for global search
-4. **Ask AI** — Select text and ask the AI assistant for explanations or summaries
-5. **Customize** — Change themes, font size, and even add custom CSS
+macOS 自用包为 ad-hoc 签名，首次打开时可在 Finder 中右键选择“打开”。
 
-## Keyboard Shortcuts
+## 开发命令
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+O` | Open file |
-| `Ctrl+Shift+O` | Open folder |
-| `Ctrl+F` | Search |
-| `Ctrl+Shift+F` | Global search |
-| `Ctrl+S` | Toggle source view |
-| `Ctrl+E` | Export |
-| `Ctrl+.` | Focus mode |
-| `Ctrl+\` | Split view |
-| `F1` | Show shortcuts |
+```bash
+npm install
+npm run dev
+npm run lint
+npm test
+npm run build
+npm run electron:build:mac
+```
 
-## Contributing
+## 当前版本
 
-We welcome contributions! Please check out our [issue templates](https://github.com/liujunGH/ai-markdown-reader/issues) to report bugs or request features.
-
-## License
-
-MIT © AI Markdown Reader Contributors
+当前文档对应 v1.5.5。

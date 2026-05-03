@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.4-blue)
+![Version](https://img.shields.io/badge/Version-1.5.5-blue)
 
 ## 功能特性
 
@@ -67,6 +67,18 @@
 - **文件拖拽** - 支持将外部文件拖入应用打开，拖拽时有视觉反馈
 - **在 Finder 中显示** - 右键菜单中可选择在文件管理器中显示当前文件
 - **复制文件路径** - 方便复制当前文件的完整路径
+
+### 工作区与知识库维护
+- **运营仪表盘** - 集中查看工作区质量、可执行修复、链接安全、图片资产、阅读助手和发布辅助
+- **工作区管理** - 保存常用文件夹，支持置顶、重命名、清理失效工作区和快速切换
+- **知识库健康报告** - 综合缺失链接、孤立文档、当前文档问题、图片问题和索引覆盖率生成健康分
+- **待处理队列** - 将缺失链接、图片问题、索引跳过、文档健康问题整理成可处理清单
+- **发布前检查** - 打包前汇总健康分、维护队列和索引覆盖率，支持复制 Markdown 报告
+- **索引诊断** - 记录跳过目录、大文件、读取失败文件，并支持调整索引策略后重建
+- **反向链接** - 查看哪些文档引用了当前文件
+- **文档图谱** - 可视化工作区 Markdown 文件之间的链接关系
+- **缺失链接助手** - 汇总不存在的 WikiLink，并提供可能匹配的已有文档
+- **阅读时间线** - 根据阅读历史继续回到最近阅读的文档
 
 ### 导航与大纲
 - **目录导航** - 大纲自动跟踪当前阅读位置，支持章节折叠/展开
@@ -134,8 +146,8 @@
 ### macOS 自用版
 
 当前本地构建产物位于 `release/`：
-- Apple Silicon 芯片（M1/M2/M3/M4）使用 `Markdown Reader-1.5.1-arm64.dmg`
-- Intel 芯片使用 `Markdown Reader-1.5.1-x64.dmg`
+- Apple Silicon 芯片（M1/M2/M3/M4）使用 `Markdown Reader-1.5.5-arm64.dmg`
+- Intel 芯片使用 `Markdown Reader-1.5.5-x64.dmg`
 
 本项目的本地包默认使用 ad-hoc 签名，首次打开时 macOS 可能会拦截。自用安装时可在 Finder 中右键应用选择“打开”。如果系统仍提示安全限制，可执行：
 
@@ -143,7 +155,7 @@
 xattr -cr /Applications/Markdown\ Reader.app
 ```
 
-v1.5.1 已按纯 Markdown 阅读器路线收敛：保留 Markdown、Mermaid、KaTeX、搜索、标签、导出等核心阅读功能；移除代码执行、未落地 AI 能力、诊断面板、数据备份、自定义 CSS、阅读统计等偏高级能力。
+v1.5.5 延续纯 Markdown 阅读器路线，同时强化个人知识库维护：工作区健康、索引诊断、图片检查、缺失链接、反向链接、文档图谱、待处理队列和发布前检查都集中在工具菜单中。
 
 ### Windows
 下载 `Markdown-Reader-x.x.x.exe` 并运行安装程序。
@@ -211,6 +223,11 @@ markdown-reader/
 │   │   ├── GlobalSearch/     # 全局搜索
 │   │   ├── QuickJump/        # 快速跳转
 │   │   ├── ExportPanel/      # 导出面板
+│   │   ├── WorkspaceDashboardPanel/ # 运营仪表盘
+│   │   ├── MaintenanceQueuePanel/   # 待处理队列
+│   │   ├── ReleasePreflightPanel/   # 发布前检查
+│   │   ├── KnowledgeHealthPanel/    # 知识库健康报告
+│   │   ├── IndexDiagnosticsPanel/   # 索引诊断
 │   │   ├── ErrorBoundary/    # 错误边界
 │   │   └── Skeleton/         # 骨架屏
 │   ├── context/        # React Context
