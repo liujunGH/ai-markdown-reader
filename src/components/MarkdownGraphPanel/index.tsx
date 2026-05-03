@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import styles from './MarkdownGraphPanel.module.css'
 import type { IndexProgress } from '../../utils/searchIndex'
 
@@ -24,7 +24,7 @@ export interface MarkdownGraph {
 
 interface Props {
   graph: MarkdownGraph
-  onOpenFile: (path: string) => void
+  onOpenFile: (path: string, line?: number) => void
   onReindex?: () => Promise<void> | void
   onClose: () => void
   folderPath?: string
@@ -49,13 +49,24 @@ export function MarkdownGraphPanel({
   indexProgress,
   onCancelIndex,
 }: Props) {
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const positionedNodes = useMemo(() => layoutNodes(graph.nodes), [graph.nodes])
   const nodeById = useMemo(() => new Map(positionedNodes.map(node => [node.id, node])), [positionedNodes])
+  const graphNodeById = useMemo(() => new Map(graph.nodes.map(node => [node.id, node])), [graph.nodes])
   const topNodes = useMemo(() => (
     [...graph.nodes]
       .sort((a, b) => (b.incoming + b.outgoing) - (a.incoming + a.outgoing) || a.label.localeCompare(b.label))
       .slice(0, 12)
   ), [graph.nodes])
+  const focusedNode = focusedNodeId ? graphNodeById.get(focusedNodeId) : null
+  const focusedIncoming = useMemo(
+    () => focusedNodeId ? graph.edges.filter(edge => edge.to === focusedNodeId) : [],
+    [focusedNodeId, graph.edges],
+  )
+  const focusedOutgoing = useMemo(
+    () => focusedNodeId ? graph.edges.filter(edge => edge.from === focusedNodeId) : [],
+    [focusedNodeId, graph.edges],
+  )
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -120,15 +131,15 @@ export function MarkdownGraphPanel({
                         y1={from.y}
                         x2={to.x}
                         y2={to.y}
-                        className={styles.edge}
+                        className={`${styles.edge} ${focusedNodeId && (edge.from === focusedNodeId || edge.to === focusedNodeId) ? styles.edgeActive : ''} ${focusedNodeId && edge.from !== focusedNodeId && edge.to !== focusedNodeId ? styles.edgeMuted : ''}`}
                       />
                     )
                   })}
                   {positionedNodes.map(node => (
                     <g
                       key={node.id}
-                      className={`${styles.nodeGroup} ${node.filePath ? styles.clickableNode : ''}`}
-                      onClick={() => node.filePath && onOpenFile(node.filePath)}
+                      className={`${styles.nodeGroup} ${node.filePath ? styles.clickableNode : ''} ${focusedNodeId === node.id ? styles.nodeFocused : ''}`}
+                      onClick={() => setFocusedNodeId(node.id)}
                     >
                       <circle cx={node.x} cy={node.y} r={node.radius} className={styles.nodeCircle} />
                       <text x={node.x} y={node.y + node.radius + 14} className={styles.nodeLabel}>
@@ -144,21 +155,34 @@ export function MarkdownGraphPanel({
                   <h4>核心节点</h4>
                   <div className={styles.nodeList}>
                     {topNodes.map(node => (
-                      <NodeRow key={node.id} node={node} onOpenFile={onOpenFile} />
+                      <NodeRow key={node.id} node={node} isFocused={focusedNodeId === node.id} onFocusNode={setFocusedNodeId} />
                     ))}
                   </div>
                 </section>
 
                 <section className={styles.section}>
-                  <h4>孤立文档</h4>
-                  {graph.orphanNodes.length === 0 ? (
-                    <div className={styles.muted}>没有孤立文档</div>
+                  {focusedNode ? (
+                    <FocusedNodePanel
+                      node={focusedNode}
+                      incoming={focusedIncoming}
+                      outgoing={focusedOutgoing}
+                      nodeById={graphNodeById}
+                      onOpenFile={onOpenFile}
+                      onClear={() => setFocusedNodeId(null)}
+                    />
                   ) : (
-                    <div className={styles.orphanList}>
-                      {graph.orphanNodes.slice(0, 24).map((node, index) => (
-                        <OrphanNode key={orphanKey(node, index)} node={node} onOpenFile={onOpenFile} />
-                      ))}
-                    </div>
+                    <>
+                      <h4>孤立文档</h4>
+                      {graph.orphanNodes.length === 0 ? (
+                        <div className={styles.muted}>没有孤立文档</div>
+                      ) : (
+                        <div className={styles.orphanList}>
+                          {graph.orphanNodes.slice(0, 24).map((node, index) => (
+                            <OrphanNode key={orphanKey(node, index)} node={node} onOpenFile={onOpenFile} />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </section>
               </div>
@@ -179,7 +203,15 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   )
 }
 
-function NodeRow({ node, onOpenFile }: { node: MarkdownGraphNode; onOpenFile: (path: string) => void }) {
+function NodeRow({
+  node,
+  isFocused,
+  onFocusNode,
+}: {
+  node: MarkdownGraphNode
+  isFocused: boolean
+  onFocusNode: (id: string) => void
+}) {
   const content = (
     <>
       <span className={styles.nodeName}>{node.label}</span>
@@ -192,9 +224,111 @@ function NodeRow({ node, onOpenFile }: { node: MarkdownGraphNode; onOpenFile: (p
   }
 
   return (
-    <button type="button" className={styles.nodeRow} onClick={() => onOpenFile(node.filePath || '')}>
+    <button
+      type="button"
+      className={`${styles.nodeRow} ${isFocused ? styles.nodeRowFocused : ''}`}
+      onClick={() => onFocusNode(node.id)}
+      aria-label={`聚焦节点 ${node.label}`}
+    >
       {content}
     </button>
+  )
+}
+
+function FocusedNodePanel({
+  node,
+  incoming,
+  outgoing,
+  nodeById,
+  onOpenFile,
+  onClear,
+}: {
+  node: MarkdownGraphNode
+  incoming: MarkdownGraphEdge[]
+  outgoing: MarkdownGraphEdge[]
+  nodeById: Map<string, MarkdownGraphNode>
+  onOpenFile: (path: string, line?: number) => void
+  onClear: () => void
+}) {
+  return (
+    <div className={styles.focusPanel} role="region" aria-label={`节点关系 ${node.label}`}>
+      <div className={styles.focusHeader}>
+        <div>
+          <h4>{node.label}</h4>
+          <span>入 {incoming.length} · 出 {outgoing.length}</span>
+        </div>
+        <button type="button" onClick={onClear}>清除</button>
+      </div>
+
+      <LinkGroup
+        title="入链"
+        emptyText="没有入链"
+        edges={incoming}
+        getPeer={edge => nodeById.get(edge.from)}
+        makeLabel={(peer, edge) => `打开来源 ${peer?.label || edge.from} 行 ${edge.line}`}
+        onOpenFile={onOpenFile}
+      />
+      <LinkGroup
+        title="出链"
+        emptyText="没有出链"
+        edges={outgoing}
+        getPeer={edge => nodeById.get(edge.to)}
+        makeLabel={(peer, edge) => `打开目标 ${peer?.label || edge.to} 行 ${edge.line}`}
+        onOpenFile={onOpenFile}
+      />
+    </div>
+  )
+}
+
+function LinkGroup({
+  title,
+  emptyText,
+  edges,
+  getPeer,
+  makeLabel,
+  onOpenFile,
+}: {
+  title: string
+  emptyText: string
+  edges: MarkdownGraphEdge[]
+  getPeer: (edge: MarkdownGraphEdge) => MarkdownGraphNode | undefined
+  makeLabel: (peer: MarkdownGraphNode | undefined, edge: MarkdownGraphEdge) => string
+  onOpenFile: (path: string, line?: number) => void
+}) {
+  return (
+    <div className={styles.linkGroup}>
+      <h5>{title}</h5>
+      {edges.length === 0 ? (
+        <div className={styles.muted}>{emptyText}</div>
+      ) : (
+        <div className={styles.linkRows}>
+          {edges.map((edge, index) => {
+            const peer = getPeer(edge)
+            const label = peer?.label || edge.to
+            if (!peer?.filePath) {
+              return (
+                <div key={`${edge.from}-${edge.to}-${edge.line}-${index}`} className={`${styles.linkRow} ${styles.disabledRow}`}>
+                  <span>{label}</span>
+                  <small>行 {edge.line}</small>
+                </div>
+              )
+            }
+            return (
+              <button
+                key={`${edge.from}-${edge.to}-${edge.line}-${index}`}
+                type="button"
+                className={styles.linkRow}
+                aria-label={makeLabel(peer, edge)}
+                onClick={() => onOpenFile(peer.filePath || '', edge.line)}
+              >
+                <span>{label}</span>
+                <small>行 {edge.line}</small>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
