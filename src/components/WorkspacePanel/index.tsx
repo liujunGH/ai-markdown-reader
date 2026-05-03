@@ -20,6 +20,10 @@ interface Props {
   onTogglePinned: (id: string) => void
   onRenameWorkspace: (id: string, name: string) => void
   onCleanInvalidWorkspaces: () => void
+  onOpenGlobalSearch?: () => void
+  onOpenKnowledgeHealth?: () => void
+  onOpenMarkdownGraph?: () => void
+  onOpenReadingTimeline?: () => void
   onClose: () => void
 }
 
@@ -33,6 +37,10 @@ export function WorkspacePanel({
   onTogglePinned,
   onRenameWorkspace,
   onCleanInvalidWorkspaces,
+  onOpenGlobalSearch,
+  onOpenKnowledgeHealth,
+  onOpenMarkdownGraph,
+  onOpenReadingTimeline,
   onClose,
 }: Props) {
   const sortedWorkspaces = useMemo(
@@ -71,6 +79,52 @@ export function WorkspacePanel({
             title={currentWorkspace ? '更新当前工作区' : '保存当前工作区'}
           >
             {currentWorkspace ? '更新' : '保存'}
+          </button>
+        </section>
+
+        <section className={styles.quickActions} aria-label="工作区快捷动作">
+          <button
+            type="button"
+            className={styles.quickAction}
+            onClick={onOpenGlobalSearch}
+            disabled={!currentFolderPath}
+            aria-label="搜索当前工作区"
+            title={currentFolderPath ? '搜索当前工作区' : '打开文件夹后可用'}
+          >
+            <span>⌕</span>
+            搜索
+          </button>
+          <button
+            type="button"
+            className={styles.quickAction}
+            onClick={onOpenReadingTimeline}
+            aria-label="打开阅读时间线"
+            title="打开阅读时间线"
+          >
+            <span>◷</span>
+            时间线
+          </button>
+          <button
+            type="button"
+            className={styles.quickAction}
+            onClick={onOpenKnowledgeHealth}
+            disabled={!currentFolderPath}
+            aria-label="查看知识健康报告"
+            title={currentFolderPath ? '查看知识健康报告' : '打开文件夹后可用'}
+          >
+            <span>✓</span>
+            健康
+          </button>
+          <button
+            type="button"
+            className={styles.quickAction}
+            onClick={onOpenMarkdownGraph}
+            disabled={!currentFolderPath}
+            aria-label="查看文档图谱"
+            title={currentFolderPath ? '查看文档图谱' : '打开文件夹后可用'}
+          >
+            <span>◎</span>
+            图谱
           </button>
         </section>
 

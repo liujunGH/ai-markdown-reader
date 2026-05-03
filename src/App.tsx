@@ -1362,6 +1362,22 @@ function AppInner() {
                 onTogglePinned={handleToggleWorkspacePinned}
                 onRenameWorkspace={handleRenameWorkspace}
                 onCleanInvalidWorkspaces={handleCleanInvalidWorkspaces}
+                onOpenGlobalSearch={() => {
+                  closePanel('workspaces')
+                  openPanel('globalSearch')
+                }}
+                onOpenKnowledgeHealth={() => {
+                  closePanel('workspaces')
+                  openPanel('knowledgeHealth')
+                }}
+                onOpenMarkdownGraph={() => {
+                  closePanel('workspaces')
+                  openPanel('markdownGraph')
+                }}
+                onOpenReadingTimeline={() => {
+                  closePanel('workspaces')
+                  openPanel('readingTimeline')
+                }}
                 onClose={() => closePanel('workspaces')}
               />
             </Suspense>
