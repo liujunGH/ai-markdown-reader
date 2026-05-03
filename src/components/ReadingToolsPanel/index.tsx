@@ -1,8 +1,11 @@
 import type {
   ReaderMark,
+  AnnotationOverview,
+  AnnotationOverviewItem,
   ReadLaterItem,
   ReadLaterStatus,
   ChapterProgress,
+  ChapterReadingAction,
   ReadingStats,
   ChapterCompletion,
   FocusTimer,
@@ -11,6 +14,8 @@ import type {
   ReadingLayoutMode,
   ReadingPreset,
   ReadingResumePoint,
+  ReadingSnapshot,
+  ReadingStatusCard,
 } from '../../utils/readingExperience'
 import styles from './ReadingToolsPanel.module.css'
 
@@ -30,6 +35,10 @@ interface Props {
   chapterCompletions?: ChapterCompletion[]
   focusTimer?: FocusTimer | null
   accessibility?: ReadingAccessibilitySettings
+  annotationOverview?: AnnotationOverview
+  statusCard?: ReadingStatusCard | null
+  chapterActions?: ChapterReadingAction[]
+  snapshots?: ReadingSnapshot[]
   activeSessionMinutes?: number
   onAddHighlight: () => void
   onAddExcerpt: () => void
@@ -50,6 +59,10 @@ interface Props {
   onOpenMediaGallery: () => void
   onSyncComparison: () => void
   onUpdateAccessibility: (settings: Partial<ReadingAccessibilitySettings>) => void
+  onOpenAnnotation: (item: AnnotationOverviewItem) => void
+  onOpenChapter: (chapter: ChapterReadingAction) => void
+  onCreateSnapshot: () => void
+  onRestoreSnapshot: (snapshot: ReadingSnapshot) => void
   onClose: () => void
 }
 
@@ -69,6 +82,10 @@ export function ReadingToolsPanel({
   chapterCompletions = [],
   focusTimer,
   accessibility,
+  annotationOverview,
+  statusCard,
+  chapterActions = [],
+  snapshots = [],
   activeSessionMinutes = 0,
   onAddHighlight,
   onAddExcerpt,
@@ -89,6 +106,10 @@ export function ReadingToolsPanel({
   onOpenMediaGallery,
   onSyncComparison,
   onUpdateAccessibility,
+  onOpenAnnotation,
+  onOpenChapter,
+  onCreateSnapshot,
+  onRestoreSnapshot,
   onClose,
 }: Props) {
   const highlights = marks.filter(mark => mark.kind === 'highlight')
@@ -111,6 +132,56 @@ export function ReadingToolsPanel({
         </header>
 
         <div className={styles.grid}>
+          <section className={styles.section}>
+            <h4>阅读状态卡</h4>
+            <p>{statusCard ? `${statusCard.fileName} · ${statusCard.progressPercent}% · ${statusCard.lastReadLabel}` : '当前文档暂无阅读状态'}</p>
+            {statusCard && (
+              <strong>
+                高亮 {statusCard.highlightCount} · 摘录 {statusCard.excerptCount} · 完成章节 {statusCard.completedChapterCount}
+              </strong>
+            )}
+          </section>
+
+          <section className={styles.section}>
+            <h4>批注总览</h4>
+            <p>{annotationOverview ? `高亮 ${annotationOverview.summary.highlights} · 摘录 ${annotationOverview.summary.excerpts} · 章节 ${annotationOverview.summary.completedChapters}` : '暂无批注记录'}</p>
+            <div className={styles.list}>
+              {annotationOverview?.items.slice(0, 5).map(item => (
+                <article key={`annotation-${item.id}`} className={styles.item}>
+                  <span>{item.badge} · {item.label}</span>
+                  <div className={styles.rowActions}>
+                    <button type="button" onClick={() => onOpenAnnotation(item)} aria-label={`打开批注 ${item.label}`}>打开</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className={styles.section}>
+            <h4>长文章节模式</h4>
+            <p>{chapterActions.length > 0 ? `${chapterActions.filter(item => item.completed).length} / ${chapterActions.length} 节已完成` : '当前文档暂无章节'}</p>
+            <div className={styles.list}>
+              {chapterActions.slice(0, 5).map(chapter => (
+                <button key={chapter.id} type="button" onClick={() => onOpenChapter(chapter)} aria-label={`跳到章节 ${chapter.heading}`}>
+                  {chapter.completed ? '已完成' : '继续'} · {chapter.index}/{chapter.total} {chapter.heading}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className={styles.section}>
+            <h4>阅读快照</h4>
+            <p>{snapshots.length > 0 ? `${snapshots.length} 个可恢复阅读现场` : '保存当前字号、主题、布局和阅读位置'}</p>
+            <button type="button" onClick={onCreateSnapshot}>保存阅读快照</button>
+            <div className={styles.list}>
+              {snapshots.slice(0, 4).map(snapshot => (
+                <button key={snapshot.id} type="button" onClick={() => onRestoreSnapshot(snapshot)}>
+                  恢复快照 {snapshot.heading || snapshot.fileName} · {snapshot.progressPercent}%
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className={styles.section}>
             <h4>标注 / 高亮</h4>
             <p>{selectedText || '选中正文后保存为高亮'}</p>

@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ReadingToolsPanel } from '../../components/ReadingToolsPanel'
-import type { ChapterCompletion, FocusTimer, ReaderMark, ReadingAccessibilitySettings, ChapterProgress, ReadingStats, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
+import type { AnnotationOverview, ChapterCompletion, ChapterReadingAction, FocusTimer, ReaderMark, ReadingAccessibilitySettings, ReadingSnapshot, ReadingStatusCard, ChapterProgress, ReadingStats, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
 
 const marks: ReaderMark[] = [
   { id: 'h1', filePath: '/docs/a.md', fileName: 'a.md', text: 'Important text', kind: 'highlight', color: 'yellow', line: 3, createdAt: 100 },
@@ -65,6 +65,29 @@ const accessibility: ReadingAccessibilitySettings = {
 const chapterCompletions: ChapterCompletion[] = [
   { id: 'c1', filePath: '/docs/a.md', heading: 'Intro', line: 1, completedAt: 100 },
 ]
+const annotationOverview: AnnotationOverview = {
+  summary: { highlights: 1, excerpts: 1, completedChapters: 1 },
+  items: [
+    { id: 'h1', kind: 'highlight', label: 'Important text', badge: '高亮 · #重点', filePath: '/docs/a.md', line: 3, createdAt: 100 },
+    { id: 'c1', kind: 'chapter', label: 'Intro', badge: '章节完成', filePath: '/docs/a.md', line: 1, createdAt: 90 },
+  ],
+}
+const statusCard: ReadingStatusCard = {
+  filePath: '/docs/a.md',
+  fileName: 'a.md',
+  progressPercent: 40,
+  highlightCount: 1,
+  excerptCount: 1,
+  completedChapterCount: 1,
+  lastReadLabel: '刚刚阅读',
+}
+const chapterActions: ChapterReadingAction[] = [
+  { id: 'chapter-1', heading: 'Intro', line: 1, completed: true, index: 1, total: 2 },
+  { id: 'chapter-2', heading: 'Next', line: 30, completed: false, index: 2, total: 2 },
+]
+const snapshots: ReadingSnapshot[] = [
+  { id: 's1', filePath: '/docs/a.md', fileName: 'a.md', heading: 'Intro', progress: 0.4, progressPercent: 40, scrollTop: 480, fontSize: 16, theme: 'sepia', layoutMode: 'single', createdAt: 100 },
+]
 
 describe('ReadingToolsPanel', () => {
   it('renders reader sections and calls handlers', async () => {
@@ -89,6 +112,10 @@ describe('ReadingToolsPanel', () => {
       onOpenMediaGallery: vi.fn(),
       onSyncComparison: vi.fn(),
       onUpdateAccessibility: vi.fn(),
+      onOpenAnnotation: vi.fn(),
+      onOpenChapter: vi.fn(),
+      onCreateSnapshot: vi.fn(),
+      onRestoreSnapshot: vi.fn(),
       onClose: vi.fn(),
     }
 
@@ -109,6 +136,10 @@ describe('ReadingToolsPanel', () => {
         chapterCompletions={chapterCompletions}
         focusTimer={focusTimer}
         accessibility={accessibility}
+        annotationOverview={annotationOverview}
+        statusCard={statusCard}
+        chapterActions={chapterActions}
+        snapshots={snapshots}
         activeSessionMinutes={6}
         {...handlers}
       />
@@ -132,6 +163,10 @@ describe('ReadingToolsPanel', () => {
     expect(screen.getByText('图片/表格')).toBeInTheDocument()
     expect(screen.getByText('对比阅读')).toBeInTheDocument()
     expect(screen.getByText('无障碍')).toBeInTheDocument()
+    expect(screen.getByText('阅读状态卡')).toBeInTheDocument()
+    expect(screen.getByText('批注总览')).toBeInTheDocument()
+    expect(screen.getByText('长文章节模式')).toBeInTheDocument()
+    expect(screen.getByText('阅读快照')).toBeInTheDocument()
     expect(screen.getByLabelText('阅读工具侧栏')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '保存高亮' }))
@@ -187,5 +222,17 @@ describe('ReadingToolsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: '切换减少动画' }))
     expect(handlers.onUpdateAccessibility).toHaveBeenCalledWith(expect.objectContaining({ reduceMotion: false }))
+
+    await user.click(screen.getByRole('button', { name: '打开批注 Important text' }))
+    expect(handlers.onOpenAnnotation).toHaveBeenCalledWith(annotationOverview.items[0])
+
+    await user.click(screen.getByRole('button', { name: '跳到章节 Next' }))
+    expect(handlers.onOpenChapter).toHaveBeenCalledWith(chapterActions[1])
+
+    await user.click(screen.getByRole('button', { name: '保存阅读快照' }))
+    expect(handlers.onCreateSnapshot).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /恢复快照 Intro/ }))
+    expect(handlers.onRestoreSnapshot).toHaveBeenCalledWith(snapshots[0])
   })
 })

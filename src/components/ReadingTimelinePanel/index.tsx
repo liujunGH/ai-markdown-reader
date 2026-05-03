@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { filterReadingTimelineItems, type ReadingTimelineStatusFilter } from '../../utils/readingExperience'
 import styles from './ReadingTimelinePanel.module.css'
 
 export interface ReadingTimelineItem {
@@ -25,8 +26,13 @@ const GROUP_LABELS: Record<TimelineGroup, string> = {
 }
 
 export function ReadingTimelinePanel({ items, onOpenFile, onClose }: Props) {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState<ReadingTimelineStatusFilter>('all')
+  const filteredItems = useMemo(() => (
+    filterReadingTimelineItems(items, { query, status })
+  ), [items, query, status])
   const groupedItems = useMemo(() => {
-    const sortedItems = [...items].sort((a, b) => b.updatedAt - a.updatedAt)
+    const sortedItems = [...filteredItems].sort((a, b) => b.updatedAt - a.updatedAt)
     const groups: Record<TimelineGroup, ReadingTimelineItem[]> = {
       today: [],
       yesterday: [],
@@ -38,7 +44,7 @@ export function ReadingTimelinePanel({ items, onOpenFile, onClose }: Props) {
     })
 
     return groups
-  }, [items])
+  }, [filteredItems])
 
   const visibleGroups = (Object.keys(groupedItems) as TimelineGroup[])
     .filter(group => groupedItems[group].length > 0)
@@ -49,17 +55,32 @@ export function ReadingTimelinePanel({ items, onOpenFile, onClose }: Props) {
         <header className={styles.header}>
           <div>
             <h3>阅读时间线</h3>
-            <p>共 {items.length} 条阅读记录</p>
+            <p>共 {items.length} 条阅读记录 · 当前显示 {filteredItems.length} 条</p>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="关闭">×</button>
         </header>
 
+        <div className={styles.filters}>
+          <input
+            type="search"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="搜索阅读记录"
+            aria-label="搜索阅读记录"
+          />
+          <div className={styles.filterTabs} aria-label="阅读状态筛选">
+            <button type="button" className={status === 'all' ? styles.activeFilter : ''} onClick={() => setStatus('all')}>全部</button>
+            <button type="button" className={status === 'unfinished' ? styles.activeFilter : ''} onClick={() => setStatus('unfinished')}>未读完</button>
+            <button type="button" className={status === 'completed' ? styles.activeFilter : ''} onClick={() => setStatus('completed')}>已读完</button>
+          </div>
+        </div>
+
         <div className={styles.content}>
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>🕘</div>
-              <div className={styles.emptyTitle}>暂无阅读记录</div>
-              <div className={styles.emptySubtitle}>打开文档并滚动阅读后，会在这里形成时间线</div>
+              <div className={styles.emptyTitle}>{items.length === 0 ? '暂无阅读记录' : '没有匹配的阅读记录'}</div>
+              <div className={styles.emptySubtitle}>{items.length === 0 ? '打开文档并滚动阅读后，会在这里形成时间线' : '换一个关键词或筛选状态试试'}</div>
             </div>
           ) : (
             visibleGroups.map(group => (

@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   addReaderMark,
+  buildAnnotationOverview,
+  buildChapterReadingPlan,
   buildComparisonSyncTarget,
   buildReadingLandmarks,
   buildReadingStats,
+  buildReadingStatusCard,
   buildResumePoint,
   buildChapterProgress,
   createFocusTimer,
+  createReadingSnapshot,
   createReadingSession,
   createReadLaterItem,
   exportReaderAnnotationsMarkdown,
+  extractReadingMediaItems,
+  filterReadingTimelineItems,
   getDefaultReadingPresets,
   normalizeAccessibilitySettings,
   normalizeLayoutMode,
@@ -194,5 +200,75 @@ describe('readingExperience', () => {
     expect(timer.endsAt).toBe(1501000)
     expect(target.line).toBe(3)
     expect(accessibility).toMatchObject({ reduceMotion: true, ttsRate: 1.4, highContrastHighlights: true })
+  })
+
+  it('builds annotation overview and current document status cards', () => {
+    const marks = addReaderMark([], {
+      filePath: '/docs/a.md',
+      fileName: 'a.md',
+      text: 'Important text',
+      kind: 'highlight',
+      tag: '重点',
+      line: 3,
+    }, 100)
+    const completions = [{ id: 'c1', filePath: '/docs/a.md', heading: 'Intro', line: 1, completedAt: 120 }]
+    const overview = buildAnnotationOverview(marks, completions)
+    const card = buildReadingStatusCard({
+      filePath: '/docs/a.md',
+      fileName: 'a.md',
+      progress: 0.42,
+      marks,
+      chapterCompletions: completions,
+      historyUpdatedAt: 1000,
+    })
+
+    expect(overview.summary).toEqual({ highlights: 1, excerpts: 0, completedChapters: 1 })
+    expect(overview.items[0]).toEqual(expect.objectContaining({ label: 'Important text', badge: '高亮 · #重点' }))
+    expect(card).toEqual(expect.objectContaining({
+      fileName: 'a.md',
+      progressPercent: 42,
+      highlightCount: 1,
+      completedChapterCount: 1,
+    }))
+  })
+
+  it('extracts reading media and builds chapter reading actions', () => {
+    const media = extractReadingMediaItems(content)
+    const plan = buildChapterReadingPlan(content, [
+      { id: 'c1', filePath: '/docs/a.md', heading: 'Intro', line: 1, completedAt: 10 },
+    ], '/docs/a.md')
+
+    expect(media.map(item => item.type)).toEqual(['image', 'table'])
+    expect(media[0]).toEqual(expect.objectContaining({ label: 'Cover', src: 'cover.png', line: 5 }))
+    expect(media[1]).toEqual(expect.objectContaining({ markdown: expect.stringContaining('| A | B |'), csv: expect.stringContaining('A,B') }))
+    expect(plan[0]).toEqual(expect.objectContaining({ heading: 'Intro', completed: true, line: 1 }))
+    expect(plan[1]).toEqual(expect.objectContaining({ heading: 'Details', completed: false, line: 11 }))
+  })
+
+  it('filters reading history and creates restorable reading snapshots', () => {
+    const history = [
+      { filePath: '/docs/a.md', name: 'Annotated.md', progress: 0.4, updatedAt: 1 },
+      { filePath: '/docs/b.md', name: 'Done.md', progress: 1, updatedAt: 2 },
+    ]
+    const snapshot = createReadingSnapshot({
+      filePath: '/docs/a.md',
+      fileName: 'a.md',
+      progress: 0.5,
+      scrollTop: 480,
+      fontSize: 18,
+      theme: 'sepia',
+      layoutMode: 'columns',
+      heading: 'Intro',
+    }, 100)
+
+    expect(filterReadingTimelineItems(history, { query: 'annotated', status: 'all' })).toHaveLength(1)
+    expect(filterReadingTimelineItems(history, { query: '', status: 'unfinished' })).toHaveLength(1)
+    expect(filterReadingTimelineItems(history, { query: '', status: 'completed' })).toHaveLength(1)
+    expect(snapshot).toEqual(expect.objectContaining({
+      id: expect.stringMatching(/^snapshot-100-/),
+      progressPercent: 50,
+      theme: 'sepia',
+      layoutMode: 'columns',
+    }))
   })
 })

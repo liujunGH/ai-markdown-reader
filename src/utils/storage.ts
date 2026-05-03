@@ -28,6 +28,7 @@ export type ExactStorageKey =
   | 'reader-chapters'
   | 'reader-accessibility'
   | 'reader-focus-timer'
+  | 'reader-snapshots'
 
 export type PatternStorageKey =
   | `index-diagnostics-${string}`

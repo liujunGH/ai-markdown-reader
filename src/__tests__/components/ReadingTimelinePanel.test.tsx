@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ReadingTimelinePanel } from '../../components/ReadingTimelinePanel'
 
@@ -24,7 +25,6 @@ describe('ReadingTimelinePanel', () => {
   })
 
   it('passes the stored scroll position when opening an item', async () => {
-    const { default: userEvent } = await import('@testing-library/user-event')
     const onOpenFile = vi.fn()
 
     render(
@@ -45,5 +45,28 @@ describe('ReadingTimelinePanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /a.md/ }))
 
     expect(onOpenFile).toHaveBeenCalledWith('/docs/a.md', 12, 480)
+  })
+
+  it('filters reading history by query and unfinished status', async () => {
+    const user = userEvent.setup()
+    render(
+      <ReadingTimelinePanel
+        items={[
+          { filePath: '/docs/a.md', name: 'Guide.md', progress: 0.5, updatedAt: Date.now() },
+          { filePath: '/docs/b.md', name: 'Done.md', progress: 1, updatedAt: Date.now() },
+        ]}
+        onOpenFile={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: '未读完' }))
+
+    expect(screen.getByText('Guide.md')).toBeInTheDocument()
+    expect(screen.queryByText('Done.md')).not.toBeInTheDocument()
+
+    await user.type(screen.getByPlaceholderText('搜索阅读记录'), 'guide')
+
+    expect(screen.getByText('Guide.md')).toBeInTheDocument()
   })
 })

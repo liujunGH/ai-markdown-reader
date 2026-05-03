@@ -57,6 +57,7 @@ const IndexDiagnosticsPanel = React.lazy(() => import('./components/IndexDiagnos
 const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 const ReadingToolsPanel = React.lazy(() => import('./components/ReadingToolsPanel').then(m => ({ default: m.ReadingToolsPanel })))
+const ReadingMediaPanel = React.lazy(() => import('./components/ReadingMediaPanel').then(m => ({ default: m.ReadingMediaPanel })))
 const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
 const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
 const WorkspaceDashboardPanel = React.lazy(() => import('./components/WorkspaceDashboardPanel').then(m => ({ default: m.WorkspaceDashboardPanel })))
@@ -113,14 +114,19 @@ import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnos
 import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
 import {
   addReaderMark,
+  buildAnnotationOverview,
   buildChapterProgress,
+  buildChapterReadingPlan,
   buildComparisonSyncTarget,
+  buildReadingStatusCard,
   buildReadingStats,
   buildReadingLandmarks,
   buildResumePoint,
+  createReadingSnapshot,
   createReadingSession,
   createFocusTimer,
   exportReaderAnnotationsMarkdown,
+  extractReadingMediaItems,
   getDefaultReadingPresets,
   normalizeAccessibilitySettings,
   normalizeLayoutMode,
@@ -129,10 +135,13 @@ import {
   updateReaderMarkMetadata,
   updateReadLaterStatus,
   upsertReadLaterItem,
+  type AnnotationOverviewItem,
   type ReaderMark,
   type ChapterCompletion,
+  type ChapterReadingAction,
   type FocusTimer,
   type ReadingAccessibilitySettings,
+  type ReadingSnapshot,
   type ReadLaterItem,
   type ReadLaterStatus,
   type ReadingLandmark,
@@ -155,6 +164,7 @@ const READER_SESSIONS_KEY = 'reader-sessions'
 const READER_CHAPTERS_KEY = 'reader-chapters'
 const READER_ACCESSIBILITY_KEY = 'reader-accessibility'
 const READER_FOCUS_TIMER_KEY = 'reader-focus-timer'
+const READER_SNAPSHOTS_KEY = 'reader-snapshots'
 
 function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
   try {
@@ -242,7 +252,7 @@ function markdownFileNameForTarget(target: string): string {
 
 function AppInner() {
   const { t } = useTranslation()
-  const { theme, accentColor, toggleTheme } = useTheme()
+  const { theme, accentColor, toggleTheme, setTheme } = useTheme()
 
   // ── Stores ──
   const {
@@ -300,6 +310,7 @@ function AppInner() {
   const [readLaterItems, setReadLaterItems] = useState<ReadLaterItem[]>(() => loadJsonArray<ReadLaterItem>(READER_QUEUE_KEY))
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>(() => loadJsonArray<ReadingSession>(READER_SESSIONS_KEY))
   const [chapterCompletions, setChapterCompletions] = useState<ChapterCompletion[]>(() => loadJsonArray<ChapterCompletion>(READER_CHAPTERS_KEY))
+  const [readingSnapshots, setReadingSnapshots] = useState<ReadingSnapshot[]>(() => loadJsonArray<ReadingSnapshot>(READER_SNAPSHOTS_KEY))
   const [focusTimer, setFocusTimer] = useState<FocusTimer | null>(() => {
     const timer = loadJsonObject<FocusTimer | null>(READER_FOCUS_TIMER_KEY, null)
     return timer && timer.endsAt > Date.now() ? timer : null
@@ -310,6 +321,8 @@ function AppInner() {
   const [selectedReaderText, setSelectedReaderText] = useState('')
   const [currentReadingLine, setCurrentReadingLine] = useState(1)
   const [currentReadingProgress, setCurrentReadingProgress] = useState(0)
+  const [showReadingMediaPanel, setShowReadingMediaPanel] = useState(false)
+  const [activeReadingMediaId, setActiveReadingMediaId] = useState<string | null>(null)
   const [activeSessionMinutes, setActiveSessionMinutes] = useState(0)
   const [activeReaderPresetId, setActiveReaderPresetId] = useState<ReadingPreset['id']>(() => {
     const stored = getStorageItem(READER_PRESET_KEY)
@@ -483,10 +496,30 @@ function AppInner() {
       scrollTop: history.scrollTop || 0,
     }, history.updatedAt)
   }, [activeTab, readingHistory])
+  const activeHistoryItem = useMemo(() => (
+    activeTab?.filePath ? readingHistory.find(item => item.filePath === activeTab.filePath) : undefined
+  ), [activeTab?.filePath, readingHistory])
   const readingLandmarks = useMemo(() => buildReadingLandmarks(activeTab?.content || ''), [activeTab?.content])
-  const mediaLandmarks = useMemo(() => (
-    readingLandmarks.filter(landmark => landmark.type === 'image' || landmark.type === 'table')
-  ), [readingLandmarks])
+  const readingMediaItems = useMemo(() => extractReadingMediaItems(activeTab?.content || ''), [activeTab?.content])
+  const activeReadingSnapshots = useMemo(() => (
+    readingSnapshots.filter(snapshot => snapshot.filePath === activeReaderFileKey)
+  ), [activeReaderFileKey, readingSnapshots])
+  const annotationOverview = useMemo(() => (
+    buildAnnotationOverview(activeReaderMarks, activeChapterCompletions)
+  ), [activeChapterCompletions, activeReaderMarks])
+  const readingStatusCard = useMemo(() => (
+    activeTab ? buildReadingStatusCard({
+      filePath: activeReaderFileKey,
+      fileName: activeTab.name,
+      progress: currentReadingProgress,
+      marks: activeReaderMarks,
+      chapterCompletions: activeChapterCompletions,
+      historyUpdatedAt: activeHistoryItem?.updatedAt,
+    }) : null
+  ), [activeChapterCompletions, activeHistoryItem?.updatedAt, activeReaderFileKey, activeReaderMarks, activeTab, currentReadingProgress])
+  const chapterReadingActions = useMemo(() => (
+    activeTab?.content ? buildChapterReadingPlan(activeTab.content, activeChapterCompletions, activeReaderFileKey) : []
+  ), [activeChapterCompletions, activeReaderFileKey, activeTab?.content])
   const readingStats = useMemo(() => buildReadingStats(readingSessions), [readingSessions])
   const chapterProgress = useMemo(() => (
     activeTab?.content ? buildChapterProgress(activeTab.content, currentReadingLine) : null
@@ -1295,6 +1328,11 @@ function AppInner() {
     setStorageItem(READER_CHAPTERS_KEY, JSON.stringify(next))
   }, [])
 
+  const persistReadingSnapshots = useCallback((next: ReadingSnapshot[]) => {
+    setReadingSnapshots(next)
+    setStorageItem(READER_SNAPSHOTS_KEY, JSON.stringify(next))
+  }, [])
+
   const getSelectedLine = useCallback((text: string): number | undefined => {
     if (!activeTab?.content || !text) return undefined
     const index = activeTab.content.indexOf(text)
@@ -1421,6 +1459,33 @@ function AppInner() {
     window.setTimeout(() => setHighlightedLine(landmark.line), 0)
   }, [setHighlightedLine, setShowSource])
 
+  const handleOpenAnnotation = useCallback((item: AnnotationOverviewItem) => {
+    if (item.line) {
+      if (activeTab?.filePath === item.filePath || activeReaderFileKey === item.filePath) {
+        handleJumpToReadingLandmark({
+          id: item.id,
+          type: item.kind === 'chapter' ? 'heading' : 'paragraph',
+          label: item.label,
+          line: item.line,
+        })
+        return
+      }
+      void openFileAtLine(item.filePath, item.line)
+      return
+    }
+    setQuery(item.label)
+    openPanel('search')
+  }, [activeReaderFileKey, activeTab?.filePath, handleJumpToReadingLandmark, openFileAtLine, openPanel, setQuery])
+
+  const handleOpenChapterAction = useCallback((chapter: ChapterReadingAction) => {
+    handleJumpToReadingLandmark({
+      id: chapter.id,
+      type: 'heading',
+      label: chapter.heading,
+      line: chapter.line,
+    })
+  }, [handleJumpToReadingLandmark])
+
   const handleSetReadingLayoutMode = useCallback((mode: ReadingLayoutMode) => {
     setReadingLayoutMode(mode)
     setStorageItem(READER_LAYOUT_KEY, mode)
@@ -1460,14 +1525,29 @@ function AppInner() {
   }, [showToast])
 
   const handleOpenMediaGallery = useCallback(() => {
-    const landmark = mediaLandmarks[0]
-    if (!landmark) {
+    const media = readingMediaItems[0]
+    if (!media) {
       showToast('当前文档没有图片或表格')
       return
     }
-    handleJumpToReadingLandmark(landmark)
-    showToast(`已跳到${landmark.type === 'image' ? '图片' : '表格'}：${landmark.label}`)
-  }, [handleJumpToReadingLandmark, mediaLandmarks, showToast])
+    setActiveReadingMediaId(media.id)
+    setShowReadingMediaPanel(true)
+  }, [readingMediaItems, showToast])
+
+  const handleJumpToReadingMediaLine = useCallback((line: number) => {
+    setShowReadingMediaPanel(false)
+    handleJumpToReadingLandmark({
+      id: `media-line-${line}`,
+      type: 'paragraph',
+      label: `行 ${line}`,
+      line,
+    })
+  }, [handleJumpToReadingLandmark])
+
+  const handleCopyReadingMedia = useCallback((text: string, label: string) => {
+    void navigator.clipboard?.writeText(text)
+    showToast(label)
+  }, [showToast])
 
   const handleSyncComparison = useCallback(() => {
     if (!secondaryTab?.content) {
@@ -1492,6 +1572,39 @@ function AppInner() {
     setStorageItem(READER_ACCESSIBILITY_KEY, JSON.stringify(next))
     showToast('阅读无障碍设置已更新')
   }, [accessibility, showToast])
+
+  const handleCreateReadingSnapshot = useCallback(() => {
+    if (!activeTab) {
+      showToast('当前没有可保存的阅读现场')
+      return
+    }
+    const snapshot = createReadingSnapshot({
+      filePath: activeReaderFileKey,
+      fileName: activeTab.name,
+      progress: currentReadingProgress,
+      scrollTop: mainRef.current?.scrollTop || 0,
+      fontSize,
+      theme,
+      layoutMode: readingLayoutMode,
+      heading: currentHeading || undefined,
+    })
+    persistReadingSnapshots([snapshot, ...readingSnapshots.filter(item => item.id !== snapshot.id)].slice(0, 60))
+    showToast('阅读快照已保存')
+  }, [activeReaderFileKey, activeTab, currentHeading, currentReadingProgress, fontSize, persistReadingSnapshots, readingLayoutMode, readingSnapshots, showToast, theme])
+
+  const handleRestoreReadingSnapshot = useCallback((snapshot: ReadingSnapshot) => {
+    setFontSize(snapshot.fontSize)
+    if (snapshot.theme === 'light' || snapshot.theme === 'dark' || snapshot.theme === 'sepia') {
+      setTheme(snapshot.theme)
+    }
+    handleSetReadingLayoutMode(snapshot.layoutMode)
+    if (activeReaderFileKey === snapshot.filePath && mainRef.current) {
+      mainRef.current.scrollTop = snapshot.scrollTop
+    } else {
+      void openFileAtLine(snapshot.filePath, undefined, snapshot.scrollTop)
+    }
+    showToast('阅读快照已恢复')
+  }, [activeReaderFileKey, handleSetReadingLayoutMode, openFileAtLine, setFontSize, setTheme, showToast])
 
   const jumpHeadingByOffset = useCallback((offset: number) => {
     if (outlineItems.length === 0) return
@@ -2234,6 +2347,10 @@ function AppInner() {
                   chapterCompletions={activeChapterCompletions}
                   focusTimer={focusTimer}
                   accessibility={accessibility}
+                  annotationOverview={annotationOverview}
+                  statusCard={readingStatusCard}
+                  chapterActions={chapterReadingActions}
+                  snapshots={activeReadingSnapshots}
                   activeSessionMinutes={activeSessionMinutes}
                   onAddHighlight={() => handleAddReaderMark('highlight')}
                   onAddExcerpt={() => handleAddReaderMark('excerpt')}
@@ -2254,6 +2371,10 @@ function AppInner() {
                   onOpenMediaGallery={handleOpenMediaGallery}
                   onSyncComparison={handleSyncComparison}
                   onUpdateAccessibility={handleUpdateAccessibility}
+                  onOpenAnnotation={handleOpenAnnotation}
+                  onOpenChapter={handleOpenChapterAction}
+                  onCreateSnapshot={handleCreateReadingSnapshot}
+                  onRestoreSnapshot={handleRestoreReadingSnapshot}
                   onClose={() => closePanel('readingTools')}
                 />
               </Suspense>
@@ -2529,6 +2650,17 @@ function AppInner() {
                 items={readingHistory}
                 onOpenFile={openFileAtLine}
                 onClose={() => closePanel('readingTimeline')}
+              />
+            </Suspense>
+          )}
+          {showReadingMediaPanel && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ReadingMediaPanel
+                items={readingMediaItems}
+                activeId={activeReadingMediaId}
+                onJumpToLine={handleJumpToReadingMediaLine}
+                onCopy={handleCopyReadingMedia}
+                onClose={() => setShowReadingMediaPanel(false)}
               />
             </Suspense>
           )}

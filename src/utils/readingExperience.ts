@@ -4,6 +4,8 @@ export type ReadLaterStatus = 'unread' | 'reading' | 'done'
 export type ReadingLandmarkType = 'heading' | 'paragraph' | 'image' | 'code' | 'table'
 export type ReadingLayoutMode = 'single' | 'columns' | 'split'
 export type ReadingKeyboardAction = 'scroll-down' | 'scroll-up' | 'next-heading' | 'previous-heading' | 'mark-read-later' | 'bookmark'
+export type ReadingMediaType = 'image' | 'table'
+export type ReadingTimelineStatusFilter = 'all' | 'unfinished' | 'completed'
 
 export interface ReaderMark {
   id: string
@@ -123,6 +125,81 @@ export interface ReadingAccessibilitySettings {
 export interface ComparisonSyncTarget {
   progress: number
   line: number
+}
+
+export interface AnnotationOverviewItem {
+  id: string
+  kind: ReaderMarkKind | 'chapter'
+  label: string
+  badge: string
+  filePath: string
+  line?: number
+  createdAt: number
+}
+
+export interface AnnotationOverview {
+  summary: {
+    highlights: number
+    excerpts: number
+    completedChapters: number
+  }
+  items: AnnotationOverviewItem[]
+}
+
+export interface ReadingStatusCard {
+  filePath: string
+  fileName: string
+  progressPercent: number
+  highlightCount: number
+  excerptCount: number
+  completedChapterCount: number
+  lastReadLabel: string
+}
+
+export interface ReadingMediaItem {
+  id: string
+  type: ReadingMediaType
+  label: string
+  line: number
+  src?: string
+  alt?: string
+  markdown?: string
+  csv?: string
+}
+
+export interface ChapterReadingAction {
+  id: string
+  heading: string
+  line: number
+  completed: boolean
+  index: number
+  total: number
+}
+
+export interface ReadingTimelineFilter {
+  query: string
+  status: ReadingTimelineStatusFilter
+}
+
+export interface ReadingTimelineLikeItem {
+  filePath: string
+  name: string
+  progress: number
+  updatedAt: number
+}
+
+export interface ReadingSnapshot {
+  id: string
+  filePath: string
+  fileName: string
+  heading?: string
+  progress: number
+  progressPercent: number
+  scrollTop: number
+  fontSize: number
+  theme: string
+  layoutMode: ReadingLayoutMode
+  createdAt: number
 }
 
 export function addReaderMark(items: ReaderMark[], input: ReaderMarkInput, createdAt = Date.now()): ReaderMark[] {
@@ -408,6 +485,170 @@ export function buildComparisonSyncTarget(progress: number, content: string): Co
   }
 }
 
+export function buildAnnotationOverview(marks: ReaderMark[], chapterCompletions: ChapterCompletion[]): AnnotationOverview {
+  const markItems: AnnotationOverviewItem[] = marks.map(mark => ({
+    id: mark.id,
+    kind: mark.kind,
+    label: mark.text,
+    badge: `${mark.kind === 'highlight' ? '高亮' : '摘录'}${mark.tag ? ` · #${mark.tag}` : ''}`,
+    filePath: mark.filePath,
+    line: mark.line,
+    createdAt: mark.createdAt,
+  }))
+  const chapterItems: AnnotationOverviewItem[] = chapterCompletions.map(item => ({
+    id: item.id,
+    kind: 'chapter',
+    label: item.heading,
+    badge: '章节完成',
+    filePath: item.filePath,
+    line: item.line,
+    createdAt: item.completedAt,
+  }))
+
+  return {
+    summary: {
+      highlights: marks.filter(mark => mark.kind === 'highlight').length,
+      excerpts: marks.filter(mark => mark.kind === 'excerpt').length,
+      completedChapters: chapterCompletions.length,
+    },
+    items: [...markItems, ...chapterItems].sort((a, b) => {
+      if (a.kind === 'chapter' && b.kind !== 'chapter') return 1
+      if (a.kind !== 'chapter' && b.kind === 'chapter') return -1
+      return b.createdAt - a.createdAt
+    }),
+  }
+}
+
+export function buildReadingStatusCard(input: {
+  filePath: string
+  fileName: string
+  progress: number
+  marks: ReaderMark[]
+  chapterCompletions: ChapterCompletion[]
+  historyUpdatedAt?: number
+}): ReadingStatusCard {
+  return {
+    filePath: input.filePath,
+    fileName: input.fileName,
+    progressPercent: Math.round(clamp01(input.progress) * 100),
+    highlightCount: input.marks.filter(mark => mark.kind === 'highlight').length,
+    excerptCount: input.marks.filter(mark => mark.kind === 'excerpt').length,
+    completedChapterCount: input.chapterCompletions.length,
+    lastReadLabel: input.historyUpdatedAt ? formatRelativeDate(input.historyUpdatedAt) : '暂无阅读记录',
+  }
+}
+
+export function extractReadingMediaItems(content: string): ReadingMediaItem[] {
+  const lines = content.split('\n')
+  const items: ReadingMediaItem[] = []
+  let inCode = false
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const trimmed = line.trim()
+    if (/^(`{3,}|~{3,})/.test(trimmed)) {
+      inCode = !inCode
+      continue
+    }
+    if (inCode) continue
+
+    const image = trimmed.match(/!\[([^\]]*)\]\(([^)]+)\)/)
+    if (image) {
+      const lineNumber = index + 1
+      const alt = image[1] || ''
+      const src = image[2] || ''
+      items.push({
+        id: `media-image-${lineNumber}`,
+        type: 'image',
+        label: alt || src || `图片 · 行 ${lineNumber}`,
+        line: lineNumber,
+        alt,
+        src,
+      })
+      continue
+    }
+
+    if (/^\|.+\|$/.test(trimmed)) {
+      const start = index
+      const tableLines: string[] = []
+      while (index < lines.length && /^\|.+\|$/.test(lines[index].trim())) {
+        tableLines.push(lines[index].trim())
+        index += 1
+      }
+      index -= 1
+      const lineNumber = start + 1
+      const markdown = tableLines.join('\n')
+      items.push({
+        id: `media-table-${lineNumber}`,
+        type: 'table',
+        label: `表格 · 行 ${lineNumber}`,
+        line: lineNumber,
+        markdown,
+        csv: markdownTableToCsv(tableLines),
+      })
+    }
+  }
+
+  return items
+}
+
+export function buildChapterReadingPlan(content: string, chapterCompletions: ChapterCompletion[], filePath: string): ChapterReadingAction[] {
+  const headings = content.split('\n')
+    .map((line, index) => ({ line: index + 1, match: line.trim().match(/^#{1,6}\s+(.+)$/) }))
+    .filter((item): item is { line: number; match: RegExpMatchArray } => Boolean(item.match))
+  const chapterHeadings = headings.length > 0 ? headings : [{ line: 1, match: ['# 文档', '文档'] as unknown as RegExpMatchArray }]
+
+  return chapterHeadings.map((heading, index) => {
+    const title = heading.match[1].trim()
+    return {
+      id: `chapter-action-${hashText(`${filePath}:${title}:${heading.line}`)}`,
+      heading: title,
+      line: heading.line,
+      completed: chapterCompletions.some(item => item.filePath === filePath && item.heading === title && item.line === heading.line),
+      index: index + 1,
+      total: chapterHeadings.length,
+    }
+  })
+}
+
+export function filterReadingTimelineItems<T extends ReadingTimelineLikeItem>(items: T[], filter: ReadingTimelineFilter): T[] {
+  const query = filter.query.trim().toLowerCase()
+  return items.filter(item => {
+    const matchesQuery = !query || `${item.name} ${item.filePath}`.toLowerCase().includes(query)
+    const progress = clamp01(item.progress)
+    const matchesStatus = filter.status === 'all'
+      || (filter.status === 'unfinished' && progress < 0.98)
+      || (filter.status === 'completed' && progress >= 0.98)
+    return matchesQuery && matchesStatus
+  })
+}
+
+export function createReadingSnapshot(input: {
+  filePath: string
+  fileName: string
+  progress: number
+  scrollTop: number
+  fontSize: number
+  theme: string
+  layoutMode: ReadingLayoutMode
+  heading?: string
+}, createdAt = Date.now()): ReadingSnapshot {
+  const progress = clamp01(input.progress)
+  return {
+    id: `snapshot-${createdAt}-${hashText(input.filePath)}`,
+    filePath: input.filePath,
+    fileName: input.fileName,
+    heading: input.heading,
+    progress,
+    progressPercent: Math.round(progress * 100),
+    scrollTop: Math.max(0, Math.round(input.scrollTop)),
+    fontSize: Math.max(10, Math.min(36, Math.round(input.fontSize))),
+    theme: input.theme,
+    layoutMode: normalizeLayoutMode(input.layoutMode),
+    createdAt,
+  }
+}
+
 export function normalizeAccessibilitySettings(input: Partial<ReadingAccessibilitySettings> = {}): ReadingAccessibilitySettings {
   return {
     lineHeight: clampRange(input.lineHeight, 1.3, 2.4, 1.65),
@@ -438,6 +679,34 @@ function clamp01(value: number): number {
 function clampRange(value: number | undefined, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return fallback
   return Math.max(min, Math.min(max, value))
+}
+
+function markdownTableToCsv(lines: string[]): string {
+  return lines
+    .filter((line, index) => index !== 1 || !/^\|\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(line))
+    .map(line => splitMarkdownTableRow(line).map(csvEscape).join(','))
+    .join('\n')
+}
+
+function splitMarkdownTableRow(line: string): string[] {
+  return line
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map(cell => cell.trim())
+}
+
+function csvEscape(value: string): string {
+  if (!/[",\n]/.test(value)) return value
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function formatRelativeDate(timestamp: number): string {
+  const diff = Date.now() - timestamp
+  if (diff < 60000) return '刚刚阅读'
+  if (diff < 3600000) return `${Math.max(1, Math.round(diff / 60000))} 分钟前`
+  if (diff < 86400000) return `${Math.max(1, Math.round(diff / 3600000))} 小时前`
+  return new Date(timestamp).toLocaleDateString('zh-CN')
 }
 
 function formatMarks(marks: ReaderMark[]): string[] {
