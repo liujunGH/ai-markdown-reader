@@ -27,6 +27,30 @@ describe('MarkdownGraphPanel', () => {
     expect(onReindex).toHaveBeenCalled()
   })
 
+  it('shows a local error when reindexing from the graph fails', async () => {
+    const user = userEvent.setup()
+    const onReindex = vi.fn().mockRejectedValue(new Error('磁盘不可读'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    try {
+      render(
+        <MarkdownGraphPanel
+          graph={{ nodes: [], edges: [], orphanNodes: [] }}
+          folderPath="/docs"
+          onOpenFile={vi.fn()}
+          onReindex={onReindex}
+          onClose={vi.fn()}
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: '重建索引' }))
+
+      expect(await screen.findByText('索引失败：磁盘不可读')).toBeInTheDocument()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
   it('focuses a node and exposes incoming and outgoing navigation', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()

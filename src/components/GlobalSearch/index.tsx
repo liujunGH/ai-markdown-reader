@@ -38,6 +38,7 @@ export function GlobalSearch({
   const [loading, setLoading] = useState(false)
   const [indexedCount, setIndexedCount] = useState(0)
   const [hasSearched, setHasSearched] = useState(false)
+  const [reindexNotice, setReindexNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -68,6 +69,7 @@ export function GlobalSearch({
       setHasSearched(false)
       setIsRegex(false)
       setScope('all')
+      setReindexNotice(null)
     }
   }, [isOpen])
 
@@ -128,12 +130,15 @@ export function GlobalSearch({
 
   const handleReindex = async () => {
     if (!onReindex) return
+    setReindexNotice(null)
     try {
       await onReindex()
       refreshIndexedCount()
       await performSearch(query, isRegex, scope)
+      setReindexNotice({ type: 'success', message: '索引已完成，已刷新搜索结果' })
     } catch (error) {
       console.error('Reindex failed:', error)
+      setReindexNotice({ type: 'error', message: `索引失败：${formatErrorMessage(error)}` })
     }
   }
 
@@ -273,6 +278,12 @@ export function GlobalSearch({
           </div>
         )}
 
+        {reindexNotice && (
+          <div className={`${styles.reindexNotice} ${reindexNotice.type === 'error' ? styles.reindexNoticeError : styles.reindexNoticeSuccess}`} role="status">
+            {reindexNotice.message}
+          </div>
+        )}
+
         <div className={styles.results}>
           {hasSearched && !loading && results.length === 0 && (
             <div className={styles.empty}>
@@ -314,4 +325,8 @@ export function GlobalSearch({
       </div>
     </div>
   )
+}
+
+function formatErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
 }

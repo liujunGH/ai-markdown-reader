@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { GlobalSearch } from '../../components/GlobalSearch'
+import { getIndexedFileCount } from '../../utils/searchIndex'
 
 vi.mock('../../utils/searchIndex', () => ({
   getIndexedFileCount: vi.fn(async () => 0),
@@ -12,6 +13,7 @@ vi.mock('../../utils/searchIndex', () => ({
 describe('GlobalSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(getIndexedFileCount).mockResolvedValue(0)
   })
 
   it('explains that search needs an index when the current folder has no indexed files', async () => {
@@ -36,5 +38,29 @@ describe('GlobalSearch', () => {
     await user.click(screen.getByRole('button', { name: '立即重建索引' }))
 
     expect(onReindex).toHaveBeenCalled()
+  })
+
+  it('confirms when a manual reindex finishes and refreshes search state', async () => {
+    const user = userEvent.setup()
+    const onReindex = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(getIndexedFileCount)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(3)
+
+    render(
+      <GlobalSearch
+        isOpen
+        folderPath="/docs"
+        onClose={vi.fn()}
+        onOpenFile={vi.fn()}
+        onReindex={onReindex}
+      />
+    )
+
+    await screen.findByText('尚未建立索引')
+    await user.click(screen.getByRole('button', { name: '立即重建索引' }))
+
+    expect(await screen.findByText('索引已完成，已刷新搜索结果')).toBeInTheDocument()
+    expect(screen.getByText('已索引 3 个文件')).toBeInTheDocument()
   })
 })

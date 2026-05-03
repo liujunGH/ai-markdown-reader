@@ -52,6 +52,7 @@ export function MarkdownGraphPanel({
   onCancelIndex,
 }: Props) {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [reindexNotice, setReindexNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const positionedNodes = useMemo(() => layoutNodes(graph.nodes), [graph.nodes])
   const nodeById = useMemo(() => new Map(positionedNodes.map(node => [node.id, node])), [positionedNodes])
   const graphNodeById = useMemo(() => new Map(graph.nodes.map(node => [node.id, node])), [graph.nodes])
@@ -69,6 +70,17 @@ export function MarkdownGraphPanel({
     () => focusedNodeId ? graph.edges.filter(edge => edge.from === focusedNodeId) : [],
     [focusedNodeId, graph.edges],
   )
+  const handleReindex = async () => {
+    if (!onReindex) return
+    setReindexNotice(null)
+    try {
+      await onReindex()
+      setReindexNotice({ type: 'success', message: '索引已完成，图谱会自动刷新' })
+    } catch (error) {
+      console.error('Reindex failed:', error)
+      setReindexNotice({ type: 'error', message: `索引失败：${formatErrorMessage(error)}` })
+    }
+  }
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -100,18 +112,16 @@ export function MarkdownGraphPanel({
             <div className={styles.empty}>
               <strong>{folderPath ? '当前索引为空' : '还没有可显示的图谱'}</strong>
               <span>{folderPath ? '搜索、反链和图谱都依赖索引，点击重建后会重新扫描这个文件夹。' : '先打开一个 Markdown 文件夹，文档关系会显示在这里。'}</span>
+              {reindexNotice && (
+                <div className={`${styles.reindexNotice} ${reindexNotice.type === 'error' ? styles.reindexNoticeError : styles.reindexNoticeSuccess}`} role="status">
+                  {reindexNotice.message}
+                </div>
+              )}
               {folderPath && onReindex && (
                 <button
                   type="button"
                   className={styles.primaryBtn}
-                  onClick={() => {
-                    try {
-                      const result = onReindex()
-                      if (result instanceof Promise) result.catch(error => console.error('Reindex failed:', error))
-                    } catch (error) {
-                      console.error('Reindex failed:', error)
-                    }
-                  }}
+                  onClick={handleReindex}
                   disabled={isIndexing}
                 >
                   {isIndexing ? '正在重建索引...' : '重建索引'}
@@ -195,6 +205,10 @@ export function MarkdownGraphPanel({
       </section>
     </div>
   )
+}
+
+function formatErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
