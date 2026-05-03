@@ -19,6 +19,7 @@ export type ExactStorageKey =
   | 'index-settings'
   | 'read-later-count'
   | 'package-history'
+  | 'operation-snapshots'
 
 export type PatternStorageKey =
   | `index-diagnostics-${string}`

@@ -86,6 +86,17 @@ import {
   type UnlinkedMention,
 } from './utils/workspaceActions'
 import {
+  buildBatchMovePlan,
+  buildImageAssetAudit,
+  buildOperationPreview,
+  buildReleaseAutomationPlan,
+  buildStaticSiteExportPlan,
+  buildWorkspaceHome,
+  createOperationSnapshot,
+  formatOperationPreviewMarkdown,
+  type OperationSnapshot,
+} from './utils/safetyAutomation'
+import {
   getWorkspaceSession,
   getWorkspaces,
   saveWorkspace,
@@ -104,6 +115,50 @@ const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
 const PACKAGE_HISTORY_KEY = 'package-history'
+const OPERATION_SNAPSHOTS_KEY = 'operation-snapshots'
+const RELEASE_AUTOMATION_VERSION = '1.5.6'
+
+function loadOperationSnapshots(): OperationSnapshot[] {
+  try {
+    const stored = getStorageItem(OPERATION_SNAPSHOTS_KEY, '[]')
+    const parsed = stored ? JSON.parse(stored) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveOperationSnapshot(snapshot: OperationSnapshot): void {
+  const snapshots = [snapshot, ...loadOperationSnapshots()].slice(0, 8)
+  setStorageItem(OPERATION_SNAPSHOTS_KEY, JSON.stringify(snapshots))
+}
+
+function replaceOperationSnapshots(snapshots: OperationSnapshot[]): void {
+  setStorageItem(OPERATION_SNAPSHOTS_KEY, JSON.stringify(snapshots.slice(0, 8)))
+}
+
+function formatStaticSitePlanMarkdown(outputDir: string, pages: Array<{ sourcePath: string; outputPath: string; title: string }>): string {
+  return [
+    '# 静态站点导出计划',
+    '',
+    `- 输出目录：${outputDir}`,
+    `- 页面数量：${pages.length}`,
+    '',
+    ...pages.slice(0, 80).map(page => `- ${page.title}: ${page.sourcePath} -> ${page.outputPath}`),
+  ].join('\n')
+}
+
+function formatBatchMovePlanMarkdown(targetDir: string, operations: Array<{ from: string; to: string }>, affectedLinks: number): string {
+  return [
+    '# 批量移动/重命名计划',
+    '',
+    `- 目标目录：${targetDir}`,
+    `- 文件数量：${operations.length}`,
+    `- 需关注链接：${affectedLinks}`,
+    '',
+    ...operations.slice(0, 80).map(operation => `- ${operation.from} -> ${operation.to}`),
+  ].join('\n')
+}
 
 function wikiPathCandidates(dir: string, target: string): string[] {
   const trimmed = target.trim()
@@ -283,6 +338,44 @@ function AppInner() {
     remoteImageCount: imageAssetPlan.summary.remote,
     missingLinkCount: missingLinks.length,
   }), [imageAssetPlan.summary.remote, indexedFiles, knowledgeHealthReport.score, maintenanceTasks.length, missingLinks.length])
+  const operationPreview = useMemo(() => buildOperationPreview({
+    id: 'rename-links-preview',
+    title: '重命名链接安全预览',
+    changes: actionRenamePlan.changedFiles.map(file => {
+      const indexedFile = indexedFiles.find(item => item.path === file.path)
+      const before = indexedFile?.content || ''
+      return {
+        path: file.path,
+        before,
+        after: applyRenamePlanToContent(before, actionRenamePlan),
+      }
+    }).filter(change => change.before !== change.after),
+  }), [actionRenamePlan, indexedFiles])
+  const imageAudit = useMemo(() => buildImageAssetAudit({
+    files: indexedFiles,
+    imageFiles: activeImageInventory.map(image => image.resolvedPath).filter((path): path is string => Boolean(path)),
+    duplicateGroups: [],
+    remoteImageCount: imageAssetPlan.summary.remote,
+  }), [activeImageInventory, imageAssetPlan.summary.remote, indexedFiles])
+  const batchMovePlan = useMemo(() => buildBatchMovePlan(
+    indexedFiles,
+    currentFolderPath ? join(currentFolderPath, 'archive') : 'archive',
+  ), [currentFolderPath, indexedFiles])
+  const workspaceHomeCards = useMemo(() => buildWorkspaceHome({
+    recentFileName: readingHistory[0]?.name || activeTab?.name || '未打开文件',
+    healthScore: knowledgeHealthReport.score,
+    taskCount: maintenanceTasks.length,
+    modifiedCount: indexedFiles.length,
+    unlinkedMentionCount: unlinkedMentions.length,
+  }).cards, [activeTab?.name, indexedFiles.length, knowledgeHealthReport.score, maintenanceTasks.length, readingHistory, unlinkedMentions.length])
+  const staticSitePlan = useMemo(() => buildStaticSiteExportPlan(
+    indexedFiles,
+    currentFolderPath ? join(currentFolderPath, 'site') : 'site',
+  ), [currentFolderPath, indexedFiles])
+  const releaseAutomationPlan = useMemo(() => buildReleaseAutomationPlan(
+    RELEASE_AUTOMATION_VERSION,
+    `docs/releases/v${RELEASE_AUTOMATION_VERSION}.md`,
+  ), [])
 
   // ── Effects ──
 
@@ -851,6 +944,9 @@ function AppInner() {
       showToast('没有需要更新的链接')
       return
     }
+    if (operationPreview.changes.length > 0) {
+      saveOperationSnapshot(createOperationSnapshot(operationPreview))
+    }
     let updated = 0
     for (const file of actionRenamePlan.changedFiles) {
       const result = await window.electronAPI.readFile(file.path)
@@ -864,7 +960,7 @@ function AppInner() {
     }
     if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
     showToast(updated > 0 ? `已更新 ${updated} 个文件的链接` : '没有文件被更新')
-  }, [actionRenamePlan, currentFolderPath, scheduleFolderIndex, showToast, updateTabContent])
+  }, [actionRenamePlan, currentFolderPath, operationPreview, scheduleFolderIndex, showToast, updateTabContent])
 
   const handleLocalizeImages = useCallback(async () => {
     if (!window.electronAPI || !activeTab?.filePath || imageLocalizationPlan.items.length === 0) {
@@ -919,6 +1015,53 @@ function AppInner() {
     void navigator.clipboard?.writeText(archiveReport)
     showToast('归档报告已复制')
   }, [archiveReport, showToast])
+
+  const handleCopyOperationPreview = useCallback(() => {
+    void navigator.clipboard?.writeText(formatOperationPreviewMarkdown(operationPreview))
+    showToast(operationPreview.changes.length > 0 ? 'diff 预览已复制' : '当前没有可预览的变更')
+  }, [operationPreview, showToast])
+
+  const handleUndoLastOperation = useCallback(async () => {
+    if (!window.electronAPI) {
+      showToast('当前环境不支持撤销写入', 'error')
+      return
+    }
+    const [snapshot, ...rest] = loadOperationSnapshots()
+    if (!snapshot) {
+      showToast('没有可撤销的操作')
+      return
+    }
+    let restored = 0
+    for (const file of snapshot.files) {
+      const result = await window.electronAPI.updateMarkdownFile(file.path, file.content)
+      if (result.success) {
+        updateTabContent(file.path, file.content, basename(file.path))
+        restored += 1
+      }
+    }
+    replaceOperationSnapshots(rest)
+    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
+    showToast(restored > 0 ? `已撤销 ${restored} 个文件` : '没有文件被撤销')
+  }, [currentFolderPath, scheduleFolderIndex, showToast, updateTabContent])
+
+  const handleCopyBatchMovePlan = useCallback(() => {
+    void navigator.clipboard?.writeText(formatBatchMovePlanMarkdown(
+      batchMovePlan.targetDir,
+      batchMovePlan.operations,
+      batchMovePlan.affectedLinks,
+    ))
+    showToast('批量整理计划已复制')
+  }, [batchMovePlan, showToast])
+
+  const handleCopyStaticSitePlan = useCallback(() => {
+    void navigator.clipboard?.writeText(formatStaticSitePlanMarkdown(staticSitePlan.outputDir, staticSitePlan.pages))
+    showToast('静态站点计划已复制')
+  }, [showToast, staticSitePlan])
+
+  const handleCopyReleaseCommands = useCallback(() => {
+    void navigator.clipboard?.writeText(releaseAutomationPlan.commands.join('\n'))
+    showToast('Release 命令已复制')
+  }, [releaseAutomationPlan.commands, showToast])
 
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
@@ -1810,12 +1953,23 @@ function AppInner() {
                 imagePlan={imageLocalizationPlan}
                 unlinkedMentions={unlinkedMentions}
                 archiveReport={archiveReport}
+                operationPreview={operationPreview}
+                imageAudit={imageAudit}
+                batchMovePlan={batchMovePlan}
+                workspaceHomeCards={workspaceHomeCards}
+                staticSitePlan={staticSitePlan}
+                releasePlan={releaseAutomationPlan}
                 onExecuteFix={handleExecuteFix}
                 onApplyRename={handleApplyRenamePlan}
                 onLocalizeImages={handleLocalizeImages}
                 onCreateFromTemplate={handleCreateFromTemplate}
                 onOpenMention={handleOpenUnlinkedMention}
                 onCopyArchive={handleCopyArchiveReport}
+                onCopyPreview={handleCopyOperationPreview}
+                onUndoLast={handleUndoLastOperation}
+                onCopyBatchMove={handleCopyBatchMovePlan}
+                onCopyStaticSite={handleCopyStaticSitePlan}
+                onCopyReleaseCommands={handleCopyReleaseCommands}
                 onClose={() => closePanel('actionWorkbench')}
               />
             </Suspense>
