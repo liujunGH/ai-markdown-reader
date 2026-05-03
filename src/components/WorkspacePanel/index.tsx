@@ -14,6 +14,8 @@ interface Props {
   workspaces: Workspace[]
   currentFolderPath: string | null
   currentFolderName: string
+  workspaceIndexCounts?: Record<string, number>
+  isIndexing?: boolean
   onSaveCurrent: () => void
   onOpenWorkspace: (folderPath: string) => void
   onRemoveWorkspace: (id: string) => void
@@ -31,6 +33,8 @@ export function WorkspacePanel({
   workspaces,
   currentFolderPath,
   currentFolderName,
+  workspaceIndexCounts = {},
+  isIndexing = false,
   onSaveCurrent,
   onOpenWorkspace,
   onRemoveWorkspace,
@@ -51,6 +55,11 @@ export function WorkspacePanel({
   const currentWorkspace = currentFolderPath
     ? workspaces.find(workspace => workspace.folderPath === currentFolderPath)
     : undefined
+  const currentIndexStatus = currentFolderPath
+    ? isIndexing
+      ? '当前索引：更新中'
+      : `当前索引：${workspaceIndexCounts[currentFolderPath] ?? 0} 个文件`
+    : '当前索引：未打开文件夹'
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -70,6 +79,7 @@ export function WorkspacePanel({
             <span title={currentFolderPath || undefined}>
               {currentFolderPath || '打开文件夹后可保存为工作区'}
             </span>
+            <span className={styles.currentIndex}>{currentIndexStatus}</span>
           </div>
           <button
             type="button"
@@ -168,7 +178,10 @@ export function WorkspacePanel({
                           {isActive && <span className={styles.badge}>当前</span>}
                         </div>
                         <div className={styles.path} title={workspace.folderPath}>{workspace.folderPath}</div>
-                        <div className={styles.time}>{formatTime(workspace.updatedAt)}</div>
+                        <div className={styles.meta}>
+                          <span>{formatTime(workspace.updatedAt)}</span>
+                          <span className={styles.indexBadge}>索引 {workspaceIndexCounts[workspace.folderPath] ?? 0}</span>
+                        </div>
                       </div>
                     </button>
                     <div className={styles.workspaceActions}>

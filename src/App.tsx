@@ -151,6 +151,7 @@ function AppInner() {
   const [showToolsMenu, setShowToolsMenu] = useState(false)
   const [indexedFiles, setIndexedFiles] = useState<FileIndex[]>([])
   const [indexedFileCount, setIndexedFileCount] = useState(0)
+  const [workspaceIndexCounts, setWorkspaceIndexCounts] = useState<Record<string, number>>({})
   const [isIndexing, setIsIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
@@ -215,12 +216,36 @@ function AppInner() {
       ])
       setIndexedFiles(files)
       setIndexedFileCount(count)
+      setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: count }))
     } catch (error) {
       console.error('Failed to load indexed files:', error)
       setIndexedFiles([])
       setIndexedFileCount(0)
+      setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: 0 }))
     }
   }, [])
+
+  const refreshWorkspaceIndexCounts = useCallback(async () => {
+    const paths = Array.from(new Set([
+      ...workspaces.map(workspace => workspace.folderPath),
+      currentFolderPath,
+    ].filter((path): path is string => Boolean(path))))
+
+    if (paths.length === 0) {
+      setWorkspaceIndexCounts({})
+      return
+    }
+
+    const entries = await Promise.all(paths.map(async folderPath => {
+      try {
+        return [folderPath, await getIndexedFileCount(folderPath)] as const
+      } catch (error) {
+        console.error('Failed to load workspace index count:', error)
+        return [folderPath, 0] as const
+      }
+    }))
+    setWorkspaceIndexCounts(Object.fromEntries(entries))
+  }, [currentFolderPath, workspaces])
 
   const rebuildFolderIndex = useCallback(async (
     folderPath = currentFolderPath,
@@ -298,6 +323,10 @@ function AppInner() {
   useEffect(() => {
     void refreshIndexedFiles(currentFolderPath)
   }, [currentFolderPath, refreshIndexedFiles])
+
+  useEffect(() => {
+    void refreshWorkspaceIndexCounts()
+  }, [refreshWorkspaceIndexCounts])
 
   // Sync file settings to global UI state
   useEffect(() => {
@@ -1390,6 +1419,8 @@ function AppInner() {
                 workspaces={workspaces}
                 currentFolderPath={currentFolderPath}
                 currentFolderName={currentFolderName}
+                workspaceIndexCounts={workspaceIndexCounts}
+                isIndexing={isIndexing}
                 onSaveCurrent={handleSaveWorkspace}
                 onOpenWorkspace={handleOpenWorkspace}
                 onRemoveWorkspace={handleRemoveWorkspace}
