@@ -58,7 +58,7 @@ const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').th
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getDefaultIndexSkipDirectoryNames, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
@@ -77,11 +77,16 @@ import {
   Workspace,
 } from './utils/workspaces'
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
+import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from './utils/indexDiagnostics'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
 const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
 const MAX_INDEX_FILE_SIZE = 50 * 1024 * 1024
+const INDEX_POLICY = {
+  maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
+  skipDirectoryNames: getDefaultIndexSkipDirectoryNames(),
+}
 
 function wikiPathCandidates(dir: string, target: string): string[] {
   const trimmed = target.trim()
@@ -156,6 +161,7 @@ function AppInner() {
   const [isIndexing, setIsIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
   const [indexSkippedItems, setIndexSkippedItems] = useState<IndexSkippedItem[]>([])
+  const [indexDiagnosticsUpdatedAt, setIndexDiagnosticsUpdatedAt] = useState<number | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
   const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
@@ -273,13 +279,20 @@ function AppInner() {
     try {
       const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
       const skippedItems: IndexSkippedItem[] = []
+      const persistSkippedItems = (nextItems: IndexSkippedItem[]) => {
+        const updatedAt = Date.now()
+        setIndexSkippedItems([...nextItems])
+        setIndexDiagnosticsUpdatedAt(updatedAt)
+        saveIndexDiagnostics(folderPath, nextItems, updatedAt)
+      }
       setIndexSkippedItems([])
+      setIndexDiagnosticsUpdatedAt(null)
       const allFiles = await getAllMarkdownFiles(folderPath, {
         signal: controller.signal,
         onProgress: handleProgress,
         onSkip: item => {
           skippedItems.push(item)
-          setIndexSkippedItems([...skippedItems])
+          persistSkippedItems(skippedItems)
         },
         maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
       })
@@ -288,11 +301,11 @@ function AppInner() {
         onProgress: handleProgress,
         onSkip: item => {
           skippedItems.push(item)
-          setIndexSkippedItems([...skippedItems])
+          persistSkippedItems(skippedItems)
         },
         initialSkippedItems: skippedItems,
       })
-      setIndexSkippedItems([...skippedItems])
+      persistSkippedItems(skippedItems)
       await refreshIndexedFiles(folderPath)
       if (!options.silent) {
         const skippedCount = skippedItems.length
@@ -341,6 +354,17 @@ function AppInner() {
   useEffect(() => {
     void refreshIndexedFiles(currentFolderPath)
   }, [currentFolderPath, refreshIndexedFiles])
+
+  useEffect(() => {
+    if (!currentFolderPath) {
+      setIndexSkippedItems([])
+      setIndexDiagnosticsUpdatedAt(null)
+      return
+    }
+    const saved = loadSavedIndexDiagnostics(currentFolderPath)
+    setIndexSkippedItems(saved.skippedItems)
+    setIndexDiagnosticsUpdatedAt(saved.updatedAt)
+  }, [currentFolderPath])
 
   useEffect(() => {
     void refreshWorkspaceIndexCounts()
@@ -1448,8 +1472,16 @@ function AppInner() {
                 folderPath={currentFolderPath}
                 skippedItems={indexSkippedItems}
                 isIndexing={isIndexing}
+                policy={INDEX_POLICY}
+                updatedAt={indexDiagnosticsUpdatedAt}
                 onReindex={() => rebuildFolderIndex()}
-                onClear={() => setIndexSkippedItems([])}
+                onClear={() => {
+                  setIndexSkippedItems([])
+                  setIndexDiagnosticsUpdatedAt(null)
+                  if (currentFolderPath) {
+                    clearSavedIndexDiagnostics(currentFolderPath)
+                  }
+                }}
                 onClose={() => closePanel('indexDiagnostics')}
               />
             </Suspense>

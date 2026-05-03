@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { formatIndexPolicy, type IndexPolicy } from '../../utils/indexDiagnostics'
 import { formatIndexSkippedItem, type IndexSkippedItem } from '../../utils/searchIndex'
 import styles from './IndexDiagnosticsPanel.module.css'
 
@@ -6,6 +7,8 @@ interface Props {
   folderPath?: string | null
   skippedItems: IndexSkippedItem[]
   isIndexing: boolean
+  policy: IndexPolicy
+  updatedAt: number | null
   onReindex: () => void
   onClear: () => void
   onClose: () => void
@@ -26,9 +29,10 @@ const FILTERS: Array<{ value: ReasonFilter; label: string; ariaLabel: string }> 
   { value: 'read-error', label: '读取失败', ariaLabel: '只看读取失败' },
 ]
 
-export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, onReindex, onClear, onClose }: Props) {
+export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, policy, updatedAt, onReindex, onClear, onClose }: Props) {
   const [reasonFilter, setReasonFilter] = useState<ReasonFilter>('all')
   const reasonCounts = countReasons(skippedItems)
+  const formattedPolicy = useMemo(() => formatIndexPolicy(policy), [policy])
   const filteredItems = useMemo(() => (
     reasonFilter === 'all'
       ? skippedItems
@@ -51,6 +55,23 @@ export function IndexDiagnosticsPanel({ folderPath, skippedItems, isIndexing, on
           <SummaryCard label="忽略目录" value={reasonCounts['ignored-directory']} />
           <SummaryCard label="文件过大" value={reasonCounts['large-file']} />
           <SummaryCard label="读取失败" value={reasonCounts['read-error']} />
+        </div>
+
+        <div className={styles.policy}>
+          <div>
+            <strong>索引规则</strong>
+            <span>{updatedAt ? `上次诊断：${new Date(updatedAt).toLocaleString('zh-CN')}` : '还没有保存的诊断'}</span>
+          </div>
+          <dl>
+            <div>
+              <dt>最大文件</dt>
+              <dd>最大文件：{formattedPolicy.maxFileSize}</dd>
+            </div>
+            <div>
+              <dt>忽略目录</dt>
+              <dd>{formattedPolicy.skippedDirectories}</dd>
+            </div>
+          </dl>
         </div>
 
         <div className={styles.actions}>

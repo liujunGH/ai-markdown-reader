@@ -27,6 +27,11 @@ describe('IndexDiagnosticsPanel', () => {
           { path: '/docs/private.md', name: 'private.md', reason: 'read-error', detail: '权限不足' },
         ]}
         isIndexing={false}
+        policy={{
+          maxFileSizeBytes: 50 * 1024 * 1024,
+          skipDirectoryNames: ['.git', 'node_modules', 'dist'],
+        }}
+        updatedAt={1710000000000}
         onReindex={onReindex}
         onClear={onClear}
         onClose={vi.fn()}
@@ -36,6 +41,10 @@ describe('IndexDiagnosticsPanel', () => {
     expect(screen.getByRole('region', { name: '索引诊断' })).toBeInTheDocument()
     expect(screen.getByText('跳过项')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('索引规则')).toBeInTheDocument()
+    expect(screen.getByText('最大文件：50 MB')).toBeInTheDocument()
+    expect(screen.getByText('.git、node_modules、dist')).toBeInTheDocument()
+    expect(screen.getByText(`上次诊断：${new Date(1710000000000).toLocaleString('zh-CN')}`)).toBeInTheDocument()
     expect(screen.getAllByText('忽略目录').length).toBeGreaterThan(0)
     expect(screen.getAllByText('文件过大').length).toBeGreaterThan(0)
     expect(screen.getAllByText('读取失败').length).toBeGreaterThan(0)
@@ -66,6 +75,11 @@ describe('IndexDiagnosticsPanel', () => {
         folderPath="/docs"
         skippedItems={[]}
         isIndexing={false}
+        policy={{
+          maxFileSizeBytes: 50 * 1024 * 1024,
+          skipDirectoryNames: ['.git', 'node_modules'],
+        }}
+        updatedAt={null}
         onReindex={vi.fn()}
         onClear={vi.fn()}
         onClose={vi.fn()}

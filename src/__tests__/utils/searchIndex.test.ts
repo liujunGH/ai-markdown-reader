@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { formatIndexSkippedItem, getAllMarkdownFiles, getIndexedFiles, indexFolder, searchInFolder, type IndexSkippedItem } from '../../utils/searchIndex'
+import { formatIndexSkippedItem, getAllMarkdownFiles, getDefaultIndexSkipDirectoryNames, getIndexedFiles, indexFolder, searchInFolder, type IndexSkippedItem } from '../../utils/searchIndex'
 
 describe('searchIndex', () => {
   beforeEach(() => {
@@ -140,6 +140,20 @@ describe('searchIndex', () => {
     expect(formatIndexSkippedItem({ path: '/docs/node_modules', name: 'node_modules', reason: 'ignored-directory' })).toBe('node_modules：已忽略目录')
     expect(formatIndexSkippedItem({ path: '/docs/large.md', name: 'large.md', reason: 'large-file', size: 200, maxSize: 100 })).toBe('large.md：文件过大（200 B > 100 B）')
     expect(formatIndexSkippedItem({ path: '/docs/bad.md', name: 'bad.md', reason: 'read-error', detail: '权限不足' })).toBe('bad.md：读取失败（权限不足）')
+  })
+
+  it('exposes the default skipped directories for diagnostics policy display', () => {
+    expect(getDefaultIndexSkipDirectoryNames()).toEqual([
+      '.git',
+      '.hg',
+      '.svn',
+      'node_modules',
+      'dist',
+      'build',
+      'release',
+      '.next',
+      '.cache',
+    ])
   })
 
   it('indexes with progress and supports cancellation', async () => {

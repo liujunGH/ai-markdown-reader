@@ -18,6 +18,7 @@ export type ExactStorageKey =
   | 'reading-history'
 
 export type PatternStorageKey =
+  | `index-diagnostics-${string}`
   | `scroll-position-${string}`
   | `file-settings-${string}`
   | `outline-fold-${string}`

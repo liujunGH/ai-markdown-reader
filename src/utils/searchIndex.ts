@@ -84,6 +84,10 @@ const DEFAULT_SKIP_DIRECTORIES = new Set([
   '.cache',
 ])
 
+export function getDefaultIndexSkipDirectoryNames(): string[] {
+  return Array.from(DEFAULT_SKIP_DIRECTORIES)
+}
+
 function assertNotCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new Error('索引已取消')
