@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './MarkdownGraphPanel.module.css'
-import type { IndexProgress } from '../../utils/searchIndex'
+import { formatIndexSkippedItem, type IndexProgress } from '../../utils/searchIndex'
 
 export interface MarkdownGraphNode {
   id: string
@@ -71,6 +71,7 @@ export function MarkdownGraphPanel({
     () => focusedNodeId ? graph.edges.filter(edge => edge.from === focusedNodeId) : [],
     [focusedNodeId, graph.edges],
   )
+  const latestSkippedItem = indexProgress?.skippedItems?.at(-1)
   useEffect(() => {
     if (isIndexing) {
       setReindexNotice(null)
@@ -116,6 +117,9 @@ export function MarkdownGraphPanel({
         {isIndexing && indexProgress && (
           <div className={styles.indexProgress}>
             <span>索引中：发现 {indexProgress.discoveredFiles}，已处理 {indexProgress.indexedFiles}，跳过 {indexProgress.skippedFiles}</span>
+            {latestSkippedItem && (
+              <span className={styles.indexSkipText}>最近跳过：{formatIndexSkippedItem(latestSkippedItem)}</span>
+            )}
             {onCancelIndex && (
               <button type="button" onClick={handleCancelIndex}>取消</button>
             )}

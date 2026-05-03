@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { getAllMarkdownFiles, getIndexedFiles, indexFolder, searchInFolder } from '../../utils/searchIndex'
+import { formatIndexSkippedItem, getAllMarkdownFiles, getIndexedFiles, indexFolder, searchInFolder, type IndexSkippedItem } from '../../utils/searchIndex'
 
 describe('searchIndex', () => {
   beforeEach(() => {
@@ -74,6 +74,72 @@ describe('searchIndex', () => {
       'scanning:/docs/node_modules:2:2',
       'scanning:/docs/.drafts:2:4',
     ]))
+  })
+
+  it('reports structured skip reasons while scanning', async () => {
+    window.electronAPI = {
+      readFolder: vi.fn(async () => ({
+        success: true,
+        files: [
+          { name: 'README.md', filePath: '/docs/README.md', isDirectory: false, size: 12 },
+          { name: 'node_modules', filePath: '/docs/node_modules', isDirectory: true },
+          { name: 'large.md', filePath: '/docs/large.md', isDirectory: false, size: 200 },
+        ],
+      })),
+    } as unknown as Window['electronAPI']
+    const skipped: IndexSkippedItem[] = []
+    const progressSkipped: number[] = []
+
+    const files = await getAllMarkdownFiles('/docs', {
+      maxFileSizeBytes: 100,
+      onSkip: item => skipped.push(item),
+      onProgress: progress => progressSkipped.push(progress.skippedItems?.length ?? 0),
+    })
+
+    expect(files.map(file => file.filePath)).toEqual(['/docs/README.md'])
+    expect(skipped).toEqual([
+      expect.objectContaining({ path: '/docs/node_modules', name: 'node_modules', reason: 'ignored-directory' }),
+      expect.objectContaining({ path: '/docs/large.md', name: 'large.md', reason: 'large-file', size: 200, maxSize: 100 }),
+    ])
+    expect(progressSkipped).toContain(2)
+  })
+
+  it('preserves scanning skips and adds read failures during indexing progress', async () => {
+    window.electronAPI = {
+      readFile: vi.fn(async (filePath: string) => (
+        filePath.endsWith('bad.md')
+          ? { success: false, error: '权限不足' }
+          : { success: true, content: '# OK' }
+      )),
+    } as unknown as Window['electronAPI']
+    const progress: Array<{ skippedFiles: number; skippedItems: IndexSkippedItem[] }> = []
+
+    await indexFolder('/docs', [
+      { name: 'ok.md', filePath: '/docs/ok.md' },
+      { name: 'bad.md', filePath: '/docs/bad.md' },
+    ], {
+      initialSkippedItems: [
+        { path: '/docs/node_modules', name: 'node_modules', reason: 'ignored-directory' },
+      ],
+      onProgress: item => progress.push({ skippedFiles: item.skippedFiles, skippedItems: item.skippedItems ?? [] }),
+    })
+
+    expect(await getIndexedFiles('/docs')).toEqual([
+      expect.objectContaining({ path: '/docs/ok.md' }),
+    ])
+    expect(progress.at(-1)).toEqual(expect.objectContaining({
+      skippedFiles: 2,
+      skippedItems: expect.arrayContaining([
+        expect.objectContaining({ path: '/docs/node_modules', reason: 'ignored-directory' }),
+        expect.objectContaining({ path: '/docs/bad.md', reason: 'read-error', detail: '权限不足' }),
+      ]),
+    }))
+  })
+
+  it('formats skipped index items for user-facing progress', () => {
+    expect(formatIndexSkippedItem({ path: '/docs/node_modules', name: 'node_modules', reason: 'ignored-directory' })).toBe('node_modules：已忽略目录')
+    expect(formatIndexSkippedItem({ path: '/docs/large.md', name: 'large.md', reason: 'large-file', size: 200, maxSize: 100 })).toBe('large.md：文件过大（200 B > 100 B）')
+    expect(formatIndexSkippedItem({ path: '/docs/bad.md', name: 'bad.md', reason: 'read-error', detail: '权限不足' })).toBe('bad.md：读取失败（权限不足）')
   })
 
   it('indexes with progress and supports cancellation', async () => {

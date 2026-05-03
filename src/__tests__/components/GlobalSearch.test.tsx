@@ -8,6 +8,11 @@ import { getIndexedFileCount } from '../../utils/searchIndex'
 vi.mock('../../utils/searchIndex', () => ({
   getIndexedFileCount: vi.fn(async () => 0),
   searchInFolder: vi.fn(async () => []),
+  formatIndexSkippedItem: vi.fn(item => {
+    if (item.reason === 'large-file') return `${item.name}：文件过大（${item.size} B > ${item.maxSize} B）`
+    if (item.reason === 'read-error') return `${item.name}：读取失败（${item.detail}）`
+    return `${item.name}：已忽略目录`
+  }),
 }))
 
 describe('GlobalSearch', () => {
@@ -122,5 +127,28 @@ describe('GlobalSearch', () => {
 
     expect(onCancelIndex).toHaveBeenCalled()
     expect(screen.getByText('已请求取消索引，正在停止...')).toBeInTheDocument()
+  })
+
+  it('shows the latest skipped item while indexing', () => {
+    render(
+      <GlobalSearch
+        isOpen
+        folderPath="/docs"
+        onClose={vi.fn()}
+        onOpenFile={vi.fn()}
+        onReindex={vi.fn()}
+        isIndexing
+        indexProgress={{
+          phase: 'indexing',
+          discoveredFiles: 8,
+          indexedFiles: 2,
+          skippedFiles: 1,
+          currentPath: '/docs/large.md',
+          skippedItems: [{ path: '/docs/large.md', name: 'large.md', reason: 'large-file', size: 200, maxSize: 100 }],
+        }}
+      />
+    )
+
+    expect(screen.getByText('最近跳过：large.md：文件过大（200 B > 100 B）')).toBeInTheDocument()
   })
 })

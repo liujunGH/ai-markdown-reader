@@ -99,6 +99,29 @@ describe('MarkdownGraphPanel', () => {
     expect(screen.getByText('已请求取消索引，正在停止...')).toBeInTheDocument()
   })
 
+  it('shows the latest skipped item while graph indexing is running', () => {
+    render(
+      <MarkdownGraphPanel
+        graph={{ nodes: [], edges: [], orphanNodes: [] }}
+        folderPath="/docs"
+        onOpenFile={vi.fn()}
+        onReindex={vi.fn()}
+        onClose={vi.fn()}
+        isIndexing
+        indexProgress={{
+          phase: 'indexing',
+          discoveredFiles: 10,
+          indexedFiles: 4,
+          skippedFiles: 1,
+          currentPath: '/docs/bad.md',
+          skippedItems: [{ path: '/docs/bad.md', name: 'bad.md', reason: 'read-error', detail: '权限不足' }],
+        }}
+      />
+    )
+
+    expect(screen.getByText('最近跳过：bad.md：读取失败（权限不足）')).toBeInTheDocument()
+  })
+
   it('focuses a node and exposes incoming and outgoing navigation', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()

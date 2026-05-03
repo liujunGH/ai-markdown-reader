@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import styles from './GlobalSearch.module.css'
-import { searchInFolder, getIndexedFileCount, SearchScope, SearchResult, IndexProgress } from '../../utils/searchIndex'
+import { searchInFolder, getIndexedFileCount, SearchScope, SearchResult, IndexProgress, formatIndexSkippedItem } from '../../utils/searchIndex'
 import { basename } from '../../utils/path'
 
 interface GlobalSearchProps {
@@ -211,6 +211,7 @@ export function GlobalSearch({
   const totalMatches = useMemo(() => results.reduce((sum, r) => sum + r.matches.length, 0), [results])
   const isReindexBusy = isIndexing || isLocalReindexing
   const hasEmptyIndex = Boolean(folderPath) && indexedCount === 0 && !isIndexing
+  const latestSkippedItem = indexProgress?.skippedItems?.at(-1)
   const indexStatusText = isIndexing && indexProgress
     ? `索引中：发现 ${indexProgress.discoveredFiles}，已处理 ${indexProgress.indexedFiles}，跳过 ${indexProgress.skippedFiles}`
     : loading
@@ -282,6 +283,12 @@ export function GlobalSearch({
             </button>
           )}
         </div>
+
+        {isIndexing && latestSkippedItem && (
+          <div className={styles.indexSkipNotice} role="status">
+            最近跳过：{formatIndexSkippedItem(latestSkippedItem)}
+          </div>
+        )}
 
         {hasEmptyIndex && (
           <div className={styles.indexHint} role="status">

@@ -89,6 +89,18 @@
   font-size: 13px;
 }
 
+.indexProgress span {
+  min-width: 0;
+}
+
+.indexSkipText {
+  flex: 1 1 auto;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .indexProgress button {
   flex: 0 0 auto;
   border: 1px solid var(--border);

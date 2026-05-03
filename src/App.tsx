@@ -57,7 +57,7 @@ const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').th
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
@@ -270,18 +270,25 @@ function AppInner() {
     })
     try {
       const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
+      const skippedItems: IndexSkippedItem[] = []
       const allFiles = await getAllMarkdownFiles(folderPath, {
         signal: controller.signal,
         onProgress: handleProgress,
+        onSkip: item => skippedItems.push(item),
         maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
       })
       await indexFolder(folderPath, allFiles, {
         signal: controller.signal,
         onProgress: handleProgress,
+        onSkip: item => skippedItems.push(item),
+        initialSkippedItems: skippedItems,
       })
       await refreshIndexedFiles(folderPath)
       if (!options.silent) {
-        showToast(`索引已更新：${allFiles.length} 个 Markdown 文件`)
+        const skippedCount = skippedItems.length
+        showToast(skippedCount > 0
+          ? `索引已更新：${allFiles.length} 个 Markdown 文件，跳过 ${skippedCount} 项`
+          : `索引已更新：${allFiles.length} 个 Markdown 文件`)
       }
     } catch (error) {
       if (controller.signal.aborted) {
@@ -291,6 +298,7 @@ function AppInner() {
           indexedFiles: prev?.indexedFiles ?? 0,
           skippedFiles: prev?.skippedFiles ?? 0,
           currentPath: prev?.currentPath,
+          skippedItems: prev?.skippedItems,
         }))
         if (!options.silent) {
           showToast('索引已取消')

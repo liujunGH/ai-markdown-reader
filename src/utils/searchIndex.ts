@@ -24,19 +24,52 @@ export interface SearchResult {
   matches: SearchMatch[]
 }
 
+export type IndexSkipReason = 'ignored-directory' | 'large-file' | 'read-error'
+
+export interface IndexSkippedItem {
+  path: string
+  name: string
+  reason: IndexSkipReason
+  detail?: string
+  size?: number
+  maxSize?: number
+}
+
 export interface IndexProgress {
   phase: 'scanning' | 'indexing' | 'complete' | 'cancelled'
   discoveredFiles: number
   indexedFiles: number
   skippedFiles: number
   currentPath?: string
+  skippedItems?: IndexSkippedItem[]
 }
 
 export interface IndexFolderOptions {
   signal?: AbortSignal
   onProgress?: (progress: IndexProgress) => void
+  onSkip?: (item: IndexSkippedItem) => void
+  initialSkippedItems?: IndexSkippedItem[]
   maxFileSizeBytes?: number
   skipDirectoryNames?: string[]
+}
+
+export function formatIndexSkippedItem(item: IndexSkippedItem): string {
+  if (item.reason === 'ignored-directory') {
+    return `${item.name}：已忽略目录`
+  }
+  if (item.reason === 'large-file') {
+    return `${item.name}：文件过大（${formatBytes(item.size)} > ${formatBytes(item.maxSize)}）`
+  }
+  return `${item.name}：读取失败${item.detail ? `（${item.detail}）` : ''}`
+}
+
+function formatBytes(value?: number): string {
+  if (value === undefined) return '未知'
+  if (value < 1024) return `${value} B`
+  const kb = value / 1024
+  if (kb < 1024) return `${Number(kb.toFixed(kb >= 10 ? 0 : 1))} KB`
+  const mb = kb / 1024
+  return `${Number(mb.toFixed(mb >= 10 ? 0 : 1))} MB`
 }
 
 const DEFAULT_SKIP_DIRECTORIES = new Set([
@@ -85,7 +118,23 @@ export async function getAllMarkdownFiles(
 ): Promise<Array<{ name: string; filePath: string }>> {
   if (!window.electronAPI) return []
   const files: Array<{ name: string; filePath: string }> = []
-  let skippedFiles = 0
+  const skippedItems: IndexSkippedItem[] = []
+
+  const recordSkip = (item: IndexSkippedItem) => {
+    skippedItems.push(item)
+    options.onSkip?.(item)
+  }
+
+  const emitProgress = (currentPath?: string) => {
+    options.onProgress?.({
+      phase: 'scanning',
+      discoveredFiles: files.length,
+      indexedFiles: 0,
+      skippedFiles: skippedItems.length,
+      currentPath,
+      skippedItems: [...skippedItems],
+    })
+  }
 
   const scan = async (currentFolderPath: string): Promise<void> => {
     assertNotCancelled(options.signal)
@@ -96,14 +145,12 @@ export async function getAllMarkdownFiles(
       assertNotCancelled(options.signal)
       if (item.isDirectory) {
         if (shouldSkipDirectory(item.name, options.skipDirectoryNames)) {
-          skippedFiles += 1
-          options.onProgress?.({
-            phase: 'scanning',
-            discoveredFiles: files.length,
-            indexedFiles: 0,
-            skippedFiles,
-            currentPath: item.filePath,
+          recordSkip({
+            path: item.filePath,
+            name: item.name,
+            reason: 'ignored-directory',
           })
+          emitProgress(item.filePath)
           continue
         }
         await scan(item.filePath)
@@ -111,25 +158,19 @@ export async function getAllMarkdownFiles(
       }
 
       if (options.maxFileSizeBytes !== undefined && item.size !== undefined && item.size > options.maxFileSizeBytes) {
-        skippedFiles += 1
-        options.onProgress?.({
-          phase: 'scanning',
-          discoveredFiles: files.length,
-          indexedFiles: 0,
-          skippedFiles,
-          currentPath: item.filePath,
+        recordSkip({
+          path: item.filePath,
+          name: item.name,
+          reason: 'large-file',
+          size: item.size,
+          maxSize: options.maxFileSizeBytes,
         })
+        emitProgress(item.filePath)
         continue
       }
 
       files.push({ name: item.name, filePath: item.filePath })
-      options.onProgress?.({
-        phase: 'scanning',
-        discoveredFiles: files.length,
-        indexedFiles: 0,
-        skippedFiles,
-        currentPath: item.filePath,
-      })
+      emitProgress(item.filePath)
     }
   }
 
@@ -147,6 +188,19 @@ export async function indexFolder(
   assertNotCancelled(options.signal)
 
   const indexedFiles: FileIndex[] = []
+  const skippedItems: IndexSkippedItem[] = [...(options.initialSkippedItems ?? [])]
+
+  const emitProgress = (phase: IndexProgress['phase'], currentPath?: string) => {
+    options.onProgress?.({
+      phase,
+      discoveredFiles: files.length,
+      indexedFiles: indexedFiles.length,
+      skippedFiles: skippedItems.length,
+      currentPath,
+      skippedItems: [...skippedItems],
+    })
+  }
+
   for (const file of files) {
     assertNotCancelled(options.signal)
     const result = await window.electronAPI.readFile(file.filePath)
@@ -158,14 +212,17 @@ export async function indexFolder(
         modified: Date.now(),
         folder: folderPath,
       })
+    } else {
+      const skippedItem: IndexSkippedItem = {
+        path: file.filePath,
+        name: file.name,
+        reason: 'read-error',
+        detail: result.error || '读取失败',
+      }
+      skippedItems.push(skippedItem)
+      options.onSkip?.(skippedItem)
     }
-    options.onProgress?.({
-      phase: 'indexing',
-      discoveredFiles: files.length,
-      indexedFiles: indexedFiles.length,
-      skippedFiles: files.length - indexedFiles.length,
-      currentPath: file.filePath,
-    })
+    emitProgress('indexing', file.filePath)
     assertNotCancelled(options.signal)
   }
 
@@ -183,12 +240,7 @@ export async function indexFolder(
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => {
       db.close()
-      options.onProgress?.({
-        phase: 'complete',
-        discoveredFiles: files.length,
-        indexedFiles: indexedFiles.length,
-        skippedFiles: files.length - indexedFiles.length,
-      })
+      emitProgress('complete')
       resolve()
     }
     transaction.onerror = () => { db.close(); reject(transaction.error) }
