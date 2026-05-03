@@ -53,6 +53,7 @@ const ImageInventoryPanel = React.lazy(() => import('./components/ImageInventory
 const BacklinksPanel = React.lazy(() => import('./components/BacklinksPanel').then(m => ({ default: m.BacklinksPanel })))
 const MarkdownGraphPanel = React.lazy(() => import('./components/MarkdownGraphPanel').then(m => ({ default: m.MarkdownGraphPanel })))
 const MissingLinksPanel = React.lazy(() => import('./components/MissingLinksPanel').then(m => ({ default: m.MissingLinksPanel })))
+const IndexDiagnosticsPanel = React.lazy(() => import('./components/IndexDiagnosticsPanel').then(m => ({ default: m.IndexDiagnosticsPanel })))
 const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
@@ -112,7 +113,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showWorkspaces, showReadingTimeline,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -154,6 +155,7 @@ function AppInner() {
   const [workspaceIndexCounts, setWorkspaceIndexCounts] = useState<Record<string, number>>({})
   const [isIndexing, setIsIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
+  const [indexSkippedItems, setIndexSkippedItems] = useState<IndexSkippedItem[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
   const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
@@ -271,18 +273,26 @@ function AppInner() {
     try {
       const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
       const skippedItems: IndexSkippedItem[] = []
+      setIndexSkippedItems([])
       const allFiles = await getAllMarkdownFiles(folderPath, {
         signal: controller.signal,
         onProgress: handleProgress,
-        onSkip: item => skippedItems.push(item),
+        onSkip: item => {
+          skippedItems.push(item)
+          setIndexSkippedItems([...skippedItems])
+        },
         maxFileSizeBytes: MAX_INDEX_FILE_SIZE,
       })
       await indexFolder(folderPath, allFiles, {
         signal: controller.signal,
         onProgress: handleProgress,
-        onSkip: item => skippedItems.push(item),
+        onSkip: item => {
+          skippedItems.push(item)
+          setIndexSkippedItems([...skippedItems])
+        },
         initialSkippedItems: skippedItems,
       })
+      setIndexSkippedItems([...skippedItems])
       await refreshIndexedFiles(folderPath)
       if (!options.silent) {
         const skippedCount = skippedItems.length
@@ -1030,7 +1040,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -1104,6 +1114,17 @@ function AppInner() {
                       >
                         <span>⊕</span>
                         {t('toolbar.missingLinks')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('indexDiagnostics')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>!</span>
+                        索引诊断
                       </button>
                       <button
                         type="button"
@@ -1421,6 +1442,17 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showIndexDiagnostics && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <IndexDiagnosticsPanel
+                folderPath={currentFolderPath}
+                skippedItems={indexSkippedItems}
+                isIndexing={isIndexing}
+                onReindex={() => rebuildFolderIndex()}
+                onClose={() => closePanel('indexDiagnostics')}
+              />
+            </Suspense>
+          )}
           {showWorkspaces && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <WorkspacePanel
@@ -1651,6 +1683,9 @@ function AppInner() {
               break
             case 'missing-links':
               openPanel('missingLinks')
+              break
+            case 'index-diagnostics':
+              openPanel('indexDiagnostics')
               break
             case 'workspaces':
               openPanel('workspaces')

@@ -41,6 +41,7 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'backlinks', label: '反向引用', category: '工具', icon: '↩', action: () => {} },
   { id: 'markdown-graph', label: '文档图谱', category: '工具', icon: '◎', action: () => {} },
   { id: 'missing-links', label: '缺失链接', category: '工具', icon: '⊕', action: () => {} },
+  { id: 'index-diagnostics', label: '索引诊断', category: '工具', icon: '!', action: () => {} },
   { id: 'workspaces', label: '工作区', category: '工具', icon: '▤', action: () => {} },
   { id: 'reading-timeline', label: '阅读时间线', category: '工具', icon: '◷', action: () => {} },
 
@@ -56,7 +57,7 @@ const PINYIN_INITIAL_MAP: Record<string, string> = {
   '关': 'g', '闭': 'b', '当': 'd', '前': 'q',
   '切': 'q', '换': 'h', '源': 'y', '码': 'm', '视': 's', '图': 't',
   '显': 'x', '示': 's', '隐': 'y', '藏': 'c', '目': 'm', '录': 'l',
-  '搜': 's', '索': 's',
+  '搜': 's', '索': 's', '诊': 'z', '断': 'd',
   '专': 'z', '注': 'z', '模': 'm', '式': 's',
   '最': 'z', '近': 'j',
   '主': 'z', '题': 't',

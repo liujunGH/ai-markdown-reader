@@ -22,6 +22,7 @@ export type PanelName =
   | 'backlinks'
   | 'markdownGraph'
   | 'missingLinks'
+  | 'indexDiagnostics'
   | 'workspaces'
   | 'readingTimeline'
 
@@ -46,6 +47,7 @@ interface UIState {
   showBacklinks: boolean
   showMarkdownGraph: boolean
   showMissingLinks: boolean
+  showIndexDiagnostics: boolean
   showWorkspaces: boolean
   showReadingTimeline: boolean
   fontSize: number
@@ -90,6 +92,7 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'backlinks': return { showBacklinks: value }
     case 'markdownGraph': return { showMarkdownGraph: value }
     case 'missingLinks': return { showMissingLinks: value }
+    case 'indexDiagnostics': return { showIndexDiagnostics: value }
     case 'workspaces': return { showWorkspaces: value }
     case 'readingTimeline': return { showReadingTimeline: value }
     default:
@@ -119,6 +122,7 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'backlinks': return state.showBacklinks
     case 'markdownGraph': return state.showMarkdownGraph
     case 'missingLinks': return state.showMissingLinks
+    case 'indexDiagnostics': return state.showIndexDiagnostics
     case 'workspaces': return state.showWorkspaces
     case 'readingTimeline': return state.showReadingTimeline
     default:
@@ -149,6 +153,7 @@ export const useUIStore = create<UIStore>()(
       showBacklinks: false,
       showMarkdownGraph: false,
       showMissingLinks: false,
+      showIndexDiagnostics: false,
       showWorkspaces: false,
       showReadingTimeline: false,
       fontSize: 16,
@@ -180,6 +185,7 @@ export const useUIStore = create<UIStore>()(
         showBacklinks: false,
         showMarkdownGraph: false,
         showMissingLinks: false,
+        showIndexDiagnostics: false,
         showWorkspaces: false,
         showReadingTimeline: false,
       }),
