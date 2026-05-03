@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ReadingToolsPanel } from '../../components/ReadingToolsPanel'
-import type { ChapterProgress, ReaderMark, ReadingStats, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
+import type { ChapterCompletion, FocusTimer, ReaderMark, ReadingAccessibilitySettings, ChapterProgress, ReadingStats, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
 
 const marks: ReaderMark[] = [
   { id: 'h1', filePath: '/docs/a.md', fileName: 'a.md', text: 'Important text', kind: 'highlight', color: 'yellow', line: 3, createdAt: 100 },
@@ -53,6 +53,19 @@ const chapterProgress: ChapterProgress = {
   lineEnd: 30,
 }
 
+const focusTimer: FocusTimer = { minutes: 25, startedAt: 100, endsAt: 1500100 }
+const accessibility: ReadingAccessibilitySettings = {
+  lineHeight: 1.8,
+  letterSpacing: 0.02,
+  paragraphSpacing: 1.2,
+  reduceMotion: true,
+  ttsRate: 1.2,
+  highContrastHighlights: true,
+}
+const chapterCompletions: ChapterCompletion[] = [
+  { id: 'c1', filePath: '/docs/a.md', heading: 'Intro', line: 1, completedAt: 100 },
+]
+
 describe('ReadingToolsPanel', () => {
   it('renders reader sections and calls handlers', async () => {
     const user = userEvent.setup()
@@ -68,6 +81,14 @@ describe('ReadingToolsPanel', () => {
       onJumpToMark: vi.fn(),
       onSetLayoutMode: vi.fn(),
       onRemoveMark: vi.fn(),
+      onExportAnnotations: vi.fn(),
+      onUpdateMarkMetadata: vi.fn(),
+      onToggleChapterCompletion: vi.fn(),
+      onStartFocusTimer: vi.fn(),
+      onStopFocusTimer: vi.fn(),
+      onOpenMediaGallery: vi.fn(),
+      onSyncComparison: vi.fn(),
+      onUpdateAccessibility: vi.fn(),
       onClose: vi.fn(),
     }
 
@@ -85,6 +106,9 @@ describe('ReadingToolsPanel', () => {
         panelMode="sidebar"
         readingStats={stats}
         chapterProgress={chapterProgress}
+        chapterCompletions={chapterCompletions}
+        focusTimer={focusTimer}
+        accessibility={accessibility}
         activeSessionMinutes={6}
         {...handlers}
       />
@@ -101,6 +125,13 @@ describe('ReadingToolsPanel', () => {
     expect(screen.getByText('章节进度')).toBeInTheDocument()
     expect(screen.getByText('阅读会话')).toBeInTheDocument()
     expect(screen.getByText('阅读统计')).toBeInTheDocument()
+    expect(screen.getByText('批注导出')).toBeInTheDocument()
+    expect(screen.getByText('颜色与标签')).toBeInTheDocument()
+    expect(screen.getByText('章节完成')).toBeInTheDocument()
+    expect(screen.getByText('防打扰')).toBeInTheDocument()
+    expect(screen.getByText('图片/表格')).toBeInTheDocument()
+    expect(screen.getByText('对比阅读')).toBeInTheDocument()
+    expect(screen.getByText('无障碍')).toBeInTheDocument()
     expect(screen.getByLabelText('阅读工具侧栏')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '保存高亮' }))
@@ -132,5 +163,29 @@ describe('ReadingToolsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: '双页' }))
     expect(handlers.onSetLayoutMode).toHaveBeenCalledWith('columns' satisfies ReadingLayoutMode)
+
+    await user.click(screen.getByRole('button', { name: '导出批注' }))
+    expect(handlers.onExportAnnotations).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '重点' }))
+    expect(handlers.onUpdateMarkMetadata).toHaveBeenCalledWith('h1', expect.objectContaining({ tag: '重点' }))
+
+    await user.click(screen.getByRole('button', { name: '切换当前章节完成' }))
+    expect(handlers.onToggleChapterCompletion).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '开始 25 分钟' }))
+    expect(handlers.onStartFocusTimer).toHaveBeenCalledWith(25)
+
+    await user.click(screen.getByRole('button', { name: '打开图片/表格导航' }))
+    expect(handlers.onOpenMediaGallery).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '同步对比位置' }))
+    expect(handlers.onSyncComparison).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '提高朗读速度' }))
+    expect(handlers.onUpdateAccessibility).toHaveBeenCalledWith(expect.objectContaining({ ttsRate: 1.3 }))
+
+    await user.click(screen.getByRole('button', { name: '切换减少动画' }))
+    expect(handlers.onUpdateAccessibility).toHaveBeenCalledWith(expect.objectContaining({ reduceMotion: false }))
   })
 })

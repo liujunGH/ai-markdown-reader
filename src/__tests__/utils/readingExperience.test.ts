@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   addReaderMark,
+  buildComparisonSyncTarget,
   buildReadingLandmarks,
   buildReadingStats,
   buildResumePoint,
   buildChapterProgress,
+  createFocusTimer,
   createReadingSession,
   createReadLaterItem,
+  exportReaderAnnotationsMarkdown,
   getDefaultReadingPresets,
+  normalizeAccessibilitySettings,
   normalizeLayoutMode,
   normalizeReadingKeyboardAction,
+  toggleChapterCompletion,
+  updateReaderMarkMetadata,
   updateReadLaterStatus,
 } from '../../utils/readingExperience'
 
@@ -144,5 +150,49 @@ describe('readingExperience', () => {
     expect(normalizeReadingKeyboardAction('m')).toBe('mark-read-later')
     expect(normalizeReadingKeyboardAction('b')).toBe('bookmark')
     expect(normalizeReadingKeyboardAction('x')).toBe(null)
+  })
+
+  it('exports annotations, updates highlight metadata, and toggles chapter completion', () => {
+    const marks = addReaderMark([], {
+      filePath: '/docs/a.md',
+      fileName: 'a.md',
+      text: 'Important paragraph',
+      kind: 'highlight',
+      color: 'yellow',
+      line: 3,
+    }, 100)
+    const updated = updateReaderMarkMetadata(marks, marks[0].id, { color: 'green', tag: '重点' })
+    const completions = toggleChapterCompletion([], { filePath: '/docs/a.md', heading: 'Intro', line: 1 }, 200)
+    const cleared = toggleChapterCompletion(completions, { filePath: '/docs/a.md', heading: 'Intro', line: 1 }, 300)
+    const markdown = exportReaderAnnotationsMarkdown({
+      fileName: 'a.md',
+      marks: updated,
+      chapterCompletions: completions,
+      progressLabel: 'Intro · 40%',
+    })
+
+    expect(updated[0]).toMatchObject({ color: 'green', tag: '重点' })
+    expect(completions).toHaveLength(1)
+    expect(cleared).toHaveLength(0)
+    expect(markdown).toContain('# a.md 阅读批注')
+    expect(markdown).toContain('Important paragraph')
+    expect(markdown).toContain('Intro')
+  })
+
+  it('builds focus timers, comparison sync targets, and accessibility settings', () => {
+    const timer = createFocusTimer({ minutes: 25, startedAt: 1000 })
+    const target = buildComparisonSyncTarget(0.5, '# A\n\nText\n\n## B')
+    const accessibility = normalizeAccessibilitySettings({
+      lineHeight: 2.2,
+      letterSpacing: 0.04,
+      paragraphSpacing: 1.6,
+      reduceMotion: true,
+      ttsRate: 1.4,
+      highContrastHighlights: true,
+    })
+
+    expect(timer.endsAt).toBe(1501000)
+    expect(target.line).toBe(3)
+    expect(accessibility).toMatchObject({ reduceMotion: true, ttsRate: 1.4, highContrastHighlights: true })
   })
 })

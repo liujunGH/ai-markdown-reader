@@ -4,6 +4,9 @@ import type {
   ReadLaterStatus,
   ChapterProgress,
   ReadingStats,
+  ChapterCompletion,
+  FocusTimer,
+  ReadingAccessibilitySettings,
   ReadingLandmark,
   ReadingLayoutMode,
   ReadingPreset,
@@ -24,6 +27,9 @@ interface Props {
   panelMode?: 'modal' | 'sidebar'
   readingStats?: ReadingStats
   chapterProgress?: ChapterProgress | null
+  chapterCompletions?: ChapterCompletion[]
+  focusTimer?: FocusTimer | null
+  accessibility?: ReadingAccessibilitySettings
   activeSessionMinutes?: number
   onAddHighlight: () => void
   onAddExcerpt: () => void
@@ -36,6 +42,14 @@ interface Props {
   onJumpToMark: (mark: ReaderMark) => void
   onSetLayoutMode: (mode: ReadingLayoutMode) => void
   onRemoveMark: (id: string) => void
+  onExportAnnotations: () => void
+  onUpdateMarkMetadata: (id: string, metadata: { color?: ReaderMark['color']; tag?: string }) => void
+  onToggleChapterCompletion: () => void
+  onStartFocusTimer: (minutes: number) => void
+  onStopFocusTimer: () => void
+  onOpenMediaGallery: () => void
+  onSyncComparison: () => void
+  onUpdateAccessibility: (settings: Partial<ReadingAccessibilitySettings>) => void
   onClose: () => void
 }
 
@@ -52,6 +66,9 @@ export function ReadingToolsPanel({
   panelMode = 'modal',
   readingStats,
   chapterProgress,
+  chapterCompletions = [],
+  focusTimer,
+  accessibility,
   activeSessionMinutes = 0,
   onAddHighlight,
   onAddExcerpt,
@@ -64,10 +81,19 @@ export function ReadingToolsPanel({
   onJumpToMark,
   onSetLayoutMode,
   onRemoveMark,
+  onExportAnnotations,
+  onUpdateMarkMetadata,
+  onToggleChapterCompletion,
+  onStartFocusTimer,
+  onStopFocusTimer,
+  onOpenMediaGallery,
+  onSyncComparison,
+  onUpdateAccessibility,
   onClose,
 }: Props) {
   const highlights = marks.filter(mark => mark.kind === 'highlight')
   const excerpts = marks.filter(mark => mark.kind === 'excerpt')
+  const firstHighlight = highlights[0]
 
   return (
     <div className={panelMode === 'sidebar' ? styles.sidebarShell : styles.overlay} onClick={panelMode === 'modal' ? onClose : undefined}>
@@ -132,15 +158,52 @@ export function ReadingToolsPanel({
           </section>
 
           <section className={styles.section}>
+            <h4>章节完成</h4>
+            <p>{chapterCompletions.length} 个章节已完成</p>
+            <button type="button" onClick={onToggleChapterCompletion} disabled={!chapterProgress}>切换当前章节完成</button>
+          </section>
+
+          <section className={styles.section}>
             <h4>阅读会话</h4>
             <p>本次已读 {activeSessionMinutes} 分钟</p>
             <strong>J/K 滚动 · H/L 跳章节 · M 稍后读 · B 书签</strong>
           </section>
 
           <section className={styles.section}>
+            <h4>防打扰</h4>
+            <p>{focusTimer ? `专注到 ${new Date(focusTimer.endsAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '开启 25 分钟阅读计时'}</p>
+            <div className={styles.rowActions}>
+              <button type="button" onClick={() => onStartFocusTimer(25)}>开始 25 分钟</button>
+              <button type="button" onClick={onStopFocusTimer} disabled={!focusTimer}>停止</button>
+            </div>
+          </section>
+
+          <section className={styles.section}>
             <h4>阅读统计</h4>
             <p>{readingStats ? `今日 ${readingStats.todayMinutes} 分钟 · 累计 ${readingStats.totalMinutes} 分钟` : '暂无阅读统计'}</p>
             {readingStats && <strong>{readingStats.documentsRead} 篇文档 · {readingStats.totalWords} 字</strong>}
+          </section>
+
+          <section className={styles.section}>
+            <h4>批注导出</h4>
+            <p>导出当前文档的高亮、摘录、完成章节和进度</p>
+            <button type="button" onClick={onExportAnnotations}>导出批注</button>
+          </section>
+
+          <section className={styles.section}>
+            <h4>颜色与标签</h4>
+            <p>{firstHighlight ? '为最近高亮添加颜色和标签' : '暂无高亮可设置'}</p>
+            <div className={styles.list}>
+              {highlights.slice(0, 3).map(mark => (
+                <article key={`metadata-${mark.id}`} className={styles.item}>
+                  <span>{mark.tag ? `#${mark.tag} · ` : ''}{mark.text}</span>
+                  <div className={styles.rowActions}>
+                    <button type="button" onClick={() => onUpdateMarkMetadata(mark.id, { color: 'green', tag: '重点' })}>重点</button>
+                    <button type="button" onClick={() => onUpdateMarkMetadata(mark.id, { color: 'blue', tag: '疑问' })}>疑问</button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
 
           <section className={styles.section}>
@@ -196,6 +259,30 @@ export function ReadingToolsPanel({
               <button className={layoutMode === 'single' ? styles.activeSegment : ''} type="button" onClick={() => onSetLayoutMode('single')}>单页</button>
               <button className={layoutMode === 'columns' ? styles.activeSegment : ''} type="button" onClick={() => onSetLayoutMode('columns')}>双页</button>
               <button className={layoutMode === 'split' ? styles.activeSegment : ''} type="button" onClick={() => onSetLayoutMode('split')}>分屏</button>
+            </div>
+          </section>
+
+          <section className={styles.section}>
+            <h4>图片/表格</h4>
+            <p>集中跳转图片、表格，也可配合图片预览查看</p>
+            <button type="button" onClick={onOpenMediaGallery}>打开图片/表格导航</button>
+          </section>
+
+          <section className={styles.section}>
+            <h4>对比阅读</h4>
+            <p>把右侧文档同步到接近当前阅读进度的位置</p>
+            <button type="button" onClick={onSyncComparison}>同步对比位置</button>
+          </section>
+
+          <section className={styles.section}>
+            <h4>无障碍</h4>
+            <p>朗读 {accessibility?.ttsRate ?? 1}x · 行距 {accessibility?.lineHeight ?? 1.65} · {accessibility?.reduceMotion ? '减少动画' : '标准动画'}</p>
+            <div className={styles.rowActions}>
+              <button type="button" onClick={() => onUpdateAccessibility({ ttsRate: Math.min(1.8, (accessibility?.ttsRate ?? 1) + 0.1) })}>提高朗读速度</button>
+              <button type="button" onClick={() => onUpdateAccessibility({ lineHeight: Math.min(2.4, (accessibility?.lineHeight ?? 1.65) + 0.1) })}>增加行距</button>
+              <button type="button" onClick={() => onUpdateAccessibility({ paragraphSpacing: Math.min(2.2, (accessibility?.paragraphSpacing ?? 1) + 0.1) })}>增加段距</button>
+              <button type="button" onClick={() => onUpdateAccessibility({ reduceMotion: !accessibility?.reduceMotion })}>切换减少动画</button>
+              <button type="button" onClick={() => onUpdateAccessibility({ highContrastHighlights: !accessibility?.highContrastHighlights })}>切换高对比高亮</button>
             </div>
           </section>
         </div>

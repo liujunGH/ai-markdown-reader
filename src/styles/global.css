@@ -140,6 +140,20 @@ body, header, main, aside, nav, section, button, input, textarea, select, a, pre
   padding: 0 2px;
 }
 
+.reader-high-contrast .reader-highlight {
+  background: #ffe066;
+  color: #111827;
+  box-shadow: inset 0 -2px 0 #92400e;
+}
+
+.reader-reduce-motion *,
+.reader-reduce-motion *::before,
+.reader-reduce-motion *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
 @media print {
   body {
     background: white !important;

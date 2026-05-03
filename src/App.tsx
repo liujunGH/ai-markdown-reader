@@ -40,7 +40,7 @@ import { useScrollHistory } from './hooks/useScrollHistory'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { basename, dirname, join } from './utils/path'
 import { RecentFile } from './types/electron'
-import { getStorageItem, setStorageItem, getSessionItem, setSessionItem } from './utils/storage'
+import { getStorageItem, setStorageItem, removeStorageItem, getSessionItem, setSessionItem } from './utils/storage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import CommandPalette from './components/CommandPalette'
 import { Skeleton } from './components/Skeleton'
@@ -114,16 +114,25 @@ import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveInd
 import {
   addReaderMark,
   buildChapterProgress,
+  buildComparisonSyncTarget,
   buildReadingStats,
   buildReadingLandmarks,
   buildResumePoint,
   createReadingSession,
+  createFocusTimer,
+  exportReaderAnnotationsMarkdown,
   getDefaultReadingPresets,
+  normalizeAccessibilitySettings,
   normalizeLayoutMode,
   normalizeReadingKeyboardAction,
+  toggleChapterCompletion,
+  updateReaderMarkMetadata,
   updateReadLaterStatus,
   upsertReadLaterItem,
   type ReaderMark,
+  type ChapterCompletion,
+  type FocusTimer,
+  type ReadingAccessibilitySettings,
   type ReadLaterItem,
   type ReadLaterStatus,
   type ReadingLandmark,
@@ -143,6 +152,9 @@ const READER_QUEUE_KEY = 'reader-queue'
 const READER_PRESET_KEY = 'reader-preset'
 const READER_LAYOUT_KEY = 'reader-layout'
 const READER_SESSIONS_KEY = 'reader-sessions'
+const READER_CHAPTERS_KEY = 'reader-chapters'
+const READER_ACCESSIBILITY_KEY = 'reader-accessibility'
+const READER_FOCUS_TIMER_KEY = 'reader-focus-timer'
 
 function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
   try {
@@ -151,6 +163,17 @@ function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+function loadJsonObject<T>(key: Parameters<typeof getStorageItem>[0], fallback: T): T {
+  try {
+    const stored = getStorageItem(key)
+    if (!stored) return fallback
+    const parsed = JSON.parse(stored)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as T : fallback
+  } catch {
+    return fallback
   }
 }
 
@@ -276,6 +299,14 @@ function AppInner() {
   const [readerMarks, setReaderMarks] = useState<ReaderMark[]>(() => loadJsonArray<ReaderMark>(READER_MARKS_KEY))
   const [readLaterItems, setReadLaterItems] = useState<ReadLaterItem[]>(() => loadJsonArray<ReadLaterItem>(READER_QUEUE_KEY))
   const [readingSessions, setReadingSessions] = useState<ReadingSession[]>(() => loadJsonArray<ReadingSession>(READER_SESSIONS_KEY))
+  const [chapterCompletions, setChapterCompletions] = useState<ChapterCompletion[]>(() => loadJsonArray<ChapterCompletion>(READER_CHAPTERS_KEY))
+  const [focusTimer, setFocusTimer] = useState<FocusTimer | null>(() => {
+    const timer = loadJsonObject<FocusTimer | null>(READER_FOCUS_TIMER_KEY, null)
+    return timer && timer.endsAt > Date.now() ? timer : null
+  })
+  const [accessibility, setAccessibility] = useState<ReadingAccessibilitySettings>(() => (
+    normalizeAccessibilitySettings(loadJsonObject<Partial<ReadingAccessibilitySettings>>(READER_ACCESSIBILITY_KEY, {}))
+  ))
   const [selectedReaderText, setSelectedReaderText] = useState('')
   const [currentReadingLine, setCurrentReadingLine] = useState(1)
   const [currentReadingProgress, setCurrentReadingProgress] = useState(0)
@@ -434,6 +465,9 @@ function AppInner() {
   const activeReaderMarks = useMemo(() => (
     readerMarks.filter(mark => mark.filePath === activeReaderFileKey)
   ), [activeReaderFileKey, readerMarks])
+  const activeChapterCompletions = useMemo(() => (
+    chapterCompletions.filter(item => item.filePath === activeReaderFileKey)
+  ), [activeReaderFileKey, chapterCompletions])
   const activeReadingHighlights = useMemo(() => (
     activeReaderMarks.filter(mark => mark.kind === 'highlight').map(mark => mark.text)
   ), [activeReaderMarks])
@@ -450,6 +484,9 @@ function AppInner() {
     }, history.updatedAt)
   }, [activeTab, readingHistory])
   const readingLandmarks = useMemo(() => buildReadingLandmarks(activeTab?.content || ''), [activeTab?.content])
+  const mediaLandmarks = useMemo(() => (
+    readingLandmarks.filter(landmark => landmark.type === 'image' || landmark.type === 'table')
+  ), [readingLandmarks])
   const readingStats = useMemo(() => buildReadingStats(readingSessions), [readingSessions])
   const chapterProgress = useMemo(() => (
     activeTab?.content ? buildChapterProgress(activeTab.content, currentReadingLine) : null
@@ -1253,6 +1290,11 @@ function AppInner() {
     setStorageItem('read-later-count', String(next.filter(item => item.status !== 'done').length))
   }, [])
 
+  const persistChapterCompletions = useCallback((next: ChapterCompletion[]) => {
+    setChapterCompletions(next)
+    setStorageItem(READER_CHAPTERS_KEY, JSON.stringify(next))
+  }, [])
+
   const getSelectedLine = useCallback((text: string): number | undefined => {
     if (!activeTab?.content || !text) return undefined
     const index = activeTab.content.indexOf(text)
@@ -1282,6 +1324,26 @@ function AppInner() {
     showToast('阅读标记已删除')
   }, [persistReaderMarks, readerMarks, showToast])
 
+  const handleUpdateReaderMarkMetadata = useCallback((id: string, metadata: { color?: ReaderMark['color']; tag?: string }) => {
+    persistReaderMarks(updateReaderMarkMetadata(readerMarks, id, metadata))
+    showToast('高亮信息已更新')
+  }, [persistReaderMarks, readerMarks, showToast])
+
+  const handleExportAnnotations = useCallback(() => {
+    if (!activeTab) {
+      showToast('当前没有可导出的阅读批注')
+      return
+    }
+    const markdown = exportReaderAnnotationsMarkdown({
+      fileName: activeTab.name,
+      marks: activeReaderMarks,
+      chapterCompletions: activeChapterCompletions,
+      progressLabel: activeResumePoint?.label || (chapterProgress ? `${chapterProgress.currentHeading} · ${chapterProgress.percent}%` : undefined),
+    })
+    void navigator.clipboard?.writeText(markdown)
+    showToast('阅读批注已复制为 Markdown')
+  }, [activeChapterCompletions, activeReaderMarks, activeResumePoint?.label, activeTab, chapterProgress, showToast])
+
   const handleAddReadLater = useCallback(() => {
     if (!activeTab) {
       showToast('当前没有可加入稍后读的文档')
@@ -1305,6 +1367,21 @@ function AppInner() {
     persistReadLaterItems(updateReadLaterStatus(readLaterItems, id, status))
     showToast(status === 'done' ? '已标记为已读' : '阅读状态已更新')
   }, [persistReadLaterItems, readLaterItems, showToast])
+
+  const handleToggleChapterCompletion = useCallback(() => {
+    if (!activeTab || !chapterProgress) {
+      showToast('当前没有可标记的章节')
+      return
+    }
+    const next = toggleChapterCompletion(chapterCompletions, {
+      filePath: activeReaderFileKey,
+      heading: chapterProgress.currentHeading,
+      line: chapterProgress.lineStart,
+    })
+    persistChapterCompletions(next)
+    const completed = next.some(item => item.filePath === activeReaderFileKey && item.heading === chapterProgress.currentHeading && item.line === chapterProgress.lineStart)
+    showToast(completed ? '章节已标记完成' : '章节完成标记已取消')
+  }, [activeReaderFileKey, activeTab, chapterCompletions, chapterProgress, persistChapterCompletions, showToast])
 
   const handleResumeReading = useCallback(() => {
     if (!activeResumePoint) {
@@ -1367,6 +1444,54 @@ function AppInner() {
     setQuery(mark.text)
     openPanel('search')
   }, [handleJumpToReadingLandmark, openPanel, setQuery])
+
+  const handleStartFocusTimer = useCallback((minutes: number) => {
+    const timer = createFocusTimer({ minutes })
+    setFocusTimer(timer)
+    setStorageItem(READER_FOCUS_TIMER_KEY, JSON.stringify(timer))
+    openPanel('focusMode')
+    showToast(`已开始 ${timer.minutes} 分钟防打扰阅读`)
+  }, [openPanel, showToast])
+
+  const handleStopFocusTimer = useCallback(() => {
+    setFocusTimer(null)
+    removeStorageItem(READER_FOCUS_TIMER_KEY)
+    showToast('防打扰计时已停止')
+  }, [showToast])
+
+  const handleOpenMediaGallery = useCallback(() => {
+    const landmark = mediaLandmarks[0]
+    if (!landmark) {
+      showToast('当前文档没有图片或表格')
+      return
+    }
+    handleJumpToReadingLandmark(landmark)
+    showToast(`已跳到${landmark.type === 'image' ? '图片' : '表格'}：${landmark.label}`)
+  }, [handleJumpToReadingLandmark, mediaLandmarks, showToast])
+
+  const handleSyncComparison = useCallback(() => {
+    if (!secondaryTab?.content) {
+      showToast('请先打开对比阅读视图')
+      if (!isSplitView) toggleSplitView()
+      return
+    }
+    const target = buildComparisonSyncTarget(currentReadingProgress, secondaryTab.content)
+    window.setTimeout(() => {
+      const panes = Array.from(document.querySelectorAll<HTMLElement>(`main.${styles.splitPane}`))
+      const secondaryPane = panes[0]
+      if (!secondaryPane) return
+      const maxScroll = Math.max(1, secondaryPane.scrollHeight - secondaryPane.clientHeight)
+      secondaryPane.scrollTop = maxScroll * target.progress
+    }, 0)
+    showToast(`对比文档已同步到约第 ${target.line} 行`)
+  }, [currentReadingProgress, isSplitView, secondaryTab?.content, showToast, toggleSplitView])
+
+  const handleUpdateAccessibility = useCallback((settings: Partial<ReadingAccessibilitySettings>) => {
+    const next = normalizeAccessibilitySettings({ ...accessibility, ...settings })
+    setAccessibility(next)
+    setStorageItem(READER_ACCESSIBILITY_KEY, JSON.stringify(next))
+    showToast('阅读无障碍设置已更新')
+  }, [accessibility, showToast])
 
   const jumpHeadingByOffset = useCallback((offset: number) => {
     if (outlineItems.length === 0) return
@@ -1436,6 +1561,29 @@ function AppInner() {
     }
     return () => document.body.classList.remove('focus-mode')
   }, [showFocusMode])
+
+  useEffect(() => {
+    document.body.classList.toggle('reader-reduce-motion', accessibility.reduceMotion)
+    document.body.classList.toggle('reader-high-contrast', accessibility.highContrastHighlights)
+    return () => {
+      document.body.classList.remove('reader-reduce-motion')
+      document.body.classList.remove('reader-high-contrast')
+    }
+  }, [accessibility.highContrastHighlights, accessibility.reduceMotion])
+
+  useEffect(() => {
+    if (!focusTimer) return
+    const checkTimer = () => {
+      if (Date.now() < focusTimer.endsAt) return
+      setFocusTimer(null)
+      removeStorageItem(READER_FOCUS_TIMER_KEY)
+      closePanel('focusMode')
+      showToast('防打扰阅读计时结束')
+    }
+    checkTimer()
+    const interval = window.setInterval(checkTimer, 10000)
+    return () => window.clearInterval(interval)
+  }, [closePanel, focusTimer, showToast])
 
   // Reset highlighted line on tab/source change
   useEffect(() => {
@@ -1997,7 +2145,13 @@ function AppInner() {
                         matchCount={matches.length}
                         readingHighlights={activeReadingHighlights}
                         readingLayout={readingLayoutMode === 'columns' ? 'columns' : 'single'}
-                        readingStyle={activeReadingPreset ? { lineHeight: activeReadingPreset.lineHeight, lineWidth: activeReadingPreset.lineWidth } : undefined}
+                        readingStyle={activeReadingPreset ? {
+                          lineHeight: accessibility.lineHeight || activeReadingPreset.lineHeight,
+                          lineWidth: activeReadingPreset.lineWidth,
+                          letterSpacing: accessibility.letterSpacing,
+                          paragraphSpacing: accessibility.paragraphSpacing,
+                        } : undefined}
+                        ttsRate={accessibility.ttsRate}
                         onTextSelect={({ text }) => setSelectedReaderText(text)}
                         onWikiLinkClick={handleWikiLinkClick}
                       />
@@ -2016,7 +2170,13 @@ function AppInner() {
                       content={secondaryTab.content || ''}
                       filePath={secondaryTab.filePath}
                       readingLayout="single"
-                      readingStyle={activeReadingPreset ? { lineHeight: activeReadingPreset.lineHeight, lineWidth: activeReadingPreset.lineWidth } : undefined}
+                      readingStyle={activeReadingPreset ? {
+                        lineHeight: accessibility.lineHeight || activeReadingPreset.lineHeight,
+                        lineWidth: activeReadingPreset.lineWidth,
+                        letterSpacing: accessibility.letterSpacing,
+                        paragraphSpacing: accessibility.paragraphSpacing,
+                      } : undefined}
+                      ttsRate={accessibility.ttsRate}
                       onWikiLinkClick={handleWikiLinkClick}
                     />
                   )}
@@ -2071,6 +2231,9 @@ function AppInner() {
                   panelMode="sidebar"
                   readingStats={readingStats}
                   chapterProgress={chapterProgress}
+                  chapterCompletions={activeChapterCompletions}
+                  focusTimer={focusTimer}
+                  accessibility={accessibility}
                   activeSessionMinutes={activeSessionMinutes}
                   onAddHighlight={() => handleAddReaderMark('highlight')}
                   onAddExcerpt={() => handleAddReaderMark('excerpt')}
@@ -2083,6 +2246,14 @@ function AppInner() {
                   onJumpToMark={handleJumpToReaderMark}
                   onSetLayoutMode={handleSetReadingLayoutMode}
                   onRemoveMark={handleRemoveReaderMark}
+                  onExportAnnotations={handleExportAnnotations}
+                  onUpdateMarkMetadata={handleUpdateReaderMarkMetadata}
+                  onToggleChapterCompletion={handleToggleChapterCompletion}
+                  onStartFocusTimer={handleStartFocusTimer}
+                  onStopFocusTimer={handleStopFocusTimer}
+                  onOpenMediaGallery={handleOpenMediaGallery}
+                  onSyncComparison={handleSyncComparison}
+                  onUpdateAccessibility={handleUpdateAccessibility}
                   onClose={() => closePanel('readingTools')}
                 />
               </Suspense>

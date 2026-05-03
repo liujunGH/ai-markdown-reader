@@ -56,7 +56,7 @@
 }
 
 .renderer p {
-  margin: 1em 0;
+  margin: var(--reader-paragraph-spacing, 1em) 0;
 }
 
 .renderer a {
@@ -116,7 +116,19 @@
 .renderer table {
   border-collapse: collapse;
   width: 100%;
+  margin: 0;
+}
+
+.renderer :global(.table-reader-wrapper) {
   margin: 1em 0;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.renderer :global(.table-reader-wrapper table) {
+  min-width: max-content;
 }
 
 .renderer th,
@@ -128,6 +140,9 @@
 .renderer th {
   background: var(--bg-tertiary);
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .renderer tr:nth-child(even) {

@@ -24,7 +24,10 @@ interface Props {
   readingStyle?: {
     lineHeight: number
     lineWidth: number
+    letterSpacing?: number
+    paragraphSpacing?: number
   }
+  ttsRate?: number
   onTextSelect?: (selection: { text: string; filePath?: string }) => void
   onWikiLinkClick?: (target: string, altTarget?: string) => void
 }
@@ -188,7 +191,7 @@ function buildMermaidContainer(svg: string): HTMLDivElement {
   return containerDiv
 }
 
-export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, readingHighlights = [], readingLayout = 'single', readingStyle, onTextSelect, onWikiLinkClick }, ref) => {
+export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ content, filePath, searchQuery = '', searchRegex = false, currentMatch = 0, matchCount = 0, readingHighlights = [], readingLayout = 'single', readingStyle, ttsRate = 1, onTextSelect, onWikiLinkClick }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string; originalSrc: string } | null>(null)
   const [scale, setScale] = useState(1)
@@ -304,11 +307,12 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     }
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'zh-CN'
+    utterance.rate = Math.max(0.6, Math.min(1.8, ttsRate))
     utterance.onend = () => setSpeaking(false)
     utterance.onerror = () => setSpeaking(false)
     window.speechSynthesis.speak(utterance)
     setSpeaking(true)
-  }, [speaking])
+  }, [speaking, ttsRate])
 
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
@@ -429,6 +433,17 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
           originalSrc: img.getAttribute('data-original-src') || img.src,
         })
       })
+    })
+
+    const tables = container.querySelectorAll('table')
+    tables.forEach((table, index) => {
+      if (table.parentElement?.classList.contains('table-reader-wrapper')) return
+      const wrapper = document.createElement('div')
+      wrapper.className = 'table-reader-wrapper'
+      wrapper.setAttribute('role', 'region')
+      wrapper.setAttribute('aria-label', `表格 ${index + 1}`)
+      table.parentNode?.insertBefore(wrapper, table)
+      wrapper.appendChild(table)
     })
 
     const preElements = container.querySelectorAll('pre')
@@ -804,7 +819,12 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       <div
         ref={containerRef}
         className={`${styles.renderer} ${readingLayout === 'columns' ? styles.rendererColumns : ''}`}
-        style={readingStyle ? { maxWidth: `${readingStyle.lineWidth}px`, lineHeight: readingStyle.lineHeight } : undefined}
+        style={readingStyle ? {
+          maxWidth: `${readingStyle.lineWidth}px`,
+          lineHeight: readingStyle.lineHeight,
+          letterSpacing: `${readingStyle.letterSpacing ?? 0}em`,
+          ['--reader-paragraph-spacing' as string]: `${readingStyle.paragraphSpacing ?? 1}em`,
+        } : undefined}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {ttsButton && (

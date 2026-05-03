@@ -13,6 +13,7 @@ export interface ReaderMark {
   kind: ReaderMarkKind
   color: ReaderMarkColor
   note?: string
+  tag?: string
   line?: number
   createdAt: number
 }
@@ -24,6 +25,7 @@ export interface ReaderMarkInput {
   kind: ReaderMarkKind
   color?: ReaderMarkColor
   note?: string
+  tag?: string
   line?: number
 }
 
@@ -95,6 +97,34 @@ export interface ChapterProgress {
   lineEnd: number
 }
 
+export interface ChapterCompletion {
+  id: string
+  filePath: string
+  heading: string
+  line: number
+  completedAt: number
+}
+
+export interface FocusTimer {
+  minutes: number
+  startedAt: number
+  endsAt: number
+}
+
+export interface ReadingAccessibilitySettings {
+  lineHeight: number
+  letterSpacing: number
+  paragraphSpacing: number
+  reduceMotion: boolean
+  ttsRate: number
+  highContrastHighlights: boolean
+}
+
+export interface ComparisonSyncTarget {
+  progress: number
+  line: number
+}
+
 export function addReaderMark(items: ReaderMark[], input: ReaderMarkInput, createdAt = Date.now()): ReaderMark[] {
   const text = input.text.trim().replace(/\s+/g, ' ')
   if (!text) return items
@@ -113,9 +143,19 @@ export function addReaderMark(items: ReaderMark[], input: ReaderMarkInput, creat
     kind: input.kind,
     color: input.color || 'yellow',
     note: input.note,
+    tag: input.tag,
     line: input.line,
     createdAt,
   }, ...items].slice(0, 300)
+}
+
+export function updateReaderMarkMetadata(items: ReaderMark[], id: string, metadata: { color?: ReaderMarkColor; tag?: string; note?: string }): ReaderMark[] {
+  return items.map(item => item.id === id ? {
+    ...item,
+    color: metadata.color || item.color,
+    tag: metadata.tag !== undefined ? metadata.tag.trim() : item.tag,
+    note: metadata.note !== undefined ? metadata.note : item.note,
+  } : item)
 }
 
 export function createReadLaterItem(input: {
@@ -319,6 +359,66 @@ export function normalizeReadingKeyboardAction(key: string): ReadingKeyboardActi
   }
 }
 
+export function toggleChapterCompletion(items: ChapterCompletion[], input: { filePath: string; heading: string; line: number }, completedAt = Date.now()): ChapterCompletion[] {
+  const id = `chapter-${hashText(`${input.filePath}:${input.heading}:${input.line}`)}`
+  if (items.some(item => item.id === id)) return items.filter(item => item.id !== id)
+  return [{ id, filePath: input.filePath, heading: input.heading, line: input.line, completedAt }, ...items].slice(0, 300)
+}
+
+export function exportReaderAnnotationsMarkdown(input: {
+  fileName: string
+  marks: ReaderMark[]
+  chapterCompletions: ChapterCompletion[]
+  progressLabel?: string
+}): string {
+  const highlights = input.marks.filter(mark => mark.kind === 'highlight')
+  const excerpts = input.marks.filter(mark => mark.kind === 'excerpt')
+  return [
+    `# ${input.fileName} 阅读批注`,
+    '',
+    input.progressLabel ? `- 阅读位置：${input.progressLabel}` : '',
+    `- 高亮：${highlights.length}`,
+    `- 摘录：${excerpts.length}`,
+    `- 完成章节：${input.chapterCompletions.length}`,
+    '',
+    '## 高亮',
+    ...formatMarks(highlights),
+    '',
+    '## 摘录',
+    ...formatMarks(excerpts),
+    '',
+    '## 已完成章节',
+    ...input.chapterCompletions.map(item => `- ${item.heading}（行 ${item.line}）`),
+    '',
+  ].filter((line, index, array) => line !== '' || array[index - 1] !== '').join('\n')
+}
+
+export function createFocusTimer(input: { minutes: number; startedAt?: number }): FocusTimer {
+  const minutes = Math.max(5, Math.min(120, Math.round(input.minutes)))
+  const startedAt = input.startedAt ?? Date.now()
+  return { minutes, startedAt, endsAt: startedAt + minutes * 60000 }
+}
+
+export function buildComparisonSyncTarget(progress: number, content: string): ComparisonSyncTarget {
+  const lines = content.split('\n')
+  const normalized = clamp01(progress)
+  return {
+    progress: normalized,
+    line: Math.max(1, Math.round(Math.max(1, lines.length) * normalized)),
+  }
+}
+
+export function normalizeAccessibilitySettings(input: Partial<ReadingAccessibilitySettings> = {}): ReadingAccessibilitySettings {
+  return {
+    lineHeight: clampRange(input.lineHeight, 1.3, 2.4, 1.65),
+    letterSpacing: clampRange(input.letterSpacing, 0, 0.12, 0),
+    paragraphSpacing: clampRange(input.paragraphSpacing, 0.8, 2.2, 1),
+    reduceMotion: Boolean(input.reduceMotion),
+    ttsRate: clampRange(input.ttsRate, 0.6, 1.8, 1),
+    highContrastHighlights: Boolean(input.highContrastHighlights),
+  }
+}
+
 function findNearestHeading(lines: string[], targetLine: number): string {
   for (let index = Math.min(targetLine - 1, lines.length - 1); index >= 0; index -= 1) {
     const match = lines[index].trim().match(/^#{1,6}\s+(.+)$/)
@@ -333,6 +433,23 @@ function trimLabel(value: string): string {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value))
+}
+
+function clampRange(value: number | undefined, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback
+  return Math.max(min, Math.min(max, value))
+}
+
+function formatMarks(marks: ReaderMark[]): string[] {
+  if (marks.length === 0) return ['- 暂无']
+  return marks.map(mark => {
+    const meta = [
+      mark.tag ? `#${mark.tag}` : '',
+      mark.line ? `行 ${mark.line}` : '',
+      mark.color,
+    ].filter(Boolean).join(' · ')
+    return `- ${meta ? `${meta}：` : ''}${mark.text}`
+  })
 }
 
 function hashText(value: string): string {

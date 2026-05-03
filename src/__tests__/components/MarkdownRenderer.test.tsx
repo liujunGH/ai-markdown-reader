@@ -401,6 +401,33 @@ describe('MarkdownRenderer', () => {
     })
   })
 
+  it('wraps tables in a scrollable reading region', async () => {
+    const { container } = render(
+      <MarkdownRenderer content={'| A | B |\n|---|---|\n| 1 | 2 |'} />
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.table-reader-wrapper')).toBeInTheDocument()
+    })
+
+    expect(container.querySelector('.table-reader-wrapper')).toHaveAttribute('role', 'region')
+    expect(container.querySelector('.table-reader-wrapper table')).toBeInTheDocument()
+  })
+
+  it('applies reading accessibility style values', () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content="Readable paragraph."
+        readingStyle={{ lineHeight: 1.8, lineWidth: 680, letterSpacing: 0.04, paragraphSpacing: 1.4 }}
+      />
+    )
+
+    const root = container.querySelector('[class*="renderer"]') as HTMLElement
+    expect(root.style.lineHeight).toBe('1.8')
+    expect(root.style.letterSpacing).toBe('0.04em')
+    expect(root.style.getPropertyValue('--reader-paragraph-spacing')).toBe('1.4em')
+  })
+
   it('calls onWikiLinkClick when wiki link is clicked', async () => {
     const user = userEvent.setup()
     const onWikiLinkClick = vi.fn()
