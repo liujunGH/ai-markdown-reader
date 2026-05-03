@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ReadingToolsPanel } from '../../components/ReadingToolsPanel'
-import type { ReaderMark, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
+import type { ChapterProgress, ReaderMark, ReadingStats, ReadLaterItem, ReadingLandmark, ReadingLayoutMode, ReadingPreset, ReadingResumePoint } from '../../utils/readingExperience'
 
 const marks: ReaderMark[] = [
   { id: 'h1', filePath: '/docs/a.md', fileName: 'a.md', text: 'Important text', kind: 'highlight', color: 'yellow', line: 3, createdAt: 100 },
@@ -36,6 +36,23 @@ const landmarks: ReadingLandmark[] = [
   { id: 'image-4', type: 'image', label: 'Cover', line: 4 },
 ]
 
+const stats: ReadingStats = {
+  totalMinutes: 42,
+  todayMinutes: 8,
+  totalWords: 3600,
+  documentsRead: 3,
+  sessionCount: 5,
+}
+
+const chapterProgress: ChapterProgress = {
+  currentHeading: 'Intro',
+  currentIndex: 1,
+  totalChapters: 4,
+  percent: 62,
+  lineStart: 1,
+  lineEnd: 30,
+}
+
 describe('ReadingToolsPanel', () => {
   it('renders reader sections and calls handlers', async () => {
     const user = userEvent.setup()
@@ -48,6 +65,7 @@ describe('ReadingToolsPanel', () => {
       onResume: vi.fn(),
       onApplyPreset: vi.fn(),
       onJumpToLandmark: vi.fn(),
+      onJumpToMark: vi.fn(),
       onSetLayoutMode: vi.fn(),
       onRemoveMark: vi.fn(),
       onClose: vi.fn(),
@@ -64,6 +82,10 @@ describe('ReadingToolsPanel', () => {
         activePresetId="default"
         landmarks={landmarks}
         layoutMode="single"
+        panelMode="sidebar"
+        readingStats={stats}
+        chapterProgress={chapterProgress}
+        activeSessionMinutes={6}
         {...handlers}
       />
     )
@@ -76,6 +98,10 @@ describe('ReadingToolsPanel', () => {
     expect(screen.getByText('快速导航')).toBeInTheDocument()
     expect(screen.getByText('摘录')).toBeInTheDocument()
     expect(screen.getByText('分栏阅读')).toBeInTheDocument()
+    expect(screen.getByText('章节进度')).toBeInTheDocument()
+    expect(screen.getByText('阅读会话')).toBeInTheDocument()
+    expect(screen.getByText('阅读统计')).toBeInTheDocument()
+    expect(screen.getByLabelText('阅读工具侧栏')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '保存高亮' }))
     expect(handlers.onAddHighlight).toHaveBeenCalled()
@@ -100,6 +126,9 @@ describe('ReadingToolsPanel', () => {
 
     await user.click(screen.getByRole('button', { name: '跳到 Intro' }))
     expect(handlers.onJumpToLandmark).toHaveBeenCalledWith(landmarks[0])
+
+    await user.click(screen.getByRole('button', { name: '跳到高亮 Important text' }))
+    expect(handlers.onJumpToMark).toHaveBeenCalledWith(marks[0])
 
     await user.click(screen.getByRole('button', { name: '双页' }))
     expect(handlers.onSetLayoutMode).toHaveBeenCalledWith('columns' satisfies ReadingLayoutMode)

@@ -113,10 +113,14 @@ import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnos
 import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
 import {
   addReaderMark,
+  buildChapterProgress,
+  buildReadingStats,
   buildReadingLandmarks,
   buildResumePoint,
+  createReadingSession,
   getDefaultReadingPresets,
   normalizeLayoutMode,
+  normalizeReadingKeyboardAction,
   updateReadLaterStatus,
   upsertReadLaterItem,
   type ReaderMark,
@@ -125,6 +129,7 @@ import {
   type ReadingLandmark,
   type ReadingLayoutMode,
   type ReadingPreset,
+  type ReadingSession,
 } from './utils/readingExperience'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
@@ -137,6 +142,7 @@ const READER_MARKS_KEY = 'reader-marks'
 const READER_QUEUE_KEY = 'reader-queue'
 const READER_PRESET_KEY = 'reader-preset'
 const READER_LAYOUT_KEY = 'reader-layout'
+const READER_SESSIONS_KEY = 'reader-sessions'
 
 function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
   try {
@@ -269,7 +275,11 @@ function AppInner() {
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
   const [readerMarks, setReaderMarks] = useState<ReaderMark[]>(() => loadJsonArray<ReaderMark>(READER_MARKS_KEY))
   const [readLaterItems, setReadLaterItems] = useState<ReadLaterItem[]>(() => loadJsonArray<ReadLaterItem>(READER_QUEUE_KEY))
+  const [readingSessions, setReadingSessions] = useState<ReadingSession[]>(() => loadJsonArray<ReadingSession>(READER_SESSIONS_KEY))
   const [selectedReaderText, setSelectedReaderText] = useState('')
+  const [currentReadingLine, setCurrentReadingLine] = useState(1)
+  const [currentReadingProgress, setCurrentReadingProgress] = useState(0)
+  const [activeSessionMinutes, setActiveSessionMinutes] = useState(0)
   const [activeReaderPresetId, setActiveReaderPresetId] = useState<ReadingPreset['id']>(() => {
     const stored = getStorageItem(READER_PRESET_KEY)
     return stored === 'longform' || stored === 'code-doc' || stored === 'paper' ? stored : 'default'
@@ -278,6 +288,8 @@ function AppInner() {
   const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
   const hasRestoredLastFolderRef = useRef(false)
   const indexAbortControllerRef = useRef<AbortController | null>(null)
+  const readingSessionRef = useRef<{ filePath: string; fileName: string; startedAt: number; progressStart: number; wordsStart: number } | null>(null)
+  const readingProgressRef = useRef(0)
 
   // ── Hooks ──
   const scrollHistory = useScrollHistory()
@@ -438,6 +450,10 @@ function AppInner() {
     }, history.updatedAt)
   }, [activeTab, readingHistory])
   const readingLandmarks = useMemo(() => buildReadingLandmarks(activeTab?.content || ''), [activeTab?.content])
+  const readingStats = useMemo(() => buildReadingStats(readingSessions), [readingSessions])
+  const chapterProgress = useMemo(() => (
+    activeTab?.content ? buildChapterProgress(activeTab.content, currentReadingLine) : null
+  ), [activeTab?.content, currentReadingLine])
 
   // ── Effects ──
 
@@ -1338,6 +1354,35 @@ function AppInner() {
     }
   }, [isSplitView, setSplitView, toggleSplitView])
 
+  const handleJumpToReaderMark = useCallback((mark: ReaderMark) => {
+    if (mark.line) {
+      handleJumpToReadingLandmark({
+        id: mark.id,
+        type: mark.kind === 'highlight' ? 'paragraph' : 'paragraph',
+        label: mark.text,
+        line: mark.line,
+      })
+      return
+    }
+    setQuery(mark.text)
+    openPanel('search')
+  }, [handleJumpToReadingLandmark, openPanel, setQuery])
+
+  const jumpHeadingByOffset = useCallback((offset: number) => {
+    if (outlineItems.length === 0) return
+    const activeIndex = Math.max(0, outlineItems.findIndex(item => item.id === activeHeadingId))
+    const fallbackIndex = offset > 0 ? 0 : outlineItems.length - 1
+    const nextIndex = Math.max(0, Math.min(outlineItems.length - 1, (activeIndex >= 0 ? activeIndex : fallbackIndex) + offset))
+    handleOutlineClick(outlineItems[nextIndex].id)
+  }, [activeHeadingId, handleOutlineClick, outlineItems])
+
+  const handleKeyboardBookmark = useCallback(() => {
+    const heading = currentHeading || activeTab?.name
+    if (!heading) return
+    addBookmark(heading)
+    showToast('已添加书签')
+  }, [activeTab?.name, addBookmark, currentHeading, showToast])
+
   // Electron file open listener
   const handleFileOpenRef = useRef(handleFileOpen)
   handleFileOpenRef.current = handleFileOpen
@@ -1447,11 +1492,15 @@ function AppInner() {
       const maxScroll = Math.max(1, main.scrollHeight - main.clientHeight)
       const progress = Math.min(1, Math.max(0, main.scrollTop / maxScroll))
       const lineCount = activeTab.content.split('\n').length
+      const line = Math.max(1, Math.round(progress * lineCount))
+      setCurrentReadingProgress(progress)
+      setCurrentReadingLine(line)
+      readingProgressRef.current = progress
       recordReadingHistory({
         filePath: activeTab.filePath || '',
         name: activeTab.name,
         progress,
-        line: Math.max(1, Math.round(progress * lineCount)),
+        line,
         scrollTop: main.scrollTop,
       })
       setReadingHistory(getReadingHistory())
@@ -1470,6 +1519,67 @@ function AppInner() {
     }
   }, [activeTab?.content, activeTab?.filePath, activeTab?.name, isRestoringSession])
 
+  useEffect(() => {
+    if (!activeTab?.filePath || isRestoringSession) return
+    const startedAt = Date.now()
+    const wordsStart = Math.round((activeTab.content || '').replace(/\s/g, '').length * readingProgressRef.current)
+    readingSessionRef.current = {
+      filePath: activeTab.filePath,
+      fileName: activeTab.name,
+      startedAt,
+      progressStart: readingProgressRef.current,
+      wordsStart,
+    }
+    setActiveSessionMinutes(0)
+
+    const interval = window.setInterval(() => {
+      setActiveSessionMinutes(Math.max(0, Math.round((Date.now() - startedAt) / 60000)))
+    }, 30000)
+
+    return () => {
+      window.clearInterval(interval)
+      const session = readingSessionRef.current
+      if (!session || session.filePath !== activeTab.filePath) return
+      const endedAt = Date.now()
+      if (endedAt - session.startedAt < 5000) return
+      const wordsEnd = Math.round((activeTab.content || '').replace(/\s/g, '').length * readingProgressRef.current)
+      const nextSession = createReadingSession({
+        filePath: session.filePath,
+        fileName: session.fileName,
+        startedAt: session.startedAt,
+        endedAt,
+        progressStart: session.progressStart,
+        progressEnd: readingProgressRef.current,
+        wordsRead: Math.max(0, wordsEnd - session.wordsStart),
+      })
+      setReadingSessions(prev => {
+        const next = [nextSession, ...prev].slice(0, 500)
+        setStorageItem(READER_SESSIONS_KEY, JSON.stringify(next))
+        return next
+      })
+    }
+  }, [activeTab?.content, activeTab?.filePath, activeTab?.name, isRestoringSession])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const action = normalizeReadingKeyboardAction(event.key)
+      if (!action) return
+      event.preventDefault()
+      const main = mainRef.current
+      if (action === 'scroll-down') main?.scrollBy({ top: Math.round((main.clientHeight || 600) * 0.72), behavior: 'smooth' })
+      if (action === 'scroll-up') main?.scrollBy({ top: -Math.round((main.clientHeight || 600) * 0.72), behavior: 'smooth' })
+      if (action === 'next-heading') jumpHeadingByOffset(1)
+      if (action === 'previous-heading') jumpHeadingByOffset(-1)
+      if (action === 'mark-read-later') handleAddReadLater()
+      if (action === 'bookmark') handleKeyboardBookmark()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleAddReadLater, handleKeyboardBookmark, jumpHeadingByOffset])
+
   // Keyboard shortcuts
   useKeyboardShortcuts(
     scrollHistory,
@@ -1481,6 +1591,18 @@ function AppInner() {
     <>
       <UpdateNotification />
       <ProgressBar containerRef={mainRef} />
+      {showFocusMode && (
+        <div className={styles.focusReadingBar} role="region" aria-label="专注阅读工具条">
+          <span>{chapterProgress ? `${chapterProgress.currentHeading} · ${chapterProgress.percent}%` : `全文 ${Math.round(currentReadingProgress * 100)}%`}</span>
+          <button type="button" onClick={() => {
+            closePanel('focusMode')
+            openPanel('outline')
+          }}>目录</button>
+          <button type="button" onClick={() => setFontSize(Math.max(10, fontSize - 1))}>A-</button>
+          <button type="button" onClick={() => setFontSize(Math.min(32, fontSize + 1))}>A+</button>
+          <button type="button" onClick={() => togglePanel('focusMode')}>退出</button>
+        </div>
+      )}
       {isDraggingOver && (
         <div className={styles.dragOverlay}>
           <div className={styles.dragOverlayContent}>
@@ -1934,6 +2056,37 @@ function AppInner() {
                 )}
               </ResizableSidebar>
             )}
+            {!showFocusMode && showReadingTools && (
+              <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+                <ReadingToolsPanel
+                  fileName={activeTab?.name || '未打开文档'}
+                  selectedText={selectedReaderText}
+                  marks={activeReaderMarks}
+                  readLaterItems={readLaterItems}
+                  resumePoint={activeResumePoint}
+                  presets={readingPresets}
+                  activePresetId={activeReaderPresetId}
+                  landmarks={readingLandmarks}
+                  layoutMode={readingLayoutMode}
+                  panelMode="sidebar"
+                  readingStats={readingStats}
+                  chapterProgress={chapterProgress}
+                  activeSessionMinutes={activeSessionMinutes}
+                  onAddHighlight={() => handleAddReaderMark('highlight')}
+                  onAddExcerpt={() => handleAddReaderMark('excerpt')}
+                  onAddReadLater={handleAddReadLater}
+                  onOpenReadLater={handleOpenReadLater}
+                  onUpdateReadLaterStatus={handleUpdateReadLaterStatus}
+                  onResume={handleResumeReading}
+                  onApplyPreset={handleApplyReadingPreset}
+                  onJumpToLandmark={handleJumpToReadingLandmark}
+                  onJumpToMark={handleJumpToReaderMark}
+                  onSetLayoutMode={handleSetReadingLayoutMode}
+                  onRemoveMark={handleRemoveReaderMark}
+                  onClose={() => closePanel('readingTools')}
+                />
+              </Suspense>
+            )}
           </div>
           {!showFocusMode && <StatusBar content={activeTab?.content || ''} />}
           {showRecent && (
@@ -2205,32 +2358,6 @@ function AppInner() {
                 items={readingHistory}
                 onOpenFile={openFileAtLine}
                 onClose={() => closePanel('readingTimeline')}
-              />
-            </Suspense>
-          )}
-          {showReadingTools && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <ReadingToolsPanel
-                fileName={activeTab?.name || '未打开文档'}
-                selectedText={selectedReaderText}
-                marks={activeReaderMarks}
-                readLaterItems={readLaterItems}
-                resumePoint={activeResumePoint}
-                presets={readingPresets}
-                activePresetId={activeReaderPresetId}
-                landmarks={readingLandmarks}
-                layoutMode={readingLayoutMode}
-                onAddHighlight={() => handleAddReaderMark('highlight')}
-                onAddExcerpt={() => handleAddReaderMark('excerpt')}
-                onAddReadLater={handleAddReadLater}
-                onOpenReadLater={handleOpenReadLater}
-                onUpdateReadLaterStatus={handleUpdateReadLaterStatus}
-                onResume={handleResumeReading}
-                onApplyPreset={handleApplyReadingPreset}
-                onJumpToLandmark={handleJumpToReadingLandmark}
-                onSetLayoutMode={handleSetReadingLayoutMode}
-                onRemoveMark={handleRemoveReaderMark}
-                onClose={() => closePanel('readingTools')}
               />
             </Suspense>
           )}

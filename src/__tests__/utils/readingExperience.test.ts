@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   addReaderMark,
   buildReadingLandmarks,
+  buildReadingStats,
   buildResumePoint,
+  buildChapterProgress,
+  createReadingSession,
   createReadLaterItem,
   getDefaultReadingPresets,
   normalizeLayoutMode,
+  normalizeReadingKeyboardAction,
   updateReadLaterStatus,
 } from '../../utils/readingExperience'
 
@@ -102,5 +106,43 @@ describe('readingExperience', () => {
     expect(presets.map(preset => preset.id)).toEqual(['default', 'longform', 'code-doc', 'paper'])
     expect(normalizeLayoutMode('columns')).toBe('columns')
     expect(normalizeLayoutMode('bad')).toBe('single')
+  })
+
+  it('builds reading sessions and aggregate reading stats', () => {
+    const session = createReadingSession({
+      filePath: '/docs/a.md',
+      fileName: 'a.md',
+      startedAt: 1000,
+      endedAt: 61000,
+      progressStart: 0.2,
+      progressEnd: 0.7,
+      wordsRead: 500,
+    })
+    const stats = buildReadingStats([session], 120000)
+
+    expect(session.durationMs).toBe(60000)
+    expect(stats.totalMinutes).toBe(1)
+    expect(stats.totalWords).toBe(500)
+    expect(stats.documentsRead).toBe(1)
+    expect(stats.todayMinutes).toBe(1)
+  })
+
+  it('builds chapter progress from headings and current line', () => {
+    const progress = buildChapterProgress(content, 12)
+
+    expect(progress.currentHeading).toBe('Details')
+    expect(progress.currentIndex).toBe(2)
+    expect(progress.totalChapters).toBe(2)
+    expect(progress.percent).toBeGreaterThan(0)
+  })
+
+  it('normalizes keyboard reading actions', () => {
+    expect(normalizeReadingKeyboardAction('j')).toBe('scroll-down')
+    expect(normalizeReadingKeyboardAction('K')).toBe('scroll-up')
+    expect(normalizeReadingKeyboardAction('l')).toBe('next-heading')
+    expect(normalizeReadingKeyboardAction('h')).toBe('previous-heading')
+    expect(normalizeReadingKeyboardAction('m')).toBe('mark-read-later')
+    expect(normalizeReadingKeyboardAction('b')).toBe('bookmark')
+    expect(normalizeReadingKeyboardAction('x')).toBe(null)
   })
 })

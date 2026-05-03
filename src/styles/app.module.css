@@ -197,6 +197,42 @@
   font-size: 13px;
 }
 
+.focusReadingBar {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.focusReadingBar span {
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.focusReadingBar button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.focusReadingBar button:hover {
+  border-color: var(--accent);
+}
+
 .splitView {
   display: flex;
   flex: 1;
@@ -267,4 +303,3 @@
 .toolsDropdown button:hover {
   background: var(--bg-secondary);
 }
-

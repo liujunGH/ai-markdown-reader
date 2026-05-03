@@ -8,6 +8,14 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
+.sidebarShell {
+  width: min(360px, 40vw);
+  height: 100%;
+  flex: 0 0 min(360px, 40vw);
+  border-left: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
 .panel {
   width: min(960px, calc(100vw - 32px));
   max-height: min(820px, calc(100vh - 32px));
@@ -18,6 +26,15 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+}
+
+.sidebarPanel {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .header {
@@ -55,6 +72,17 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
+}
+
+.sidebarPanel .grid {
+  grid-template-columns: 1fr;
+}
+
+.section strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .section {

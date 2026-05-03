@@ -2,6 +2,8 @@ import type {
   ReaderMark,
   ReadLaterItem,
   ReadLaterStatus,
+  ChapterProgress,
+  ReadingStats,
   ReadingLandmark,
   ReadingLayoutMode,
   ReadingPreset,
@@ -19,6 +21,10 @@ interface Props {
   activePresetId: ReadingPreset['id']
   landmarks: ReadingLandmark[]
   layoutMode: ReadingLayoutMode
+  panelMode?: 'modal' | 'sidebar'
+  readingStats?: ReadingStats
+  chapterProgress?: ChapterProgress | null
+  activeSessionMinutes?: number
   onAddHighlight: () => void
   onAddExcerpt: () => void
   onAddReadLater: () => void
@@ -27,6 +33,7 @@ interface Props {
   onResume: () => void
   onApplyPreset: (preset: ReadingPreset) => void
   onJumpToLandmark: (landmark: ReadingLandmark) => void
+  onJumpToMark: (mark: ReaderMark) => void
   onSetLayoutMode: (mode: ReadingLayoutMode) => void
   onRemoveMark: (id: string) => void
   onClose: () => void
@@ -42,6 +49,10 @@ export function ReadingToolsPanel({
   activePresetId,
   landmarks,
   layoutMode,
+  panelMode = 'modal',
+  readingStats,
+  chapterProgress,
+  activeSessionMinutes = 0,
   onAddHighlight,
   onAddExcerpt,
   onAddReadLater,
@@ -50,6 +61,7 @@ export function ReadingToolsPanel({
   onResume,
   onApplyPreset,
   onJumpToLandmark,
+  onJumpToMark,
   onSetLayoutMode,
   onRemoveMark,
   onClose,
@@ -58,8 +70,12 @@ export function ReadingToolsPanel({
   const excerpts = marks.filter(mark => mark.kind === 'excerpt')
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <section className={styles.panel} onClick={event => event.stopPropagation()} aria-label="阅读工具">
+    <div className={panelMode === 'sidebar' ? styles.sidebarShell : styles.overlay} onClick={panelMode === 'modal' ? onClose : undefined}>
+      <section
+        className={`${styles.panel} ${panelMode === 'sidebar' ? styles.sidebarPanel : ''}`}
+        onClick={event => event.stopPropagation()}
+        aria-label={panelMode === 'sidebar' ? '阅读工具侧栏' : '阅读工具'}
+      >
         <header className={styles.header}>
           <div>
             <h3>阅读工具</h3>
@@ -77,7 +93,10 @@ export function ReadingToolsPanel({
               {highlights.slice(0, 4).map(mark => (
                 <article key={mark.id} className={styles.item}>
                   <span>{mark.text}</span>
-                  <button type="button" onClick={() => onRemoveMark(mark.id)} aria-label={`删除高亮 ${mark.text}`}>删除</button>
+                  <div className={styles.rowActions}>
+                    <button type="button" onClick={() => onJumpToMark(mark)} aria-label={`跳到高亮 ${mark.text}`}>跳到</button>
+                    <button type="button" onClick={() => onRemoveMark(mark.id)} aria-label={`删除高亮 ${mark.text}`}>删除</button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -104,6 +123,24 @@ export function ReadingToolsPanel({
             <h4>继续阅读</h4>
             <p>{resumePoint ? resumePoint.label : '当前文档暂无阅读位置'}</p>
             <button type="button" onClick={onResume} disabled={!resumePoint}>从上次位置继续</button>
+          </section>
+
+          <section className={styles.section}>
+            <h4>章节进度</h4>
+            <p>{chapterProgress ? `${chapterProgress.currentHeading} · ${chapterProgress.percent}%` : '当前章节暂无进度'}</p>
+            {chapterProgress && <strong>第 {chapterProgress.currentIndex} / {chapterProgress.totalChapters} 节</strong>}
+          </section>
+
+          <section className={styles.section}>
+            <h4>阅读会话</h4>
+            <p>本次已读 {activeSessionMinutes} 分钟</p>
+            <strong>J/K 滚动 · H/L 跳章节 · M 稍后读 · B 书签</strong>
+          </section>
+
+          <section className={styles.section}>
+            <h4>阅读统计</h4>
+            <p>{readingStats ? `今日 ${readingStats.todayMinutes} 分钟 · 累计 ${readingStats.totalMinutes} 分钟` : '暂无阅读统计'}</p>
+            {readingStats && <strong>{readingStats.documentsRead} 篇文档 · {readingStats.totalWords} 字</strong>}
           </section>
 
           <section className={styles.section}>
@@ -143,7 +180,10 @@ export function ReadingToolsPanel({
               {excerpts.slice(0, 4).map(mark => (
                 <article key={mark.id} className={styles.item}>
                   <span>{mark.text}</span>
-                  <button type="button" onClick={() => onRemoveMark(mark.id)} aria-label={`删除摘录 ${mark.text}`}>删除</button>
+                  <div className={styles.rowActions}>
+                    <button type="button" onClick={() => onJumpToMark(mark)} aria-label={`跳到摘录 ${mark.text}`}>跳到</button>
+                    <button type="button" onClick={() => onRemoveMark(mark.id)} aria-label={`删除摘录 ${mark.text}`}>删除</button>
+                  </div>
                 </article>
               ))}
             </div>
