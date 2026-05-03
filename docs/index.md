@@ -40,4 +40,4 @@ npm run electron:build:mac
 
 ## 当前版本
 
-当前文档对应 v1.5.5。
+当前文档对应 v1.5.6。

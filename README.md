@@ -5,7 +5,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.5-blue)
+![Version](https://img.shields.io/badge/Version-1.5.6-blue)
 
 ## 功能特性
 
@@ -176,8 +176,8 @@
 ### macOS 自用版
 
 当前本地构建产物位于 `release/`：
-- Apple Silicon 芯片（M1/M2/M3/M4）使用 `Markdown Reader-1.5.5-arm64.dmg`
-- Intel 芯片使用 `Markdown Reader-1.5.5-x64.dmg`
+- Apple Silicon 芯片（M1/M2/M3/M4）使用 `Markdown Reader-1.5.6-arm64.dmg`
+- Intel 芯片使用 `Markdown Reader-1.5.6-x64.dmg`
 
 本项目的本地包默认使用 ad-hoc 签名，首次打开时 macOS 可能会拦截。自用安装时可在 Finder 中右键应用选择“打开”。如果系统仍提示安全限制，可执行：
 
@@ -185,7 +185,7 @@
 xattr -cr /Applications/Markdown\ Reader.app
 ```
 
-v1.5.5 延续纯 Markdown 阅读器路线，同时强化个人知识库维护：工作区健康、索引诊断、图片检查、缺失链接、反向链接、文档图谱、待处理队列和发布前检查都集中在工具菜单中。
+v1.5.6 延续纯 Markdown 阅读器路线，重点强化阅读体验：阅读工具侧栏、批注总览、阅读状态卡、章节模式、图片/表格阅读面板、阅读快照和无障碍阅读设置都集中在阅读流程中。
 
 ### Windows
 下载 `Markdown-Reader-x.x.x.exe` 并运行安装程序。
