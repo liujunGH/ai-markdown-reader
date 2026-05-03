@@ -57,7 +57,7 @@ const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').th
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getIndexedFiles, FileIndex, IndexProgress } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
@@ -150,6 +150,7 @@ function AppInner() {
   })
   const [showToolsMenu, setShowToolsMenu] = useState(false)
   const [indexedFiles, setIndexedFiles] = useState<FileIndex[]>([])
+  const [indexedFileCount, setIndexedFileCount] = useState(0)
   const [isIndexing, setIsIndexing] = useState(false)
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
@@ -204,13 +205,20 @@ function AppInner() {
   const refreshIndexedFiles = useCallback(async (folderPath: string | null) => {
     if (!folderPath) {
       setIndexedFiles([])
+      setIndexedFileCount(0)
       return
     }
     try {
-      setIndexedFiles(await getIndexedFiles(folderPath))
+      const [files, count] = await Promise.all([
+        getIndexedFiles(folderPath),
+        getIndexedFileCount(folderPath),
+      ])
+      setIndexedFiles(files)
+      setIndexedFileCount(count)
     } catch (error) {
       console.error('Failed to load indexed files:', error)
       setIndexedFiles([])
+      setIndexedFileCount(0)
     }
   }, [])
 
@@ -1161,12 +1169,16 @@ function AppInner() {
                     <WelcomeHome
                       recentFileCount={recentFiles.length}
                       readingHistoryCount={readingHistory.length}
+                      indexedFileCount={indexedFileCount}
+                      isIndexing={isIndexing}
+                      indexProgress={indexProgress}
                       currentFolderName={currentFolderName}
                       currentFolderPath={currentFolderPath}
                       onOpenFolder={handleOpenFolder}
                       onOpenRecent={() => openPanel('recent')}
                       onOpenWorkspaces={() => openPanel('workspaces')}
                       onOpenReadingTimeline={() => openPanel('readingTimeline')}
+                      onReindex={() => rebuildFolderIndex()}
                     />
                   )}
                   {showSource ? (

@@ -1,26 +1,46 @@
 import styles from './WelcomeHome.module.css'
 
+interface IndexProgressSummary {
+  discoveredFiles: number
+  indexedFiles: number
+  skippedFiles: number
+}
+
 interface Props {
   recentFileCount: number
   readingHistoryCount: number
+  indexedFileCount: number
+  isIndexing: boolean
+  indexProgress?: IndexProgressSummary | null
   currentFolderName: string
   currentFolderPath: string | null
   onOpenFolder: () => void
   onOpenRecent: () => void
   onOpenWorkspaces: () => void
   onOpenReadingTimeline: () => void
+  onReindex: () => void
 }
 
 export function WelcomeHome({
   recentFileCount,
   readingHistoryCount,
+  indexedFileCount,
+  isIndexing,
+  indexProgress,
   currentFolderName,
   currentFolderPath,
   onOpenFolder,
   onOpenRecent,
   onOpenWorkspaces,
   onOpenReadingTimeline,
+  onReindex,
 }: Props) {
+  const indexStatus = isIndexing && indexProgress
+    ? `索引中：发现 ${indexProgress.discoveredFiles}，已处理 ${indexProgress.indexedFiles}，跳过 ${indexProgress.skippedFiles}`
+    : currentFolderPath
+      ? `已索引 ${indexedFileCount} 个文件`
+      : '未打开工作区'
+
   return (
     <section className={styles.home} aria-label="开始工作">
       <div className={styles.summary}>
@@ -36,6 +56,18 @@ export function WelcomeHome({
         <div className={styles.stats} aria-label="恢复状态">
           <span>{recentFileCount} 个最近文件</span>
           <span>{readingHistoryCount} 条阅读记录</span>
+        </div>
+        <div className={styles.indexStatus} aria-label="索引状态">
+          <span>{indexStatus}</span>
+          <button
+            type="button"
+            className={styles.indexButton}
+            onClick={onReindex}
+            disabled={!currentFolderPath || isIndexing}
+            aria-label="从欢迎页重建索引"
+          >
+            {isIndexing ? '索引中' : '重建索引'}
+          </button>
         </div>
       </div>
 
