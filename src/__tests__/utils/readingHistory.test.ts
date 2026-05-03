@@ -9,13 +9,13 @@ describe('readingHistory', () => {
   })
 
   it('records reading history with newest item first and clamps progress', () => {
-    recordReadingHistory({ filePath: '/docs/a.md', name: 'a.md', progress: 2, line: 20 })
-    recordReadingHistory({ filePath: '/docs/b.md', name: 'b.md', progress: 0.5, line: 5 })
+    recordReadingHistory({ filePath: '/docs/a.md', name: 'a.md', progress: 2, line: 20, scrollTop: -20 })
+    recordReadingHistory({ filePath: '/docs/b.md', name: 'b.md', progress: 0.5, line: 5, scrollTop: 320 })
     recordReadingHistory({ filePath: '/docs/a.md', name: 'a.md', progress: -1, line: 1 })
 
     expect(getReadingHistory()).toEqual([
-      expect.objectContaining({ filePath: '/docs/a.md', progress: 0, line: 1 }),
-      expect.objectContaining({ filePath: '/docs/b.md', progress: 0.5, line: 5 }),
+      expect.objectContaining({ filePath: '/docs/a.md', progress: 0, line: 1, scrollTop: 0 }),
+      expect.objectContaining({ filePath: '/docs/b.md', progress: 0.5, line: 5, scrollTop: 320 }),
     ])
   })
 })

@@ -361,8 +361,11 @@ function AppInner() {
     })
   }, [openFile, loadRecentFiles, setFileInfo])
 
-  const openFileAtLine = useCallback(async (filePath: string, line?: number) => {
+  const openFileAtLine = useCallback(async (filePath: string, line?: number, scrollTop?: number) => {
     if (!window.electronAPI) return
+    if (typeof scrollTop === 'number') {
+      setStorageItem(`scroll-position-${filePath}`, String(Math.max(0, Math.round(scrollTop))))
+    }
     const result = await window.electronAPI.readFile(filePath)
     if (result.success && result.content !== undefined) {
       handleFileOpen(result.content, basename(filePath) || filePath, filePath)
@@ -836,6 +839,7 @@ function AppInner() {
         name: activeTab.name,
         progress,
         line: Math.max(1, Math.round(progress * lineCount)),
+        scrollTop: main.scrollTop,
       })
       setReadingHistory(getReadingHistory())
     }

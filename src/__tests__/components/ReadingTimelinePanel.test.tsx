@@ -22,4 +22,28 @@ describe('ReadingTimelinePanel', () => {
     expect(screen.getByText('50%')).toBeInTheDocument()
     expect(screen.getByText('行 12')).toBeInTheDocument()
   })
+
+  it('passes the stored scroll position when opening an item', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    const onOpenFile = vi.fn()
+
+    render(
+      <ReadingTimelinePanel
+        items={[{
+          filePath: '/docs/a.md',
+          name: 'a.md',
+          progress: 0.5,
+          line: 12,
+          scrollTop: 480,
+          updatedAt: Date.now(),
+        }]}
+        onOpenFile={onOpenFile}
+        onClose={vi.fn()}
+      />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /a.md/ }))
+
+    expect(onOpenFile).toHaveBeenCalledWith('/docs/a.md', 12, 480)
+  })
 })

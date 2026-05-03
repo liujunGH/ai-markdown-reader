@@ -8,6 +8,7 @@ export interface ReadingHistoryItem {
   name: string
   progress: number
   line?: number
+  scrollTop?: number
   updatedAt: number
 }
 
@@ -24,6 +25,7 @@ export function recordReadingHistory(item: Omit<ReadingHistoryItem, 'updatedAt'>
   const next: ReadingHistoryItem = {
     ...item,
     progress: Math.max(0, Math.min(1, item.progress || 0)),
+    scrollTop: Math.max(0, Math.round(item.scrollTop || 0)),
     updatedAt: Date.now(),
   }
   const history = [next, ...getReadingHistory().filter(existing => existing.filePath !== item.filePath)].slice(0, MAX_HISTORY)

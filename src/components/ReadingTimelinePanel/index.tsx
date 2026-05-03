@@ -6,12 +6,13 @@ export interface ReadingTimelineItem {
   name: string
   progress: number
   line?: number
+  scrollTop?: number
   updatedAt: number
 }
 
 interface Props {
   items: ReadingTimelineItem[]
-  onOpenFile: (filePath: string, line?: number) => void
+  onOpenFile: (filePath: string, line?: number, scrollTop?: number) => void
   onClose: () => void
 }
 
@@ -73,7 +74,7 @@ export function ReadingTimelinePanel({ items, onOpenFile, onClose }: Props) {
                         type="button"
                         key={`${item.filePath}-${item.updatedAt}`}
                         className={styles.timelineItem}
-                        onClick={() => onOpenFile(item.filePath, item.line)}
+                        onClick={() => onOpenFile(item.filePath, item.line, item.scrollTop)}
                       >
                         <div className={styles.itemTop}>
                           <strong title={item.name}>{item.name}</strong>
