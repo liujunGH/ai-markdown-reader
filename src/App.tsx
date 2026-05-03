@@ -1243,6 +1243,14 @@ function AppInner() {
               onClearAll={clearRecentFiles}
               onClose={() => closePanel('recent')}
               onOpenFolder={handleOpenFolder}
+              onOpenWorkspaces={() => {
+                closePanel('recent')
+                openPanel('workspaces')
+              }}
+              onOpenReadingTimeline={() => {
+                closePanel('recent')
+                openPanel('readingTimeline')
+              }}
             />
           )}
           {showSearch && (

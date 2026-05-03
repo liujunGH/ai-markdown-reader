@@ -182,6 +182,34 @@
   cursor: pointer;
 }
 
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.emptyActions .emptyBtn {
+  margin-top: 0;
+}
+
+.emptySecondaryBtn {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.emptySecondaryBtn:hover {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
 .emptyTitle {
   font-size: 14px;
   font-weight: 600;
@@ -201,22 +229,38 @@
 }
 
 .fileCard {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.fileCard:hover,
+.fileCard:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.fileMain {
+  width: 100%;
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding-right: 42px;
+  border: none;
+  background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
-  position: relative;
 }
 
-.fileCard:hover {
-  border-color: var(--accent);
-  background: var(--bg-tertiary);
+.fileMain:focus-visible,
+.removeBtn:focus-visible,
+.emptyBtn:focus-visible,
+.emptySecondaryBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .fileIcon {

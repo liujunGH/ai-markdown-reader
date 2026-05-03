@@ -14,11 +14,22 @@ interface Props {
   onClearAll: () => void
   onClose: () => void
   onOpenFolder: () => void
+  onOpenWorkspaces?: () => void
+  onOpenReadingTimeline?: () => void
 }
 
 type SortType = 'time' | 'name' | 'path'
 
-export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose, onOpenFolder }: Props) {
+export function RecentFilesPage({
+  files,
+  onSelect,
+  onRemove,
+  onClearAll,
+  onClose,
+  onOpenFolder,
+  onOpenWorkspaces,
+  onOpenReadingTimeline,
+}: Props) {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortType>('time')
   const [isCleaning, setIsCleaning] = useState(false)
@@ -116,6 +127,32 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
                 <div className={styles.emptyIcon}>📂</div>
                 <div className={styles.emptyTitle}>暂无最近文件</div>
                 <div className={styles.emptySubtitle}>打开一个 Markdown 文件开始阅读</div>
+                <div className={styles.emptyActions}>
+                  <button
+                    type="button"
+                    className={styles.emptyBtn}
+                    onClick={onOpenFolder}
+                    aria-label="打开文件夹开始"
+                  >
+                    打开文件夹
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.emptySecondaryBtn}
+                    onClick={onOpenWorkspaces}
+                    aria-label="管理工作区"
+                  >
+                    工作区
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.emptySecondaryBtn}
+                    onClick={onOpenReadingTimeline}
+                    aria-label="打开阅读时间线"
+                  >
+                    时间线
+                  </button>
+                </div>
               </>
             ) : (
               <div className={styles.emptyText}>未找到匹配的文件</div>
@@ -124,9 +161,10 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
         ) : (
           <div className={styles.grid} role="list" aria-label="最近文件列表">
             {filteredAndSortedFiles.map((file) => (
-              <div key={file.filePath} role="listitem">
+              <article key={file.filePath} className={styles.fileCard} role="listitem">
                 <button
-                  className={styles.fileCard}
+                  type="button"
+                  className={styles.fileMain}
                   onClick={() => onSelect(file)}
                   aria-label={`打开 ${file.name}`}
                 >
@@ -136,19 +174,17 @@ export function RecentFilesPage({ files, onSelect, onRemove, onClearAll, onClose
                     <div className={styles.filePath} title={file.filePath}>{file.filePath}</div>
                     <div className={styles.fileTime}>{formatTime(file.openedAt)}</div>
                   </div>
-                  <button 
-                    className={styles.removeBtn}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemove(file.filePath)
-                    }}
-                    title="删除"
-                    aria-label={`从最近文件中删除 ${file.name}`}
-                  >
-                    ×
-                  </button>
                 </button>
-              </div>
+                <button 
+                  type="button"
+                  className={styles.removeBtn}
+                  onClick={() => onRemove(file.filePath)}
+                  title="删除"
+                  aria-label={`从最近文件中删除 ${file.name}`}
+                >
+                  ×
+                </button>
+              </article>
             ))}
           </div>
         )}
