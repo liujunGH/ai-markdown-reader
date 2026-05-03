@@ -17,6 +17,7 @@ export type PanelName =
   | 'globalSearch'
   | 'quickJump'
   | 'documentHealth'
+  | 'knowledgeHealth'
   | 'imageInventory'
   | 'backlinks'
   | 'markdownGraph'
@@ -40,6 +41,7 @@ interface UIState {
   showGlobalSearch: boolean
   showQuickJump: boolean
   showDocumentHealth: boolean
+  showKnowledgeHealth: boolean
   showImageInventory: boolean
   showBacklinks: boolean
   showMarkdownGraph: boolean
@@ -83,6 +85,7 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'globalSearch': return { showGlobalSearch: value }
     case 'quickJump': return { showQuickJump: value }
     case 'documentHealth': return { showDocumentHealth: value }
+    case 'knowledgeHealth': return { showKnowledgeHealth: value }
     case 'imageInventory': return { showImageInventory: value }
     case 'backlinks': return { showBacklinks: value }
     case 'markdownGraph': return { showMarkdownGraph: value }
@@ -111,6 +114,7 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'globalSearch': return state.showGlobalSearch
     case 'quickJump': return state.showQuickJump
     case 'documentHealth': return state.showDocumentHealth
+    case 'knowledgeHealth': return state.showKnowledgeHealth
     case 'imageInventory': return state.showImageInventory
     case 'backlinks': return state.showBacklinks
     case 'markdownGraph': return state.showMarkdownGraph
@@ -140,6 +144,7 @@ export const useUIStore = create<UIStore>()(
       showGlobalSearch: false,
       showQuickJump: false,
       showDocumentHealth: false,
+      showKnowledgeHealth: false,
       showImageInventory: false,
       showBacklinks: false,
       showMarkdownGraph: false,
@@ -170,6 +175,7 @@ export const useUIStore = create<UIStore>()(
         showFilePreview: false,
         showRecent: false,
         showDocumentHealth: false,
+        showKnowledgeHealth: false,
         showImageInventory: false,
         showBacklinks: false,
         showMarkdownGraph: false,

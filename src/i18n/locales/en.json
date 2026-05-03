@@ -147,6 +147,7 @@
     "exportTooltip": "Export (Ctrl+E)",
     "tools": "Tools",
     "toolsTooltip": "Document Tools",
+    "knowledgeHealth": "Knowledge Health",
     "documentHealth": "Document Health",
     "documentHealthTooltip": "Document Health",
     "imageInventory": "Image Inventory",

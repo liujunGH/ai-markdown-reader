@@ -1,0 +1,162 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.panel {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: hidden;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.scoreBand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.score {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.healthy {
+  border-color: #16a34a;
+}
+
+.needs-attention {
+  border-color: #d97706;
+}
+
+.critical {
+  border-color: #dc2626;
+}
+
+.scoreBand strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.scoreBand span {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 20px 20px;
+}
+
+.card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+.card span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card strong {
+  font-size: 20px;
+}
+
+.card small {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.good {
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+.info {
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+.warning {
+  border-color: rgba(217, 119, 6, 0.45);
+}
+
+.error {
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scoreBand {
+    align-items: flex-start;
+  }
+}

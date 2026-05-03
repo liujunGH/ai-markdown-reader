@@ -47,6 +47,7 @@ import { Skeleton } from './components/Skeleton'
 const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m => ({ default: m.ExportPanel })))
 const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
 const DocumentHealthPanel = React.lazy(() => import('./components/DocumentHealthPanel').then(m => ({ default: m.DocumentHealthPanel })))
+const KnowledgeHealthPanel = React.lazy(() => import('./components/KnowledgeHealthPanel').then(m => ({ default: m.KnowledgeHealthPanel })))
 const ImageInventoryPanel = React.lazy(() => import('./components/ImageInventoryPanel').then(m => ({ default: m.ImageInventoryPanel })))
 const BacklinksPanel = React.lazy(() => import('./components/BacklinksPanel').then(m => ({ default: m.BacklinksPanel })))
 const MarkdownGraphPanel = React.lazy(() => import('./components/MarkdownGraphPanel').then(m => ({ default: m.MarkdownGraphPanel })))
@@ -59,6 +60,9 @@ import { indexFolder, getAllMarkdownFiles, getIndexedFiles, FileIndex, IndexProg
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
+import { analyzeDocumentHealth } from './utils/documentHealth'
+import { analyzeMarkdownImages } from './utils/imageInventory'
+import { buildKnowledgeHealthReport, KnowledgeHealthCard } from './utils/knowledgeHealth'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -107,7 +111,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showWorkspaces, showReadingTimeline,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showWorkspaces, showReadingTimeline,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -165,6 +169,23 @@ function AppInner() {
     activeTab?.filePath ? findBacklinks(indexedFiles, activeTab.filePath, activeTab.name) : []
   ), [activeTab?.filePath, activeTab?.name, indexedFiles])
   const missingLinks = useMemo(() => findMissingWikiLinks(indexedFiles), [indexedFiles])
+  const activeDocumentHealth = useMemo(
+    () => analyzeDocumentHealth(activeTab?.content || '', activeTab?.filePath),
+    [activeTab?.content, activeTab?.filePath],
+  )
+  const activeImageInventory = useMemo(
+    () => analyzeMarkdownImages(activeTab?.content || '', activeTab?.filePath),
+    [activeTab?.content, activeTab?.filePath],
+  )
+  const knowledgeHealthReport = useMemo(() => buildKnowledgeHealthReport({
+    indexedFileCount: indexedFiles.length,
+    missingLinks,
+    orphanNodeCount: wikiGraph.orphanNodes.length,
+    documentIssueCount: activeDocumentHealth.summary.totalIssues,
+    documentErrorCount: activeDocumentHealth.summary.errors,
+    imageWarningCount: activeImageInventory.filter(image => image.warnings.length > 0).length,
+    unresolvedImageCount: activeImageInventory.filter(image => image.type === 'local-relative' && !image.resolvedPath).length,
+  }), [activeDocumentHealth.summary.errors, activeDocumentHealth.summary.totalIssues, activeImageInventory, indexedFiles.length, missingLinks, wikiGraph.orphanNodes.length])
 
   // ── Effects ──
 
@@ -479,6 +500,14 @@ function AppInner() {
     setFocusedMissingTarget(target)
     openPanel('missingLinks')
   }, [openPanel])
+
+  const handleOpenKnowledgeHealthDetail = useCallback((detail: KnowledgeHealthCard['id']) => {
+    closePanel('knowledgeHealth')
+    if (detail === 'missing-links') openPanel('missingLinks')
+    if (detail === 'orphan-docs') openPanel('markdownGraph')
+    if (detail === 'document-issues') openPanel('documentHealth')
+    if (detail === 'image-warnings') openPanel('imageInventory')
+  }, [closePanel, openPanel])
 
   // Open folder
   const handleOpenFolder = useCallback(async () => {
@@ -936,7 +965,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showDocumentHealth || showImageInventory ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -945,6 +974,17 @@ function AppInner() {
                   </button>
                   {showToolsMenu && (
                     <div className={styles.toolsDropdown} role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('knowledgeHealth')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>◉</span>
+                        {t('toolbar.knowledgeHealth')}
+                      </button>
                       <button
                         type="button"
                         role="menuitem"
@@ -1222,6 +1262,15 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showKnowledgeHealth && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <KnowledgeHealthPanel
+                report={knowledgeHealthReport}
+                onOpenDetail={handleOpenKnowledgeHealthDetail}
+                onClose={() => closePanel('knowledgeHealth')}
+              />
+            </Suspense>
+          )}
           {showDocumentHealth && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <DocumentHealthPanel
@@ -1472,6 +1521,9 @@ function AppInner() {
               break
             case 'file-info':
               openPanel('fileInfo')
+              break
+            case 'knowledge-health':
+              openPanel('knowledgeHealth')
               break
             case 'document-health':
               openPanel('documentHealth')

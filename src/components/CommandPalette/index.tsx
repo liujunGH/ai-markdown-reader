@@ -35,6 +35,7 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'toggle-split', label: '双栏对比', shortcut: 'Ctrl+\\', category: '视图', icon: '⚡', action: () => {} },
   { id: 'quick-jump', label: '快速跳转', shortcut: 'Ctrl+G', category: '视图', icon: '↗', action: () => {} },
   { id: 'file-info', label: '文件信息', category: '视图', icon: 'ℹ️', action: () => {} },
+  { id: 'knowledge-health', label: '知识库健康报告', category: '工具', icon: '◉', action: () => {} },
   { id: 'document-health', label: '文档健康检查', category: '工具', icon: '✓', action: () => {} },
   { id: 'image-inventory', label: '图片检查面板', category: '工具', icon: '▣', action: () => {} },
   { id: 'backlinks', label: '反向引用', category: '工具', icon: '↩', action: () => {} },

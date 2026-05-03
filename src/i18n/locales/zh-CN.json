@@ -147,6 +147,7 @@
     "exportTooltip": "导出 (Ctrl+E)",
     "tools": "工具",
     "toolsTooltip": "文档工具",
+    "knowledgeHealth": "知识库健康报告",
     "documentHealth": "文档健康检查",
     "documentHealthTooltip": "文档健康检查",
     "imageInventory": "图片检查面板",
