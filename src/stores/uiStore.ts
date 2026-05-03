@@ -28,6 +28,7 @@ export type PanelName =
   | 'maintenanceQueue'
   | 'releasePreflight'
   | 'workspaceDashboard'
+  | 'actionWorkbench'
 
 interface UIState {
   showOutline: boolean
@@ -56,6 +57,7 @@ interface UIState {
   showMaintenanceQueue: boolean
   showReleasePreflight: boolean
   showWorkspaceDashboard: boolean
+  showActionWorkbench: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -104,6 +106,7 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'maintenanceQueue': return { showMaintenanceQueue: value }
     case 'releasePreflight': return { showReleasePreflight: value }
     case 'workspaceDashboard': return { showWorkspaceDashboard: value }
+    case 'actionWorkbench': return { showActionWorkbench: value }
     default:
       return {}
   }
@@ -137,6 +140,7 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'maintenanceQueue': return state.showMaintenanceQueue
     case 'releasePreflight': return state.showReleasePreflight
     case 'workspaceDashboard': return state.showWorkspaceDashboard
+    case 'actionWorkbench': return state.showActionWorkbench
     default:
       return false
   }
@@ -171,6 +175,7 @@ export const useUIStore = create<UIStore>()(
       showMaintenanceQueue: false,
       showReleasePreflight: false,
       showWorkspaceDashboard: false,
+      showActionWorkbench: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -206,6 +211,7 @@ export const useUIStore = create<UIStore>()(
         showMaintenanceQueue: false,
         showReleasePreflight: false,
         showWorkspaceDashboard: false,
+        showActionWorkbench: false,
       }),
       setFontSize: (size) => set({ fontSize: size }),
       setSplitView: (enabled, secondaryId = null) => set({ isSplitView: enabled, secondaryTabId: secondaryId }),

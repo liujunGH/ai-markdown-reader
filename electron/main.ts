@@ -939,6 +939,54 @@ wrapHandler('write-file', async (_event, filePath: string, content: string) => {
   }
 })
 
+wrapHandler('update-markdown-file', async (_event, filePath: string, content: string) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext !== '.md' && ext !== '.markdown') {
+    return { success: false, error: '只能更新 Markdown 文件' }
+  }
+  try {
+    const stat = fs.statSync(filePath)
+    if (stat.isDirectory()) {
+      return { success: false, error: '路径是一个目录，不是文件' }
+    }
+    fs.writeFileSync(filePath, content, { encoding: 'utf-8' })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
+wrapHandler('download-remote-image', async (_event, url: string, outputPath: string) => {
+  if (!/^https?:\/\//i.test(url)) {
+    return { success: false, error: '只支持 http(s) 图片' }
+  }
+  if (!isPathSafe(outputPath)) {
+    return { success: false, error: '非法路径' }
+  }
+  const ext = path.extname(outputPath).toLowerCase()
+  if (!IMAGE_MIME_TYPES[ext]) {
+    return { success: false, error: '不支持的图片格式' }
+  }
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      return { success: false, error: `下载失败：${response.status}` }
+    }
+    const arrayBuffer = await response.arrayBuffer()
+    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
+      return { success: false, error: '图片过大' }
+    }
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+    fs.writeFileSync(outputPath, Buffer.from(arrayBuffer))
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+
 wrapHandler('read-image-as-data-url', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '非法路径' }

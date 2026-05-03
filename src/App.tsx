@@ -59,6 +59,7 @@ const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimeli
 const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
 const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
 const WorkspaceDashboardPanel = React.lazy(() => import('./components/WorkspaceDashboardPanel').then(m => ({ default: m.WorkspaceDashboardPanel })))
+const ActionWorkbenchPanel = React.lazy(() => import('./components/ActionWorkbenchPanel').then(m => ({ default: m.ActionWorkbenchPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
@@ -70,7 +71,20 @@ import { analyzeMarkdownImages } from './utils/imageInventory'
 import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
 import { buildMaintenanceTasks, formatMaintenanceTasksMarkdown, type MaintenanceTask } from './utils/maintenanceTasks'
 import { buildReleasePreflightReport, formatReleasePreflightMarkdown } from './utils/releasePreflight'
-import { buildImageAssetPlan, buildLinkRenamePreview, buildReadingAssistant, buildReleasePackageChecks, buildWorkspaceDashboard, type DashboardSection } from './utils/workspaceEnhancements'
+import { buildExecutableFixSuggestions, buildImageAssetPlan, buildLinkRenamePreview, buildReadingAssistant, buildReleasePackageChecks, buildWorkspaceDashboard, type DashboardSection, type ExecutableFixSuggestion } from './utils/workspaceEnhancements'
+import {
+  applyImageLocalizationReplacements,
+  applyRenamePlanToContent,
+  buildArchiveReport,
+  buildDocumentTemplates,
+  buildImageLocalizationPlan,
+  buildRenamePlan,
+  findUnlinkedMentions,
+  renderDocumentTemplate,
+  renderTemplateFileName,
+  type DocumentTemplate,
+  type UnlinkedMention,
+} from './utils/workspaceActions'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -121,7 +135,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard, showActionWorkbench,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -212,6 +226,7 @@ function AppInner() {
     indexSkippedItems,
     documentIssues: activeDocumentHealth.issues,
   }), [activeDocumentHealth.issues, activeImageInventory, indexSkippedItems, missingLinks])
+  const executableFixes = useMemo(() => buildExecutableFixSuggestions(maintenanceTasks), [maintenanceTasks])
   const releasePreflightReport = useMemo(() => buildReleasePreflightReport({
     healthScore: knowledgeHealthReport.score,
     healthStatus: knowledgeHealthReport.status,
@@ -226,6 +241,21 @@ function AppInner() {
       ? buildLinkRenamePreview(indexedFiles, activeTab.filePath, join(dirname(activeTab.filePath), `${basename(activeTab.filePath).replace(/\.(md|markdown)$/i, '')}-renamed.md`))
       : buildLinkRenamePreview(indexedFiles, 'Old.md', 'New.md')
   ), [activeTab?.filePath, indexedFiles])
+  const documentTemplates = useMemo(() => buildDocumentTemplates(), [])
+  const actionRenamePlan = useMemo(() => (
+    activeTab?.filePath
+      ? buildRenamePlan(indexedFiles, activeTab.filePath, join(dirname(activeTab.filePath), `${basename(activeTab.filePath).replace(/\.(md|markdown)$/i, '')}-renamed.md`))
+      : buildRenamePlan(indexedFiles, 'Old.md', 'New.md')
+  ), [activeTab?.filePath, indexedFiles])
+  const imageLocalizationPlan = useMemo(() => (
+    activeTab?.filePath ? buildImageLocalizationPlan(activeTab.filePath, activeImageInventory) : buildImageLocalizationPlan('Untitled.md', activeImageInventory)
+  ), [activeImageInventory, activeTab?.filePath])
+  const activeIndexedFile = useMemo(() => (
+    activeTab?.filePath ? indexedFiles.find(file => file.path === activeTab.filePath) || { path: activeTab.filePath, name: activeTab.name, content: activeTab.content } : null
+  ), [activeTab?.content, activeTab?.filePath, activeTab?.name, indexedFiles])
+  const unlinkedMentions = useMemo(() => (
+    activeIndexedFile ? findUnlinkedMentions(indexedFiles, activeIndexedFile) : []
+  ), [activeIndexedFile, indexedFiles])
   const readingAssistant = useMemo(() => buildReadingAssistant({
     activeFilePath: activeTab?.filePath || null,
     activeFileName: activeTab?.name || '',
@@ -246,6 +276,13 @@ function AppInner() {
     releaseChecks: releasePackageChecks,
     linkRenamePreview,
   }), [imageAssetPlan, knowledgeHealthReport.score, linkRenamePreview, maintenanceTasks, readingAssistant, releasePackageChecks])
+  const archiveReport = useMemo(() => buildArchiveReport({
+    files: indexedFiles,
+    healthScore: knowledgeHealthReport.score,
+    maintenanceTaskCount: maintenanceTasks.length,
+    remoteImageCount: imageAssetPlan.summary.remote,
+    missingLinkCount: missingLinks.length,
+  }), [imageAssetPlan.summary.remote, indexedFiles, knowledgeHealthReport.score, maintenanceTasks.length, missingLinks.length])
 
   // ── Effects ──
 
@@ -780,12 +817,108 @@ function AppInner() {
   const handleOpenDashboardSection = useCallback((sectionId: DashboardSection['id']) => {
     closePanel('workspaceDashboard')
     if (sectionId === 'quality') openPanel('knowledgeHealth')
-    if (sectionId === 'fixes') openPanel('maintenanceQueue')
-    if (sectionId === 'links') openPanel('markdownGraph')
-    if (sectionId === 'images') openPanel('imageInventory')
+    if (sectionId === 'fixes') openPanel('actionWorkbench')
+    if (sectionId === 'links') openPanel('actionWorkbench')
+    if (sectionId === 'images') openPanel('actionWorkbench')
     if (sectionId === 'reading') openPanel('readingTimeline')
     if (sectionId === 'release') openPanel('releasePreflight')
   }, [closePanel, openPanel])
+
+  const handleExecuteFix = useCallback((fix: ExecutableFixSuggestion) => {
+    const task = maintenanceTasks.find(item => item.id === fix.taskId)
+    if (fix.action === 'create-missing-doc') {
+      const link = missingLinks.find(item => `missing-link:${item.normalizedTarget}` === fix.taskId)
+      if (link) {
+        void handleCreateMissingLink(link.target)
+      } else {
+        showToast('未找到对应缺失链接', 'error')
+      }
+      return
+    }
+    if (fix.action === 'localize-remote-image') {
+      void handleLocalizeImages()
+      return
+    }
+    if (task) {
+      handleOpenMaintenanceTask(task)
+      return
+    }
+    openPanel('maintenanceQueue')
+  }, [handleCreateMissingLink, handleOpenMaintenanceTask, maintenanceTasks, missingLinks, openPanel, showToast])
+
+  const handleApplyRenamePlan = useCallback(async () => {
+    if (!window.electronAPI || actionRenamePlan.changedFiles.length === 0) {
+      showToast('没有需要更新的链接')
+      return
+    }
+    let updated = 0
+    for (const file of actionRenamePlan.changedFiles) {
+      const result = await window.electronAPI.readFile(file.path)
+      if (!result.success || result.content === undefined) continue
+      const nextContent = applyRenamePlanToContent(result.content, actionRenamePlan)
+      const write = await window.electronAPI.updateMarkdownFile(file.path, nextContent)
+      if (write.success) {
+        updateTabContent(file.path, nextContent, file.name)
+        updated += 1
+      }
+    }
+    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
+    showToast(updated > 0 ? `已更新 ${updated} 个文件的链接` : '没有文件被更新')
+  }, [actionRenamePlan, currentFolderPath, scheduleFolderIndex, showToast, updateTabContent])
+
+  const handleLocalizeImages = useCallback(async () => {
+    if (!window.electronAPI || !activeTab?.filePath || imageLocalizationPlan.items.length === 0) {
+      showToast('当前文档没有可本地化的网络图片')
+      return
+    }
+    let downloaded = 0
+    for (const item of imageLocalizationPlan.items) {
+      const result = await window.electronAPI.downloadRemoteImage(item.src, item.assetPath)
+      if (result.success) downloaded += 1
+    }
+    if (downloaded === 0) {
+      showToast('图片下载失败', 'error')
+      return
+    }
+    const nextContent = applyImageLocalizationReplacements(activeTab.content, imageLocalizationPlan)
+    const write = await window.electronAPI.updateMarkdownFile(activeTab.filePath, nextContent)
+    if (!write.success) {
+      showToast(write.error || '图片链接更新失败', 'error')
+      return
+    }
+    updateTabContent(activeTab.filePath, nextContent, activeTab.name)
+    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
+    showToast(`已本地化 ${downloaded} 张图片`)
+  }, [activeTab?.content, activeTab?.filePath, activeTab?.name, currentFolderPath, imageLocalizationPlan, scheduleFolderIndex, showToast, updateTabContent])
+
+  const handleCreateFromTemplate = useCallback(async (template: DocumentTemplate) => {
+    if (!window.electronAPI || !currentFolderPath) {
+      showToast('请先打开一个文件夹', 'error')
+      return
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const title = window.prompt('新文档标题', template.name) || template.name
+    const context = { title, date: today, folderName: currentFolderName || basename(currentFolderPath) || currentFolderPath }
+    const fileName = renderTemplateFileName(template, context)
+    const filePath = join(currentFolderPath, fileName)
+    const result = await window.electronAPI.writeFile(filePath, renderDocumentTemplate(template, context))
+    if (!result.success) {
+      showToast(result.error || '创建模板文档失败', 'error')
+      return
+    }
+    await openFileAtLine(filePath)
+    scheduleFolderIndex(currentFolderPath)
+    showToast(`已创建 ${basename(filePath)}`)
+  }, [currentFolderName, currentFolderPath, openFileAtLine, scheduleFolderIndex, showToast])
+
+  const handleOpenUnlinkedMention = useCallback((mention: UnlinkedMention) => {
+    void openFileAtLine(mention.targetPath)
+  }, [openFileAtLine])
+
+  const handleCopyArchiveReport = useCallback(() => {
+    void navigator.clipboard?.writeText(archiveReport)
+    showToast('归档报告已复制')
+  }, [archiveReport, showToast])
 
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
@@ -1146,7 +1279,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard || showActionWorkbench ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -1176,6 +1309,17 @@ function AppInner() {
                       >
                         <span>▦</span>
                         运营仪表盘
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('actionWorkbench')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>▧</span>
+                        增强操作台
                       </button>
                       <button
                         type="button"
@@ -1657,6 +1801,25 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showActionWorkbench && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ActionWorkbenchPanel
+                fixes={executableFixes}
+                templates={documentTemplates}
+                renamePlan={actionRenamePlan}
+                imagePlan={imageLocalizationPlan}
+                unlinkedMentions={unlinkedMentions}
+                archiveReport={archiveReport}
+                onExecuteFix={handleExecuteFix}
+                onApplyRename={handleApplyRenamePlan}
+                onLocalizeImages={handleLocalizeImages}
+                onCreateFromTemplate={handleCreateFromTemplate}
+                onOpenMention={handleOpenUnlinkedMention}
+                onCopyArchive={handleCopyArchiveReport}
+                onClose={() => closePanel('actionWorkbench')}
+              />
+            </Suspense>
+          )}
           {showWorkspaces && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <WorkspacePanel
@@ -1905,6 +2068,9 @@ function AppInner() {
               break
             case 'workspace-dashboard':
               openPanel('workspaceDashboard')
+              break
+            case 'action-workbench':
+              openPanel('actionWorkbench')
               break
             default:
               break
