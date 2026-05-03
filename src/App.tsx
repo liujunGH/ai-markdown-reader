@@ -56,6 +56,8 @@ const MissingLinksPanel = React.lazy(() => import('./components/MissingLinksPane
 const IndexDiagnosticsPanel = React.lazy(() => import('./components/IndexDiagnosticsPanel').then(m => ({ default: m.IndexDiagnosticsPanel })))
 const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
+const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
+const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
 import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
@@ -65,6 +67,8 @@ import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetF
 import { analyzeDocumentHealth } from './utils/documentHealth'
 import { analyzeMarkdownImages } from './utils/imageInventory'
 import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
+import { buildMaintenanceTasks, formatMaintenanceTasksMarkdown, type MaintenanceTask } from './utils/maintenanceTasks'
+import { buildReleasePreflightReport, formatReleasePreflightMarkdown } from './utils/releasePreflight'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -114,7 +118,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline,
+    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showMaintenanceQueue, showReleasePreflight,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -199,6 +203,20 @@ function AppInner() {
     unresolvedImageCount: activeImageInventory.filter(image => image.type === 'local-relative' && !image.resolvedPath).length,
     indexSkippedCount: indexSkippedItems.length,
   }), [activeDocumentHealth.summary.errors, activeDocumentHealth.summary.totalIssues, activeImageInventory, indexSkippedItems.length, indexedFiles.length, missingLinks, wikiGraph.orphanNodes.length])
+  const maintenanceTasks = useMemo(() => buildMaintenanceTasks({
+    missingLinks,
+    images: activeImageInventory,
+    indexSkippedItems,
+    documentIssues: activeDocumentHealth.issues,
+  }), [activeDocumentHealth.issues, activeImageInventory, indexSkippedItems, missingLinks])
+  const releasePreflightReport = useMemo(() => buildReleasePreflightReport({
+    healthScore: knowledgeHealthReport.score,
+    healthStatus: knowledgeHealthReport.status,
+    maintenanceTaskCount: maintenanceTasks.length,
+    maintenanceErrorCount: maintenanceTasks.filter(task => task.severity === 'error').length,
+    indexedFileCount,
+    indexSkippedCount: indexSkippedItems.length,
+  }), [indexedFileCount, indexSkippedItems.length, knowledgeHealthReport.score, knowledgeHealthReport.status, maintenanceTasks])
 
   // ── Effects ──
 
@@ -610,6 +628,16 @@ function AppInner() {
     showToast('健康报告已复制')
   }, [knowledgeHealthReport, showToast])
 
+  const handleCopyMaintenanceTasks = useCallback(() => {
+    void navigator.clipboard?.writeText(formatMaintenanceTasksMarkdown(maintenanceTasks))
+    showToast('待处理清单已复制')
+  }, [maintenanceTasks, showToast])
+
+  const handleCopyReleasePreflightReport = useCallback(() => {
+    void navigator.clipboard?.writeText(formatReleasePreflightMarkdown(releasePreflightReport))
+    showToast('发布前检查报告已复制')
+  }, [releasePreflightReport, showToast])
+
   // Open folder
   const handleOpenFolder = useCallback(async () => {
     if (!window.electronAPI) return
@@ -708,6 +736,17 @@ function AppInner() {
     setShowSource(true)
     window.setTimeout(() => setHighlightedLine(line), 0)
   }, [closePanel, setHighlightedLine, setShowSource])
+
+  const handleOpenMaintenanceTask = useCallback((task: MaintenanceTask) => {
+    closePanel('maintenanceQueue')
+    if (task.kind === 'document-issue' && task.line) {
+      handleJumpToLine(task.line)
+      return
+    }
+    if (task.kind === 'missing-link') openPanel('missingLinks')
+    if (task.kind === 'image-issue') openPanel('imageInventory')
+    if (task.kind === 'index-skip') openPanel('indexDiagnostics')
+  }, [closePanel, handleJumpToLine, openPanel])
 
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
@@ -1068,7 +1107,7 @@ function AppInner() {
                 <div className={styles.toolsMenu}>
                   <button
                     onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics ? styles.toolbarBtnActive : ''}`}
+                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showMaintenanceQueue || showReleasePreflight ? styles.toolbarBtnActive : ''}`}
                     aria-label={t('toolbar.tools')}
                     aria-expanded={showToolsMenu}
                     data-tooltip={t('toolbar.toolsTooltip')}
@@ -1153,6 +1192,28 @@ function AppInner() {
                       >
                         <span>!</span>
                         索引诊断
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('maintenanceQueue')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>□</span>
+                        待处理队列
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          openPanel('releasePreflight')
+                          setShowToolsMenu(false)
+                        }}
+                      >
+                        <span>◇</span>
+                        发布前检查
                       </button>
                       <button
                         type="button"
@@ -1514,6 +1575,29 @@ function AppInner() {
               />
             </Suspense>
           )}
+          {showMaintenanceQueue && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <MaintenanceQueuePanel
+                tasks={maintenanceTasks}
+                onOpenTask={handleOpenMaintenanceTask}
+                onCopyTasks={handleCopyMaintenanceTasks}
+                onClose={() => closePanel('maintenanceQueue')}
+              />
+            </Suspense>
+          )}
+          {showReleasePreflight && (
+            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
+              <ReleasePreflightPanel
+                report={releasePreflightReport}
+                onOpenMaintenance={() => {
+                  closePanel('releasePreflight')
+                  openPanel('maintenanceQueue')
+                }}
+                onCopyReport={handleCopyReleasePreflightReport}
+                onClose={() => closePanel('releasePreflight')}
+              />
+            </Suspense>
+          )}
           {showWorkspaces && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <WorkspacePanel
@@ -1753,6 +1837,12 @@ function AppInner() {
               break
             case 'reading-timeline':
               openPanel('readingTimeline')
+              break
+            case 'maintenance-queue':
+              openPanel('maintenanceQueue')
+              break
+            case 'release-preflight':
+              openPanel('releasePreflight')
               break
             default:
               break

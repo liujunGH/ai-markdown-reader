@@ -44,6 +44,8 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'index-diagnostics', label: '索引诊断', category: '工具', icon: '!', action: () => {} },
   { id: 'workspaces', label: '工作区', category: '工具', icon: '▤', action: () => {} },
   { id: 'reading-timeline', label: '阅读时间线', category: '工具', icon: '◷', action: () => {} },
+  { id: 'maintenance-queue', label: '待处理队列', category: '工具', icon: '□', action: () => {} },
+  { id: 'release-preflight', label: '发布前检查', category: '工具', icon: '◇', action: () => {} },
 
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },

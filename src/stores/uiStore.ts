@@ -25,6 +25,8 @@ export type PanelName =
   | 'indexDiagnostics'
   | 'workspaces'
   | 'readingTimeline'
+  | 'maintenanceQueue'
+  | 'releasePreflight'
 
 interface UIState {
   showOutline: boolean
@@ -50,6 +52,8 @@ interface UIState {
   showIndexDiagnostics: boolean
   showWorkspaces: boolean
   showReadingTimeline: boolean
+  showMaintenanceQueue: boolean
+  showReleasePreflight: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -95,6 +99,8 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'indexDiagnostics': return { showIndexDiagnostics: value }
     case 'workspaces': return { showWorkspaces: value }
     case 'readingTimeline': return { showReadingTimeline: value }
+    case 'maintenanceQueue': return { showMaintenanceQueue: value }
+    case 'releasePreflight': return { showReleasePreflight: value }
     default:
       return {}
   }
@@ -125,6 +131,8 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'indexDiagnostics': return state.showIndexDiagnostics
     case 'workspaces': return state.showWorkspaces
     case 'readingTimeline': return state.showReadingTimeline
+    case 'maintenanceQueue': return state.showMaintenanceQueue
+    case 'releasePreflight': return state.showReleasePreflight
     default:
       return false
   }
@@ -156,6 +164,8 @@ export const useUIStore = create<UIStore>()(
       showIndexDiagnostics: false,
       showWorkspaces: false,
       showReadingTimeline: false,
+      showMaintenanceQueue: false,
+      showReleasePreflight: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -188,6 +198,8 @@ export const useUIStore = create<UIStore>()(
         showIndexDiagnostics: false,
         showWorkspaces: false,
         showReadingTimeline: false,
+        showMaintenanceQueue: false,
+        showReleasePreflight: false,
       }),
       setFontSize: (size) => set({ fontSize: size }),
       setSplitView: (enabled, secondaryId = null) => set({ isSplitView: enabled, secondaryTabId: secondaryId }),
