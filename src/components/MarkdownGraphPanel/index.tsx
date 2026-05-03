@@ -25,6 +25,7 @@ export interface MarkdownGraph {
 interface Props {
   graph: MarkdownGraph
   onOpenFile: (path: string, line?: number) => void
+  onOpenMissingLink?: (target: string) => void
   onReindex?: () => Promise<void> | void
   onClose: () => void
   folderPath?: string
@@ -42,6 +43,7 @@ interface PositionedNode extends MarkdownGraphNode {
 export function MarkdownGraphPanel({
   graph,
   onOpenFile,
+  onOpenMissingLink,
   onReindex,
   onClose,
   folderPath,
@@ -168,6 +170,7 @@ export function MarkdownGraphPanel({
                       outgoing={focusedOutgoing}
                       nodeById={graphNodeById}
                       onOpenFile={onOpenFile}
+                      onOpenMissingLink={onOpenMissingLink}
                       onClear={() => setFocusedNodeId(null)}
                     />
                   ) : (
@@ -219,10 +222,6 @@ function NodeRow({
     </>
   )
 
-  if (!node.filePath) {
-    return <div className={`${styles.nodeRow} ${styles.disabledRow}`}>{content}</div>
-  }
-
   return (
     <button
       type="button"
@@ -241,6 +240,7 @@ function FocusedNodePanel({
   outgoing,
   nodeById,
   onOpenFile,
+  onOpenMissingLink,
   onClear,
 }: {
   node: MarkdownGraphNode
@@ -248,6 +248,7 @@ function FocusedNodePanel({
   outgoing: MarkdownGraphEdge[]
   nodeById: Map<string, MarkdownGraphNode>
   onOpenFile: (path: string, line?: number) => void
+  onOpenMissingLink?: (target: string) => void
   onClear: () => void
 }) {
   return (
@@ -257,7 +258,14 @@ function FocusedNodePanel({
           <h4>{node.label}</h4>
           <span>入 {incoming.length} · 出 {outgoing.length}</span>
         </div>
-        <button type="button" onClick={onClear}>清除</button>
+        <div className={styles.focusActions}>
+          {!node.filePath && onOpenMissingLink && (
+            <button type="button" onClick={() => onOpenMissingLink(node.label)} aria-label={`查看缺失链接 ${node.label}`}>
+              缺失链接
+            </button>
+          )}
+          <button type="button" onClick={onClear}>清除</button>
+        </div>
       </div>
 
       <LinkGroup

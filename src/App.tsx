@@ -149,6 +149,7 @@ function AppInner() {
   const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
+  const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
   const hasRestoredLastFolderRef = useRef(false)
   const indexAbortControllerRef = useRef<AbortController | null>(null)
 
@@ -470,8 +471,14 @@ function AppInner() {
     await openFileAtLine(filePath)
     scheduleFolderIndex(currentFolderPath)
     closePanel('missingLinks')
+    setFocusedMissingTarget(null)
     showToast(`已创建 ${basename(filePath)}`)
   }, [closePanel, currentFolderPath, openFileAtLine, scheduleFolderIndex, showToast])
+
+  const handleOpenMissingLinkFromGraph = useCallback((target: string) => {
+    setFocusedMissingTarget(target)
+    openPanel('missingLinks')
+  }, [openPanel])
 
   // Open folder
   const handleOpenFolder = useCallback(async () => {
@@ -1254,6 +1261,7 @@ function AppInner() {
                 isIndexing={isIndexing}
                 indexProgress={indexProgress}
                 onCancelIndex={cancelFolderIndex}
+                onOpenMissingLink={handleOpenMissingLinkFromGraph}
                 onClose={() => closePanel('markdownGraph')}
               />
             </Suspense>
@@ -1263,9 +1271,13 @@ function AppInner() {
               <MissingLinksPanel
                 links={missingLinks}
                 folderPath={currentFolderPath || undefined}
+                focusedTarget={focusedMissingTarget}
                 onCreateFile={handleCreateMissingLink}
                 onOpenSource={openFileAtLine}
-                onClose={() => closePanel('missingLinks')}
+                onClose={() => {
+                  setFocusedMissingTarget(null)
+                  closePanel('missingLinks')
+                }}
               />
             </Suspense>
           )}

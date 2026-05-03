@@ -40,4 +40,32 @@ describe('MarkdownGraphPanel', () => {
     await user.click(screen.getByRole('button', { name: '打开目标 Target 行 12' }))
     expect(onOpenFile).toHaveBeenCalledWith('/docs/target.md', 12)
   })
+
+  it('opens missing link details for unresolved graph nodes', async () => {
+    const user = userEvent.setup()
+    const onOpenMissingLink = vi.fn()
+
+    render(
+      <MarkdownGraphPanel
+        graph={{
+          nodes: [
+            { id: 'home', label: 'Home', filePath: '/docs/home.md', incoming: 0, outgoing: 1 },
+            { id: 'missing-note', label: 'Missing Note', incoming: 1, outgoing: 0 },
+          ],
+          edges: [
+            { from: 'home', to: 'missing-note', line: 18 },
+          ],
+          orphanNodes: [],
+        }}
+        onOpenFile={vi.fn()}
+        onOpenMissingLink={onOpenMissingLink}
+        onClose={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: '聚焦节点 Missing Note' }))
+    await user.click(screen.getByRole('button', { name: '查看缺失链接 Missing Note' }))
+
+    expect(onOpenMissingLink).toHaveBeenCalledWith('Missing Note')
+  })
 })

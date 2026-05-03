@@ -344,7 +344,13 @@ span.orphan:hover {
   font-size: 12px;
 }
 
-.focusHeader button {
+.focusActions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+}
+
+.focusActions button {
   flex: 0 0 auto;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -355,7 +361,7 @@ span.orphan:hover {
   font-size: 12px;
 }
 
-.focusHeader button:hover {
+.focusActions button:hover {
   border-color: var(--accent);
 }
 

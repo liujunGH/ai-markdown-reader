@@ -111,6 +111,11 @@
   background: var(--bg-secondary);
 }
 
+.focusedItem {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .itemTop {
   display: flex;
   align-items: flex-start;
