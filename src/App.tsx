@@ -59,7 +59,17 @@ import { indexFolder, getAllMarkdownFiles, getIndexedFiles, FileIndex, IndexProg
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
-import { getWorkspaceSession, getWorkspaces, saveWorkspace, saveWorkspaceSession, removeWorkspace, Workspace } from './utils/workspaces'
+import {
+  getWorkspaceSession,
+  getWorkspaces,
+  saveWorkspace,
+  saveWorkspaceSession,
+  removeWorkspace,
+  removeWorkspaces,
+  renameWorkspace,
+  toggleWorkspacePinned,
+  Workspace,
+} from './utils/workspaces'
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
@@ -414,6 +424,35 @@ function AppInner() {
     removeWorkspace(id)
     setWorkspaces(getWorkspaces())
   }, [])
+
+  const handleToggleWorkspacePinned = useCallback((id: string) => {
+    toggleWorkspacePinned(id)
+    setWorkspaces(getWorkspaces())
+  }, [])
+
+  const handleRenameWorkspace = useCallback((id: string, name: string) => {
+    renameWorkspace(id, name)
+    setWorkspaces(getWorkspaces())
+    showToast('工作区已重命名')
+  }, [showToast])
+
+  const handleCleanInvalidWorkspaces = useCallback(async () => {
+    if (!window.electronAPI) return
+    const invalidIds: string[] = []
+    for (const workspace of getWorkspaces()) {
+      const result = await window.electronAPI.readFolder(workspace.folderPath)
+      if (!result.success) {
+        invalidIds.push(workspace.id)
+      }
+    }
+    if (invalidIds.length === 0) {
+      showToast('没有失效工作区')
+      return
+    }
+    removeWorkspaces(invalidIds)
+    setWorkspaces(getWorkspaces())
+    showToast(`已清理 ${invalidIds.length} 个失效工作区`)
+  }, [showToast])
 
   const handleCreateMissingLink = useCallback(async (target: string) => {
     if (!window.electronAPI || !currentFolderPath) {
@@ -1239,6 +1278,9 @@ function AppInner() {
                 onSaveCurrent={handleSaveWorkspace}
                 onOpenWorkspace={handleOpenWorkspace}
                 onRemoveWorkspace={handleRemoveWorkspace}
+                onTogglePinned={handleToggleWorkspacePinned}
+                onRenameWorkspace={handleRenameWorkspace}
+                onCleanInvalidWorkspaces={handleCleanInvalidWorkspaces}
                 onClose={() => closePanel('workspaces')}
               />
             </Suspense>

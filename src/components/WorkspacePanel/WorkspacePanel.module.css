@@ -114,6 +114,30 @@
   padding: 16px 20px 20px;
 }
 
+.bulkActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.bulkActions button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.bulkActions button:hover {
+  border-color: var(--accent);
+}
+
 .empty {
   min-height: 280px;
   display: flex;
@@ -224,6 +248,15 @@
   font-size: 11px;
 }
 
+.pinBadge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  font-size: 11px;
+}
+
 .path {
   color: var(--text-secondary);
   font-size: 12px;
@@ -248,6 +281,27 @@
   font-size: 20px;
 }
 
+.workspaceActions {
+  flex: 0 0 auto;
+  display: flex;
+  border-left: 1px solid var(--border);
+}
+
+.actionBtn {
+  width: 36px;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.actionBtn:hover {
+  color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
 .removeBtn:hover {
   color: #dc2626;
   background: rgba(220, 38, 38, 0.08);
@@ -261,5 +315,18 @@
 
   .saveBtn {
     width: 100%;
+  }
+
+  .workspace {
+    flex-wrap: wrap;
+  }
+
+  .workspaceMain {
+    flex-basis: 100%;
+  }
+
+  .workspaceActions,
+  .removeBtn {
+    border-top: 1px solid var(--border);
   }
 }

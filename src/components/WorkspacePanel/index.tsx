@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
 import styles from './WorkspacePanel.module.css'
+import { sortWorkspaces } from '../../utils/workspaces'
 
 export interface Workspace {
   id: string
   name: string
   folderPath: string
   updatedAt: number
+  isPinned?: boolean
 }
 
 interface Props {
@@ -15,6 +17,9 @@ interface Props {
   onSaveCurrent: () => void
   onOpenWorkspace: (folderPath: string) => void
   onRemoveWorkspace: (id: string) => void
+  onTogglePinned: (id: string) => void
+  onRenameWorkspace: (id: string, name: string) => void
+  onCleanInvalidWorkspaces: () => void
   onClose: () => void
 }
 
@@ -25,10 +30,13 @@ export function WorkspacePanel({
   onSaveCurrent,
   onOpenWorkspace,
   onRemoveWorkspace,
+  onTogglePinned,
+  onRenameWorkspace,
+  onCleanInvalidWorkspaces,
   onClose,
 }: Props) {
   const sortedWorkspaces = useMemo(
-    () => [...workspaces].sort((a, b) => b.updatedAt - a.updatedAt),
+    () => sortWorkspaces(workspaces),
     [workspaces],
   )
 
@@ -67,6 +75,14 @@ export function WorkspacePanel({
         </section>
 
         <div className={styles.content}>
+          {sortedWorkspaces.length > 0 && (
+            <div className={styles.bulkActions}>
+              <span>{sortedWorkspaces.length} 个工作区</span>
+              <button type="button" onClick={onCleanInvalidWorkspaces} aria-label="清理失效工作区">
+                清理失效
+              </button>
+            </div>
+          )}
           {sortedWorkspaces.length === 0 ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>📁</div>
@@ -94,12 +110,36 @@ export function WorkspacePanel({
                       <div className={styles.workspaceInfo}>
                         <div className={styles.workspaceTop}>
                           <strong title={workspace.name}>{workspace.name}</strong>
+                          {workspace.isPinned && <span className={styles.pinBadge}>置顶</span>}
                           {isActive && <span className={styles.badge}>当前</span>}
                         </div>
                         <div className={styles.path} title={workspace.folderPath}>{workspace.folderPath}</div>
                         <div className={styles.time}>{formatTime(workspace.updatedAt)}</div>
                       </div>
                     </button>
+                    <div className={styles.workspaceActions}>
+                      <button
+                        type="button"
+                        className={styles.actionBtn}
+                        onClick={() => onTogglePinned(workspace.id)}
+                        title={workspace.isPinned ? '取消置顶' : '置顶'}
+                        aria-label={`${workspace.isPinned ? '取消置顶' : '置顶'}工作区 ${workspace.name}`}
+                      >
+                        {workspace.isPinned ? '★' : '☆'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.actionBtn}
+                        onClick={() => {
+                          const nextName = window.prompt('重命名工作区', workspace.name)
+                          if (nextName) onRenameWorkspace(workspace.id, nextName)
+                        }}
+                        title="重命名"
+                        aria-label={`重命名工作区 ${workspace.name}`}
+                      >
+                        ✎
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className={styles.removeBtn}

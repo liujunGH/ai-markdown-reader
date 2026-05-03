@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getWorkspaceSession, getWorkspaces, removeWorkspace, saveWorkspace, saveWorkspaceSession } from '../../utils/workspaces'
+import {
+  getWorkspaceSession,
+  getWorkspaces,
+  removeWorkspace,
+  renameWorkspace,
+  saveWorkspace,
+  saveWorkspaceSession,
+  sortWorkspaces,
+  toggleWorkspacePinned,
+} from '../../utils/workspaces'
 
 describe('workspaces', () => {
   beforeEach(() => {
@@ -34,5 +43,32 @@ describe('workspaces', () => {
         activeFilePath: '/Users/me/docs/a.md',
       })
     )
+  })
+
+  it('pins workspaces and keeps pinned items before recent items', () => {
+    const first = saveWorkspace('Alpha', '/Users/me/alpha')
+    vi.setSystemTime(new Date('2026-05-03T00:01:00Z'))
+    const second = saveWorkspace('Beta', '/Users/me/beta')
+
+    toggleWorkspacePinned(first.id)
+
+    expect(sortWorkspaces(getWorkspaces())).toEqual([
+      expect.objectContaining({ id: first.id, isPinned: true }),
+      expect.objectContaining({ id: second.id, isPinned: false }),
+    ])
+  })
+
+  it('renames workspaces without changing their folder path', () => {
+    const workspace = saveWorkspace('Docs', '/Users/me/docs')
+
+    renameWorkspace(workspace.id, 'Knowledge Base')
+
+    expect(getWorkspaces()).toEqual([
+      expect.objectContaining({
+        id: workspace.id,
+        name: 'Knowledge Base',
+        folderPath: '/Users/me/docs',
+      }),
+    ])
   })
 })
