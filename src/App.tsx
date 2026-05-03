@@ -17,6 +17,7 @@ import { StatusBar } from './components/StatusBar'
 import { SourceView } from './components/SourceView'
 import { FloatingTOC } from './components/FloatingTOC'
 import { RecentFilesPage } from './components/RecentFilesPage'
+import { WelcomeHome } from './components/WelcomeHome'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
 import FirstUseGuide from './components/FirstUseGuide'
 import QuickSwitcher from './components/QuickSwitcher'
@@ -693,6 +694,7 @@ function AppInner() {
     const activeItem = outlineItems.find(item => item.id === activeHeadingId)
     return activeItem?.text || ''
   }, [outlineItems, activeHeadingId])
+  const isWelcomeTab = activeTab?.name === '欢迎使用.md' && !activeTab.filePath
 
   const {
     query,
@@ -1155,6 +1157,18 @@ function AppInner() {
                 </div>
               ) : (
                 <div key={`content-${activeTabId}`} className="tab-content">
+                  {!showSource && isWelcomeTab && (
+                    <WelcomeHome
+                      recentFileCount={recentFiles.length}
+                      readingHistoryCount={readingHistory.length}
+                      currentFolderName={currentFolderName}
+                      currentFolderPath={currentFolderPath}
+                      onOpenFolder={handleOpenFolder}
+                      onOpenRecent={() => openPanel('recent')}
+                      onOpenWorkspaces={() => openPanel('workspaces')}
+                      onOpenReadingTimeline={() => openPanel('readingTimeline')}
+                    />
+                  )}
                   {showSource ? (
                     <SourceView content={activeTab?.content || ''} highlightedLine={highlightedLine} />
                   ) : (
