@@ -62,7 +62,7 @@ import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile } from './utils/wikiGraph'
 import { analyzeDocumentHealth } from './utils/documentHealth'
 import { analyzeMarkdownImages } from './utils/imageInventory'
-import { buildKnowledgeHealthReport, KnowledgeHealthCard } from './utils/knowledgeHealth'
+import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -508,6 +508,20 @@ function AppInner() {
     if (detail === 'document-issues') openPanel('documentHealth')
     if (detail === 'image-warnings') openPanel('imageInventory')
   }, [closePanel, openPanel])
+
+  const handleOpenFirstKnowledgeIssue = useCallback(() => {
+    const firstCard = knowledgeHealthReport.cards.find(card => card.value > 0 && card.severity !== 'good')
+    if (firstCard) {
+      handleOpenKnowledgeHealthDetail(firstCard.id)
+      return
+    }
+    showToast('没有需要定位的问题')
+  }, [handleOpenKnowledgeHealthDetail, knowledgeHealthReport.cards, showToast])
+
+  const handleCopyKnowledgeHealthReport = useCallback(() => {
+    void navigator.clipboard?.writeText(formatKnowledgeHealthMarkdown(knowledgeHealthReport))
+    showToast('健康报告已复制')
+  }, [knowledgeHealthReport, showToast])
 
   // Open folder
   const handleOpenFolder = useCallback(async () => {
@@ -1267,6 +1281,8 @@ function AppInner() {
               <KnowledgeHealthPanel
                 report={knowledgeHealthReport}
                 onOpenDetail={handleOpenKnowledgeHealthDetail}
+                onOpenFirstIssue={handleOpenFirstKnowledgeIssue}
+                onCopyReport={handleCopyKnowledgeHealthReport}
                 onClose={() => closePanel('knowledgeHealth')}
               />
             </Suspense>

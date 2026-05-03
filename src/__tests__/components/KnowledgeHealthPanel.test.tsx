@@ -8,6 +8,8 @@ describe('KnowledgeHealthPanel', () => {
   it('renders the health report and opens detail panels', async () => {
     const user = userEvent.setup()
     const onOpenDetail = vi.fn()
+    const onOpenFirstIssue = vi.fn()
+    const onCopyReport = vi.fn()
 
     render(
       <KnowledgeHealthPanel
@@ -22,6 +24,8 @@ describe('KnowledgeHealthPanel', () => {
           ],
         }}
         onOpenDetail={onOpenDetail}
+        onOpenFirstIssue={onOpenFirstIssue}
+        onCopyReport={onCopyReport}
         onClose={vi.fn()}
       />
     )
@@ -34,5 +38,11 @@ describe('KnowledgeHealthPanel', () => {
 
     await user.click(screen.getByRole('button', { name: '查看孤立文档' }))
     expect(onOpenDetail).toHaveBeenCalledWith('orphan-docs')
+
+    await user.click(screen.getByRole('button', { name: '定位首个问题' }))
+    expect(onOpenFirstIssue).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '复制 Markdown 报告' }))
+    expect(onCopyReport).toHaveBeenCalled()
   })
 })

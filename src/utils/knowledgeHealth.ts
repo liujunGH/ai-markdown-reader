@@ -74,3 +74,24 @@ export function buildKnowledgeHealthReport(input: KnowledgeHealthInput): Knowled
     ],
   }
 }
+
+export function formatKnowledgeHealthMarkdown(report: KnowledgeHealthReport): string {
+  const statusLabel: Record<KnowledgeHealthStatus, string> = {
+    healthy: '健康',
+    'needs-attention': '需要关注',
+    critical: '需要处理',
+  }
+  const rows = report.cards.map(card => `| ${card.label} | ${card.value} | ${card.detail} | ${card.severity} |`)
+
+  return [
+    '# 知识库健康报告',
+    '',
+    `- 健康分数：${report.score}`,
+    `- 状态：${statusLabel[report.status]}`,
+    '',
+    '| 项目 | 数量 | 说明 | 级别 |',
+    '|---|---:|---|---|',
+    ...rows,
+    '',
+  ].join('\n')
+}

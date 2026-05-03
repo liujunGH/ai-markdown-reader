@@ -95,6 +95,27 @@
   font-size: 13px;
 }
 
+.actions {
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.actions button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.actions button:hover {
+  border-color: var(--accent);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

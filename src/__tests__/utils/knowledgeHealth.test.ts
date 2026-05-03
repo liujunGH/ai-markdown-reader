@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildKnowledgeHealthReport } from '../../utils/knowledgeHealth'
+import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown } from '../../utils/knowledgeHealth'
 
 describe('knowledgeHealth', () => {
   it('summarizes workspace and active document health signals', () => {
@@ -38,5 +38,21 @@ describe('knowledgeHealth', () => {
 
     expect(report.score).toBe(100)
     expect(report.status).toBe('healthy')
+  })
+
+  it('formats a report as markdown', () => {
+    const report = buildKnowledgeHealthReport({
+      indexedFileCount: 3,
+      missingLinks: [],
+      orphanNodeCount: 0,
+      documentIssueCount: 0,
+      documentErrorCount: 0,
+      imageWarningCount: 0,
+      unresolvedImageCount: 0,
+    })
+
+    expect(formatKnowledgeHealthMarkdown(report)).toContain('# 知识库健康报告')
+    expect(formatKnowledgeHealthMarkdown(report)).toContain('- 健康分数：100')
+    expect(formatKnowledgeHealthMarkdown(report)).toContain('| 缺失链接 | 0 |')
   })
 })

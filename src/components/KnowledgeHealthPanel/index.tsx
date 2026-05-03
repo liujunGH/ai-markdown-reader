@@ -6,6 +6,8 @@ type KnowledgeHealthDetail = KnowledgeHealthCard['id']
 interface Props {
   report: KnowledgeHealthReport
   onOpenDetail: (detail: KnowledgeHealthDetail) => void
+  onOpenFirstIssue: () => void
+  onCopyReport: () => void
   onClose: () => void
 }
 
@@ -15,7 +17,7 @@ const STATUS_LABELS: Record<KnowledgeHealthReport['status'], string> = {
   critical: '需要处理',
 }
 
-export function KnowledgeHealthPanel({ report, onOpenDetail, onClose }: Props) {
+export function KnowledgeHealthPanel({ report, onOpenDetail, onOpenFirstIssue, onCopyReport, onClose }: Props) {
   return (
     <div className={styles.overlay} onClick={onClose}>
       <section className={styles.panel} onClick={event => event.stopPropagation()} aria-label="知识库健康报告">
@@ -33,6 +35,11 @@ export function KnowledgeHealthPanel({ report, onOpenDetail, onClose }: Props) {
             <strong>{STATUS_LABELS[report.status]}</strong>
             <span>分数越高，说明当前知识库的链接、图片和文档结构越稳定。</span>
           </div>
+        </div>
+
+        <div className={styles.actions}>
+          <button type="button" onClick={onOpenFirstIssue}>定位首个问题</button>
+          <button type="button" onClick={onCopyReport}>复制 Markdown 报告</button>
         </div>
 
         <div className={styles.grid}>
