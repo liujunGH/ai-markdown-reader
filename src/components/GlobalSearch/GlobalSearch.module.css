@@ -171,6 +171,47 @@
   opacity: 0.6;
 }
 
+.indexHint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 20px 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.indexHint strong {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.indexHint span {
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.indexHintBtn {
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.indexHintBtn:hover {
+  filter: brightness(1.05);
+}
+
 .scopeFilters {
   display: flex;
   align-items: center;

@@ -5,6 +5,28 @@ import '@testing-library/jest-dom'
 import { MarkdownGraphPanel } from '../../components/MarkdownGraphPanel'
 
 describe('MarkdownGraphPanel', () => {
+  it('explains an empty indexed graph and offers reindexing', async () => {
+    const user = userEvent.setup()
+    const onReindex = vi.fn()
+
+    render(
+      <MarkdownGraphPanel
+        graph={{ nodes: [], edges: [], orphanNodes: [] }}
+        folderPath="/docs"
+        onOpenFile={vi.fn()}
+        onReindex={onReindex}
+        onClose={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('当前索引为空')).toBeInTheDocument()
+    expect(screen.getByText('搜索、反链和图谱都依赖索引，点击重建后会重新扫描这个文件夹。')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '重建索引' }))
+
+    expect(onReindex).toHaveBeenCalled()
+  })
+
   it('focuses a node and exposes incoming and outgoing navigation', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()

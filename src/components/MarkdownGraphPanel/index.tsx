@@ -98,8 +98,8 @@ export function MarkdownGraphPanel({
         <div className={styles.content}>
           {graph.nodes.length === 0 ? (
             <div className={styles.empty}>
-              <strong>还没有可显示的图谱</strong>
-              <span>{folderPath ? '当前索引为空，重建索引后会显示这个文件夹里的 Markdown 文档。' : '先打开一个 Markdown 文件夹，文档关系会显示在这里。'}</span>
+              <strong>{folderPath ? '当前索引为空' : '还没有可显示的图谱'}</strong>
+              <span>{folderPath ? '搜索、反链和图谱都依赖索引，点击重建后会重新扫描这个文件夹。' : '先打开一个 Markdown 文件夹，文档关系会显示在这里。'}</span>
               {folderPath && onReindex && (
                 <button
                   type="button"

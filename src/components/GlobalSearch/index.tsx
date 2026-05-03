@@ -188,6 +188,7 @@ export function GlobalSearch({
   }
 
   const totalMatches = useMemo(() => results.reduce((sum, r) => sum + r.matches.length, 0), [results])
+  const hasEmptyIndex = Boolean(folderPath) && indexedCount === 0 && !isIndexing
   const indexStatusText = isIndexing && indexProgress
     ? `索引中：发现 ${indexProgress.discoveredFiles}，已处理 ${indexProgress.indexedFiles}，跳过 ${indexProgress.skippedFiles}`
     : loading
@@ -259,6 +260,18 @@ export function GlobalSearch({
             </button>
           )}
         </div>
+
+        {hasEmptyIndex && (
+          <div className={styles.indexHint} role="status">
+            <strong>尚未建立索引</strong>
+            <span>全文搜索、反链和图谱都需要先扫描当前文件夹。</span>
+            {onReindex && (
+              <button type="button" className={styles.indexHintBtn} onClick={handleReindex}>
+                立即重建索引
+              </button>
+            )}
+          </div>
+        )}
 
         <div className={styles.results}>
           {hasSearched && !loading && results.length === 0 && (
