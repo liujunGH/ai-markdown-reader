@@ -58,11 +58,14 @@
   "exportPanel": {
     "title": "Export Document",
     "exportHTML": "Export as HTML",
+    "nativePDF": "Export PDF File",
     "printPDF": "Print / Export as PDF",
     "copyPlainText": "Copy as Plain Text",
     "copyRichText": "Copy as Rich Text",
     "htmlSuccess": "HTML exported successfully",
     "htmlError": "HTML export failed",
+    "pdfSuccess": "PDF exported successfully",
+    "pdfError": "PDF export failed",
     "plainTextSuccess": "Plain text copied to clipboard",
     "richTextSuccess": "Rich text copied to clipboard",
     "copyError": "Copy failed"

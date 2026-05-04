@@ -136,6 +136,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: createIPCCall<() => Promise<{ filePath: string; content: string; error?: string } | null>>('open-file-dialog', { dedup: true, timeout: DIALOG_RENDERER_TIMEOUT }),
   openFolderDialog: createIPCCall<() => Promise<string | null>>('open-folder-dialog', { dedup: true, timeout: DIALOG_RENDERER_TIMEOUT }),
   readFolder: createIPCCall<(folderPath: string) => Promise<{ success: boolean; files?: { name: string; filePath: string; size?: number; lastModified?: number; isDirectory?: boolean }[]; error?: string }>>('read-folder'),
+  scanMarkdownFiles: createIPCCall<(folderPath: string, options?: { maxFileSizeBytes?: number; skipDirectoryNames?: string[] }) => Promise<{ success: boolean; files?: { name: string; filePath: string }[]; skippedItems?: { path: string; name: string; reason: 'ignored-directory' | 'large-file' | 'read-error'; detail?: string; size?: number; maxSize?: number }[]; error?: string }>>('scan-markdown-files', { timeout: 5 * 60 * 1000 }),
   readFile: createIPCCall<(filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>>('read-file'),
   writeFile: createIPCCall<(filePath: string, content: string) => Promise<{ success: boolean; error?: string }>>('write-file'),
   updateMarkdownFile: createIPCCall<(filePath: string, content: string) => Promise<{ success: boolean; error?: string }>>('update-markdown-file'),
@@ -176,6 +177,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pathJoin,
   setProgressBar: createIPCCall<(progress: number) => Promise<void>>('set-progress-bar'),
   clearProgressBar: createIPCCall<() => Promise<void>>('clear-progress-bar'),
+  exportHTMLToPDF: createIPCCall<(options: { html: string; defaultPath: string; title: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>>('export-html-to-pdf', { timeout: DIALOG_RENDERER_TIMEOUT }),
+  saveTextFile: createIPCCall<(options: { defaultPath: string; content: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; error?: string; cancelled?: boolean }>>('save-text-file', { timeout: DIALOG_RENDERER_TIMEOUT }),
+  openTextFile: createIPCCall<(options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; content?: string; error?: string; cancelled?: boolean }>>('open-text-file', { timeout: DIALOG_RENDERER_TIMEOUT }),
   setTitle: createIPCCall<(title: string) => Promise<void>>('set-title'),
   onSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => {
     systemThemeCallbacks.add(callback)

@@ -199,6 +199,34 @@ async function inlineLocalImages(html: string, filePath?: string): Promise<strin
   return template.innerHTML
 }
 
+function getExportBaseName(fileName: string): string {
+  return (fileName || 'untitled').replace(/\.(md|markdown)$/i, '') || 'untitled'
+}
+
+async function buildExportHTMLDocument(
+  fileContent: string,
+  fileName: string,
+  filePath: string | undefined,
+  theme: string,
+  accentColor: string
+): Promise<string> {
+  const html = await inlineLocalImages(parseMarkdown(fileContent), filePath)
+  const title = fileName || 'untitled'
+  const css = buildExportStyles(theme, accentColor)
+  return `<!DOCTYPE html>
+<html lang="zh-CN" data-theme="${theme}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtmlAttr(title)}</title>
+  <style>${css}</style>
+</head>
+<body>
+${html}
+</body>
+</html>`
+}
+
 export function ExportPanel({ isOpen, onClose, fileName, fileContent, filePath, theme, accentColor }: ExportPanelProps) {
   const { t } = useTranslation()
   const modalRef = useRef<HTMLDivElement>(null)
@@ -235,21 +263,8 @@ export function ExportPanel({ isOpen, onClose, fileName, fileContent, filePath, 
 
   const exportToHTML = useCallback(async () => {
     try {
-      const html = await inlineLocalImages(parseMarkdown(fileContent), filePath)
       const title = fileName || 'untitled'
-      const css = buildExportStyles(theme, accentColor)
-      const fullHTML = `<!DOCTYPE html>
-<html lang="zh-CN" data-theme="${theme}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtmlAttr(title)}</title>
-  <style>${css}</style>
-</head>
-<body>
-${html}
-</body>
-</html>`
+      const fullHTML = await buildExportHTMLDocument(fileContent, fileName, filePath, theme, accentColor)
       const blob = new Blob([fullHTML], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -269,6 +284,29 @@ ${html}
     window.print()
     document.title = originalTitle
   }, [fileName])
+
+  const exportNativePDF = useCallback(async () => {
+    if (!window.electronAPI?.exportHTMLToPDF) {
+      exportToPDF()
+      return
+    }
+    try {
+      const baseName = getExportBaseName(fileName)
+      const html = await buildExportHTMLDocument(fileContent, fileName, filePath, theme, accentColor)
+      const result = await window.electronAPI.exportHTMLToPDF({
+        html,
+        defaultPath: `${baseName}.pdf`,
+        title: baseName,
+      })
+      if (result.success) {
+        showToast(t('exportPanel.pdfSuccess'))
+      } else if (result.error) {
+        showToast(result.error, 'error')
+      }
+    } catch {
+      showToast(t('exportPanel.pdfError'), 'error')
+    }
+  }, [accentColor, exportToPDF, fileContent, fileName, filePath, showToast, t, theme])
 
   const copyPlainText = useCallback(async () => {
     try {
@@ -314,6 +352,7 @@ ${html}
 
   const actions = [
     { icon: '📄', label: t('exportPanel.exportHTML'), onClick: exportToHTML },
+    ...(window.electronAPI?.exportHTMLToPDF ? [{ icon: '⬇', label: t('exportPanel.nativePDF'), onClick: exportNativePDF }] : []),
     { icon: '🖨️', label: t('exportPanel.printPDF'), onClick: exportToPDF },
     { icon: '📋', label: t('exportPanel.copyPlainText'), onClick: copyPlainText },
     { icon: '📑', label: t('exportPanel.copyRichText'), onClick: copyRichText },

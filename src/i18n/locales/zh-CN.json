@@ -58,11 +58,14 @@
   "exportPanel": {
     "title": "导出文档",
     "exportHTML": "导出为 HTML",
+    "nativePDF": "导出 PDF 文件",
     "printPDF": "打印 / 导出为 PDF",
     "copyPlainText": "复制为纯文本",
     "copyRichText": "复制为富文本",
     "htmlSuccess": "HTML 导出成功",
     "htmlError": "HTML 导出失败",
+    "pdfSuccess": "PDF 导出成功",
+    "pdfError": "PDF 导出失败",
     "plainTextSuccess": "纯文本已复制到剪贴板",
     "richTextSuccess": "富文本已复制到剪贴板",
     "copyError": "复制失败"

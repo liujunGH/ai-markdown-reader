@@ -121,6 +121,28 @@ export async function getAllMarkdownFiles(
   options: IndexFolderOptions = {}
 ): Promise<Array<{ name: string; filePath: string }>> {
   if (!window.electronAPI) return []
+
+  if (window.electronAPI.scanMarkdownFiles) {
+    assertNotCancelled(options.signal)
+    const result = await window.electronAPI.scanMarkdownFiles(folderPath, {
+      maxFileSizeBytes: options.maxFileSizeBytes,
+      skipDirectoryNames: options.skipDirectoryNames,
+    })
+    assertNotCancelled(options.signal)
+    if (result.success && result.files) {
+      const skippedItems = result.skippedItems ?? []
+      skippedItems.forEach(item => options.onSkip?.(item))
+      options.onProgress?.({
+        phase: 'scanning',
+        discoveredFiles: result.files.length,
+        indexedFiles: 0,
+        skippedFiles: skippedItems.length,
+        skippedItems,
+      })
+      return result.files
+    }
+  }
+
   const files: Array<{ name: string; filePath: string }> = []
   const skippedItems: IndexSkippedItem[] = []
 

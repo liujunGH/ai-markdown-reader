@@ -4,29 +4,42 @@ import { MarkdownRenderer, MarkdownRendererRef } from '../MarkdownRenderer'
 interface Section {
   id: string
   content: string
+  startLine: number
+  lineCount: number
 }
 
-function splitByHeadings(content: string): Section[] {
+export function splitMarkdownSections(content: string, maxLinesPerSection = 160): Section[] {
   const lines = content.split('\n')
   const sections: Section[] = []
   let current: string[] = []
+  let currentStartLine = 1
 
-  for (const line of lines) {
+  const pushSection = () => {
+    if (current.length === 0) return
+    for (let offset = 0; offset < current.length; offset += maxLinesPerSection) {
+      const chunk = current.slice(offset, offset + maxLinesPerSection)
+      sections.push({
+        id: `sec-${sections.length}`,
+        content: chunk.join('\n'),
+        startLine: currentStartLine + offset,
+        lineCount: chunk.length,
+      })
+    }
+  }
+
+  for (const [index, line] of lines.entries()) {
     if (/^#{1,2}\s/.test(line)) {
-      if (current.length > 0) {
-        sections.push({ id: `sec-${sections.length}`, content: current.join('\n') })
-      }
+      pushSection()
       current = [line]
+      currentStartLine = index + 1
     } else {
       current.push(line)
     }
   }
 
-  if (current.length > 0) {
-    sections.push({ id: `sec-${sections.length}`, content: current.join('\n') })
-  }
+  pushSection()
 
-  return sections.length > 0 ? sections : [{ id: 'sec-0', content }]
+  return sections.length > 0 ? sections : [{ id: 'sec-0', content, startLine: 1, lineCount: lines.length }]
 }
 
 interface Props {
@@ -43,7 +56,7 @@ const BUFFER_SECTIONS = 2
 
 export const VirtualMarkdown = forwardRef<MarkdownRendererRef, Props>(
   ({ content, ...rest }, ref) => {
-    const sections = useMemo(() => splitByHeadings(content), [content])
+    const sections = useMemo(() => splitMarkdownSections(content), [content])
     const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set())
     const observerRef = useRef<IntersectionObserver | null>(null)
     const sectionEls = useRef<Map<string, HTMLElement>>(new Map())
@@ -107,7 +120,7 @@ export const VirtualMarkdown = forwardRef<MarkdownRendererRef, Props>(
               {render ? (
                 <MarkdownRenderer {...rest} content={section.content} />
               ) : (
-                <div style={{ minHeight: '200px' }} aria-hidden="true" />
+                <div style={{ minHeight: `${Math.max(80, section.lineCount * 26)}px` }} aria-hidden="true" />
               )}
             </div>
           )

@@ -4,10 +4,15 @@ import styles from './SourceView.module.css'
 interface SourceViewProps {
   content: string
   highlightedLine?: number
+  editable?: boolean
+  onSave?: (content: string) => Promise<void> | void
 }
 
-export function SourceView({ content, highlightedLine: propHighlightedLine }: SourceViewProps) {
+export function SourceView({ content, highlightedLine: propHighlightedLine, editable = false, onSave }: SourceViewProps) {
   const [clickedLine, setClickedLine] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState(content)
+  const [isSaving, setIsSaving] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   const lines = content.split('\n')
@@ -20,6 +25,27 @@ export function SourceView({ content, highlightedLine: propHighlightedLine }: So
     setClickedLine(prev => (prev === lineIndex + 1 ? null : lineIndex + 1))
   }, [])
 
+  const startEditing = useCallback(() => {
+    setDraft(content)
+    setIsEditing(true)
+  }, [content])
+
+  const cancelEditing = useCallback(() => {
+    setDraft(content)
+    setIsEditing(false)
+  }, [content])
+
+  const saveDraft = useCallback(async () => {
+    if (!onSave) return
+    setIsSaving(true)
+    try {
+      await onSave(draft)
+      setIsEditing(false)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [draft, onSave])
+
   useEffect(() => {
     if (highlightedLine && contentRef.current) {
       const lineEl = contentRef.current.children[highlightedLine - 1] as HTMLElement | undefined
@@ -29,8 +55,31 @@ export function SourceView({ content, highlightedLine: propHighlightedLine }: So
     }
   }, [highlightedLine])
 
+  if (isEditing) {
+    return (
+      <div className={styles.editorShell}>
+        <div className={styles.editorToolbar}>
+          <span>源码编辑</span>
+          <div className={styles.editorActions}>
+            <button onClick={cancelEditing} disabled={isSaving}>取消</button>
+            <button onClick={saveDraft} disabled={isSaving}>{isSaving ? '保存中...' : '保存'}</button>
+          </div>
+        </div>
+        <textarea
+          className={styles.editor}
+          value={draft}
+          spellCheck={false}
+          onChange={event => setDraft(event.target.value)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className={styles.container}>
+      {editable && onSave && (
+        <button className={styles.editButton} onClick={startEditing}>编辑</button>
+      )}
       <div className={styles.lineNumbers} style={{ width: `${lineNumberWidth}px` }}>
         {lines.map((_, i) => (
           <div

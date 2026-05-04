@@ -49,6 +49,8 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'release-preflight', label: '发布前检查', category: '工具', icon: '◇', action: () => {} },
   { id: 'workspace-dashboard', label: '运营仪表盘', category: '工具', icon: '▦', action: () => {} },
   { id: 'action-workbench', label: '增强操作台', category: '工具', icon: '▧', action: () => {} },
+  { id: 'export-reading-backup', label: '导出阅读数据备份', category: '工具', icon: '⇩', action: () => {} },
+  { id: 'import-reading-backup', label: '导入阅读数据备份', category: '工具', icon: '⇧', action: () => {} },
 
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },

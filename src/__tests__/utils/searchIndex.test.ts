@@ -76,6 +76,41 @@ describe('searchIndex', () => {
     ]))
   })
 
+  it('uses the main-process scanner when it is available', async () => {
+    window.electronAPI = {
+      scanMarkdownFiles: vi.fn(async () => ({
+        success: true,
+        files: [
+          { name: 'README.md', filePath: '/docs/README.md' },
+        ],
+        skippedItems: [
+          { path: '/docs/node_modules', name: 'node_modules', reason: 'ignored-directory' },
+        ],
+      })),
+      readFolder: vi.fn(),
+    } as unknown as Window['electronAPI']
+    const skipped: IndexSkippedItem[] = []
+    const progress: string[] = []
+
+    const files = await getAllMarkdownFiles('/docs', {
+      maxFileSizeBytes: 1024,
+      skipDirectoryNames: ['vendor'],
+      onSkip: item => skipped.push(item),
+      onProgress: item => progress.push(`${item.phase}:${item.discoveredFiles}:${item.skippedFiles}`),
+    })
+
+    expect(files).toEqual([{ name: 'README.md', filePath: '/docs/README.md' }])
+    expect(window.electronAPI!.scanMarkdownFiles).toHaveBeenCalledWith('/docs', {
+      maxFileSizeBytes: 1024,
+      skipDirectoryNames: ['vendor'],
+    })
+    expect(window.electronAPI!.readFolder).not.toHaveBeenCalled()
+    expect(skipped).toEqual([
+      expect.objectContaining({ path: '/docs/node_modules', reason: 'ignored-directory' }),
+    ])
+    expect(progress).toEqual(['scanning:1:1'])
+  })
+
   it('reports structured skip reasons while scanning', async () => {
     window.electronAPI = {
       readFolder: vi.fn(async () => ({

@@ -112,6 +112,7 @@ import {
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
 import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from './utils/indexDiagnostics'
 import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
+import { applyReadingDataBackup, createReadingDataBackup } from './utils/readingDataBackup'
 import {
   addReaderMark,
   buildAnnotationOverview,
@@ -334,6 +335,61 @@ function AppInner() {
   const indexAbortControllerRef = useRef<AbortController | null>(null)
   const readingSessionRef = useRef<{ filePath: string; fileName: string; startedAt: number; progressStart: number; wordsStart: number } | null>(null)
   const readingProgressRef = useRef(0)
+
+  const exportReadingDataBackup = useCallback(async () => {
+    if (!window.electronAPI?.saveTextFile) {
+      showToast('当前环境不支持备份导出', 'error')
+      return
+    }
+    const backup = createReadingDataBackup()
+    const stamp = new Date().toISOString().slice(0, 10)
+    const result = await window.electronAPI.saveTextFile({
+      defaultPath: `ai-markdown-reader-backup-${stamp}.json`,
+      content: JSON.stringify(backup, null, 2),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+    if (result.success) {
+      showToast(`阅读数据备份已导出：${basename(result.filePath || '') || 'backup.json'}`)
+    } else if (!result.cancelled) {
+      showToast(result.error || '阅读数据备份导出失败', 'error')
+    }
+  }, [showToast])
+
+  const importReadingDataBackup = useCallback(async () => {
+    if (!window.electronAPI?.openTextFile) {
+      showToast('当前环境不支持备份导入', 'error')
+      return
+    }
+    const result = await window.electronAPI.openTextFile({
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+    if (!result.success || result.content === undefined) {
+      if (!result.cancelled) {
+        showToast(result.error || '阅读数据备份导入失败', 'error')
+      }
+      return
+    }
+    const imported = applyReadingDataBackup(result.content)
+    if (!imported.success) {
+      showToast(imported.error || '阅读数据备份导入失败', 'error')
+      return
+    }
+    showToast(`已导入 ${imported.imported} 项阅读数据${imported.skipped ? `，跳过 ${imported.skipped} 项` : ''}`)
+  }, [showToast])
+
+  const saveSourceEdit = useCallback(async (content: string) => {
+    if (!activeTab?.filePath) {
+      showToast('当前标签没有可写入的 Markdown 文件', 'error')
+      return
+    }
+    const result = await window.electronAPI?.updateMarkdownFile(activeTab.filePath, content)
+    if (!result?.success) {
+      showToast(result?.error || '源码保存失败', 'error')
+      throw new Error(result?.error || '源码保存失败')
+    }
+    updateTabContent(activeTab.filePath, content, activeTab.name)
+    showToast('源码已保存')
+  }, [activeTab?.filePath, activeTab?.name, showToast, updateTabContent])
 
   // ── Hooks ──
   const scrollHistory = useScrollHistory()
@@ -2234,7 +2290,12 @@ function AppInner() {
                     />
                   )}
                   {showSource ? (
-                    <SourceView content={activeTab?.content || ''} highlightedLine={highlightedLine} />
+                    <SourceView
+                      content={activeTab?.content || ''}
+                      highlightedLine={highlightedLine}
+                      editable={Boolean(activeTab?.filePath)}
+                      onSave={saveSourceEdit}
+                    />
                   ) : (
                     (activeTab?.content && (activeTab.content.length > 300000 || activeTab.content.split('\n').length > 5000)) ? (
                       <VirtualMarkdown
@@ -2875,6 +2936,12 @@ function AppInner() {
               break
             case 'action-workbench':
               openPanel('actionWorkbench')
+              break
+            case 'export-reading-backup':
+              exportReadingDataBackup()
+              break
+            case 'import-reading-backup':
+              importReadingDataBackup()
               break
             default:
               break

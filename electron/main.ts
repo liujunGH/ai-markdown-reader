@@ -46,6 +46,17 @@ interface StoreData {
 }
 
 const DEFAULT_MAX_RECENT_FILES = 100
+const DEFAULT_SKIP_DIRECTORIES = new Set([
+  '.git',
+  '.hg',
+  '.svn',
+  'node_modules',
+  'dist',
+  'build',
+  'release',
+  '.next',
+  '.cache',
+])
 
 const storePath = path.join(app.getPath('userData'), 'config.json')
 
@@ -91,6 +102,12 @@ function saveStore(data: StoreData): void {
 
 function isPathSafe(filePath: string): boolean {
   return validateFilePath(filePath)
+}
+
+function shouldSkipScanDirectory(name: string, extraSkipNames: string[] = []): boolean {
+  if (name.startsWith('.')) return true
+  if (DEFAULT_SKIP_DIRECTORIES.has(name)) return true
+  return extraSkipNames.includes(name)
 }
 
 const windows = new Map<number, BrowserWindow>()
@@ -899,6 +916,81 @@ wrapHandler('read-folder', async (_event, folderPath: string) => {
   }
 })
 
+wrapHandler('scan-markdown-files', async (_event, folderPath: string, options: { maxFileSizeBytes?: number; skipDirectoryNames?: string[] } = {}) => {
+  if (!isPathSafe(folderPath)) {
+    return { success: false, error: '非法路径' }
+  }
+
+  const files: Array<{ name: string; filePath: string }> = []
+  const skippedItems: Array<{ path: string; name: string; reason: 'ignored-directory' | 'large-file' | 'read-error'; detail?: string; size?: number; maxSize?: number }> = []
+  const maxFileSizeBytes = options.maxFileSizeBytes
+  const skipDirectoryNames = options.skipDirectoryNames ?? []
+
+  const scan = (currentFolderPath: string) => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(currentFolderPath, { withFileTypes: true })
+    } catch (error) {
+      skippedItems.push({
+        path: currentFolderPath,
+        name: path.basename(currentFolderPath),
+        reason: 'read-error',
+        detail: String(error),
+      })
+      return
+    }
+
+    for (const entry of entries) {
+      const itemPath = path.join(currentFolderPath, entry.name)
+      if (entry.isDirectory()) {
+        if (shouldSkipScanDirectory(entry.name, skipDirectoryNames)) {
+          skippedItems.push({
+            path: itemPath,
+            name: entry.name,
+            reason: 'ignored-directory',
+          })
+          continue
+        }
+        scan(itemPath)
+        continue
+      }
+
+      if (!entry.name.endsWith('.md') && !entry.name.endsWith('.markdown')) {
+        continue
+      }
+
+      try {
+        const stat = fs.statSync(itemPath)
+        if (maxFileSizeBytes !== undefined && stat.size > maxFileSizeBytes) {
+          skippedItems.push({
+            path: itemPath,
+            name: entry.name,
+            reason: 'large-file',
+            size: stat.size,
+            maxSize: maxFileSizeBytes,
+          })
+          continue
+        }
+        files.push({ name: entry.name, filePath: itemPath })
+      } catch (error) {
+        skippedItems.push({
+          path: itemPath,
+          name: entry.name,
+          reason: 'read-error',
+          detail: String(error),
+        })
+      }
+    }
+  }
+
+  try {
+    scan(folderPath)
+    return { success: true, files, skippedItems }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}, 5 * 60 * 1000)
+
 wrapHandler('read-file', async (_event, filePath: string) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '非法路径' }
@@ -1139,6 +1231,113 @@ wrapHandler('clear-progress-bar', (event) => {
     win.setProgressBar(-1)
   }
 })
+
+wrapHandler('export-html-to-pdf', async (event, options: { html: string; defaultPath: string; title: string }) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
+  const result = parent
+    ? await dialog.showSaveDialog(parent, {
+      defaultPath: options.defaultPath,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    })
+    : await dialog.showSaveDialog({
+      defaultPath: options.defaultPath,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    })
+
+  if (result.canceled || !result.filePath) {
+    return { success: false }
+  }
+
+  let pdfWindow: BrowserWindow | null = null
+  try {
+    pdfWindow = new BrowserWindow({
+      show: false,
+      width: 900,
+      height: 1200,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+      },
+    })
+    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(options.html)}`)
+    const pdf = await pdfWindow.webContents.printToPDF({
+      printBackground: true,
+      margins: { marginType: 'default' },
+      pageSize: 'A4',
+    })
+    fs.writeFileSync(result.filePath, pdf)
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    logger.error('Failed to export PDF', { title: options.title, error: String(error) })
+    return { success: false, error: String(error) }
+  } finally {
+    if (pdfWindow && !pdfWindow.isDestroyed()) {
+      pdfWindow.close()
+    }
+  }
+}, DIALOG_TIMEOUT)
+
+wrapHandler('save-text-file', async (event, options: { defaultPath: string; content: string; filters?: Electron.FileFilter[] }) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
+  const result = parent
+    ? await dialog.showSaveDialog(parent, {
+      defaultPath: options.defaultPath,
+      filters: options.filters,
+    })
+    : await dialog.showSaveDialog({
+      defaultPath: options.defaultPath,
+      filters: options.filters,
+    })
+
+  if (result.canceled || !result.filePath) {
+    return { success: false, cancelled: true }
+  }
+
+  if (!isPathSafe(result.filePath)) {
+    return { success: false, error: '非法路径' }
+  }
+
+  try {
+    fs.writeFileSync(result.filePath, options.content, { encoding: 'utf-8' })
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}, DIALOG_TIMEOUT)
+
+wrapHandler('open-text-file', async (event, options: { filters?: Electron.FileFilter[] } = {}) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
+  const result = parent
+    ? await dialog.showOpenDialog(parent, {
+      properties: ['openFile'],
+      filters: options.filters,
+    })
+    : await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: options.filters,
+    })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, cancelled: true }
+  }
+
+  const filePath = result.filePaths[0]
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: '非法路径' }
+  }
+
+  const sizeCheck = validateFileSize(filePath, 5 * 1024 * 1024)
+  if (!sizeCheck.valid) {
+    return { success: false, error: sizeCheck.error }
+  }
+
+  try {
+    return { success: true, filePath, content: fs.readFileSync(filePath, 'utf-8') }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+}, DIALOG_TIMEOUT)
 
 wrapHandler('set-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender)

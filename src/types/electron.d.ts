@@ -12,6 +12,20 @@ export interface FolderFile {
   isDirectory?: boolean
 }
 
+export interface MarkdownScanOptions {
+  maxFileSizeBytes?: number
+  skipDirectoryNames?: string[]
+}
+
+export interface MarkdownScanSkippedItem {
+  path: string
+  name: string
+  reason: 'ignored-directory' | 'large-file' | 'read-error'
+  detail?: string
+  size?: number
+  maxSize?: number
+}
+
 export interface WindowState {
   width: number
   height: number
@@ -25,6 +39,12 @@ export interface ElectronAPI {
   openFileDialog: () => Promise<{ filePath: string; content: string; error?: string } | null>
   openFolderDialog: () => Promise<string | null>
   readFolder: (folderPath: string) => Promise<{ success: boolean; files?: FolderFile[]; error?: string }>
+  scanMarkdownFiles: (folderPath: string, options?: MarkdownScanOptions) => Promise<{
+    success: boolean
+    files?: Array<{ name: string; filePath: string }>
+    skippedItems?: MarkdownScanSkippedItem[]
+    error?: string
+  }>
   readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   updateMarkdownFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
@@ -62,6 +82,9 @@ export interface ElectronAPI {
   pathJoin: (...paths: string[]) => string
   setProgressBar: (progress: number) => Promise<void>
   clearProgressBar: () => Promise<void>
+  exportHTMLToPDF: (options: { html: string; defaultPath: string; title: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>
+  saveTextFile: (options: { defaultPath: string; content: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; error?: string; cancelled?: boolean }>
+  openTextFile: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; content?: string; error?: string; cancelled?: boolean }>
   setTitle: (title: string) => Promise<void>
   onSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
   offSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
