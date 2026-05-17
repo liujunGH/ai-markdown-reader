@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useSearch } from '../../hooks/useSearch'
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('useSearch', () => {
   it('initializes with empty state', () => {
@@ -177,6 +181,26 @@ describe('useSearch', () => {
     act(() => {
       result.current.setQuery('hello')
     })
+    expect(result.current.matches).toHaveLength(1)
+  })
+
+  it('defers scanning very large documents so typing does not update matches synchronously', () => {
+    vi.useFakeTimers()
+    const largeContent = `${'padding '.repeat(160000)}target`
+    const { result } = renderHook(() => useSearch(largeContent))
+
+    act(() => {
+      result.current.setQuery('target')
+    })
+
+    expect(result.current.isSearching).toBe(true)
+    expect(result.current.matches).toEqual([])
+
+    act(() => {
+      vi.advanceTimersByTime(120)
+    })
+
+    expect(result.current.isSearching).toBe(false)
     expect(result.current.matches).toHaveLength(1)
   })
 })

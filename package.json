@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "perf:startup": "npm run electron:compile && npm run build && node scripts/perf-startup.mjs",
+    "perf:document": "npm run electron:compile && npm run build && node scripts/perf-document.mjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed"
   },

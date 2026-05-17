@@ -34,6 +34,8 @@ import { useOutline } from './hooks/useOutline'
 import { useScrollSpy } from './hooks/useScrollSpy'
 import { useSearch } from './hooks/useSearch'
 import { useFileSettings } from './hooks/useFileSettings'
+import { useDocumentRenderMode } from './hooks/useDocumentRenderMode'
+import { useWorkspaceIndexing } from './hooks/useWorkspaceIndexing'
 import { TabBar } from './components/TabBar'
 import { useRecentFiles } from './hooks/useRecentFiles'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -56,7 +58,6 @@ const ReadingToolsPanel = React.lazy(() => import('./components/ReadingToolsPane
 const ReadingMediaPanel = React.lazy(() => import('./components/ReadingMediaPanel').then(m => ({ default: m.ReadingMediaPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getIndexedFileCount, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
 import {
@@ -71,8 +72,6 @@ import {
   Workspace,
 } from './utils/workspaces'
 import { getReadingHistory, recordReadingHistory, ReadingHistoryItem } from './utils/readingHistory'
-import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from './utils/indexDiagnostics'
-import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from './utils/indexSettings'
 import { applyReadingDataBackup, createReadingDataBackup } from './utils/readingDataBackup'
 import {
   addReaderMark,
@@ -123,6 +122,7 @@ const READER_CHAPTERS_KEY = 'reader-chapters'
 const READER_ACCESSIBILITY_KEY = 'reader-accessibility'
 const READER_FOCUS_TIMER_KEY = 'reader-focus-timer'
 const READER_SNAPSHOTS_KEY = 'reader-snapshots'
+const MAX_SCROLL_SPY_HEADINGS = 800
 
 function runAfterFirstPaint(task: () => void, delay = 250): void {
   globalThis.setTimeout(() => {
@@ -211,13 +211,6 @@ function AppInner() {
       return []
     }
   })
-  const [indexedFileCount, setIndexedFileCount] = useState(0)
-  const [workspaceIndexCounts, setWorkspaceIndexCounts] = useState<Record<string, number>>({})
-  const [isIndexing, setIsIndexing] = useState(false)
-  const [indexProgress, setIndexProgress] = useState<IndexProgress | null>(null)
-  const [indexSkippedItems, setIndexSkippedItems] = useState<IndexSkippedItem[]>([])
-  const [indexDiagnosticsUpdatedAt, setIndexDiagnosticsUpdatedAt] = useState<number | null>(null)
-  const [indexSettings, setIndexSettings] = useState<IndexSettings>(() => loadIndexSettings())
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => getWorkspaces())
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => getReadingHistory())
   const [readerMarks, setReaderMarks] = useState<ReaderMark[]>(() => loadJsonArray<ReaderMark>(READER_MARKS_KEY))
@@ -243,9 +236,29 @@ function AppInner() {
     return stored === 'longform' || stored === 'code-doc' || stored === 'paper' ? stored : 'default'
   })
   const [readingLayoutMode, setReadingLayoutMode] = useState<ReadingLayoutMode>(() => normalizeLayoutMode(getStorageItem(READER_LAYOUT_KEY)))
-  const indexAbortControllerRef = useRef<AbortController | null>(null)
   const readingSessionRef = useRef<{ filePath: string; fileName: string; startedAt: number; progressStart: number; wordsStart: number } | null>(null)
   const readingProgressRef = useRef(0)
+  const {
+    indexedFileCount,
+    workspaceIndexCounts,
+    isIndexing,
+    indexProgress,
+    indexSkippedItems,
+    indexDiagnosticsUpdatedAt,
+    indexSettings,
+    indexPolicy,
+    rebuildFolderIndex,
+    cancelFolderIndex,
+    clearIndexDiagnostics,
+    saveIndexSettingsOnly,
+    saveIndexSettingsAndReindex,
+    resetWorkspaceIndexSettings,
+  } = useWorkspaceIndexing({
+    currentFolderPath,
+    workspaces,
+    showWorkspaces,
+    showToast,
+  })
 
   const exportReadingDataBackup = useCallback(async () => {
     if (!window.electronAPI?.saveTextFile) {
@@ -309,7 +322,6 @@ function AppInner() {
 
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
   const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
-  const indexPolicy = useMemo(() => getEffectiveIndexPolicy(indexSettings), [indexSettings])
   const readingPresets = useMemo(() => getDefaultReadingPresets(), [])
   const activeReadingPreset = useMemo(() => (
     readingPresets.find(preset => preset.id === activeReaderPresetId) || readingPresets[0]
@@ -374,157 +386,6 @@ function AppInner() {
       void useTabStore.getState().restoreSession()
     }, 300)
   }, [])
-
-  const refreshIndexedFiles = useCallback(async (folderPath: string | null) => {
-    if (!folderPath) {
-      setIndexedFileCount(0)
-      return
-    }
-    try {
-      const count = await getIndexedFileCount(folderPath)
-      setIndexedFileCount(count)
-      setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: count }))
-    } catch (error) {
-      console.error('Failed to load indexed files:', error)
-      setIndexedFileCount(0)
-      setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: 0 }))
-    }
-  }, [])
-
-  const refreshWorkspaceIndexCounts = useCallback(async () => {
-    const paths = Array.from(new Set([
-      ...workspaces.map(workspace => workspace.folderPath),
-      currentFolderPath,
-    ].filter((path): path is string => Boolean(path))))
-
-    if (paths.length === 0) {
-      setWorkspaceIndexCounts({})
-      return
-    }
-
-    const entries = await Promise.all(paths.map(async folderPath => {
-      try {
-        return [folderPath, await getIndexedFileCount(folderPath)] as const
-      } catch (error) {
-        console.error('Failed to load workspace index count:', error)
-        return [folderPath, 0] as const
-      }
-    }))
-    setWorkspaceIndexCounts(Object.fromEntries(entries))
-  }, [currentFolderPath, workspaces])
-
-  const rebuildFolderIndex = useCallback(async (
-    folderPath = currentFolderPath,
-    options: { silent?: boolean; policy?: typeof indexPolicy } = {}
-  ) => {
-    if (!folderPath) {
-      if (!options.silent) {
-        showToast('请先打开一个文件夹', 'error')
-      }
-      return
-    }
-    indexAbortControllerRef.current?.abort()
-    const controller = new AbortController()
-    indexAbortControllerRef.current = controller
-    setIsIndexing(true)
-    setIndexProgress({
-      phase: 'scanning',
-      discoveredFiles: 0,
-      indexedFiles: 0,
-      skippedFiles: 0,
-      currentPath: folderPath,
-    })
-    try {
-      const activeIndexPolicy = options.policy ?? indexPolicy
-      const handleProgress = (progress: IndexProgress) => setIndexProgress(progress)
-      const skippedItems: IndexSkippedItem[] = []
-      const persistSkippedItems = (nextItems: IndexSkippedItem[]) => {
-        const updatedAt = Date.now()
-        setIndexSkippedItems([...nextItems])
-        setIndexDiagnosticsUpdatedAt(updatedAt)
-        saveIndexDiagnostics(folderPath, nextItems, updatedAt)
-      }
-      setIndexSkippedItems([])
-      setIndexDiagnosticsUpdatedAt(null)
-      const allFiles = await getAllMarkdownFiles(folderPath, {
-        signal: controller.signal,
-        onProgress: handleProgress,
-        onSkip: item => {
-          skippedItems.push(item)
-          persistSkippedItems(skippedItems)
-        },
-        maxFileSizeBytes: activeIndexPolicy.maxFileSizeBytes,
-        skipDirectoryNames: activeIndexPolicy.skipDirectoryNames,
-      })
-      await indexFolder(folderPath, allFiles, {
-        signal: controller.signal,
-        onProgress: handleProgress,
-        onSkip: item => {
-          skippedItems.push(item)
-          persistSkippedItems(skippedItems)
-        },
-        initialSkippedItems: skippedItems,
-      })
-      persistSkippedItems(skippedItems)
-      await refreshIndexedFiles(folderPath)
-      if (!options.silent) {
-        const skippedCount = skippedItems.length
-        showToast(skippedCount > 0
-          ? `索引已更新：${allFiles.length} 个 Markdown 文件，跳过 ${skippedCount} 项`
-          : `索引已更新：${allFiles.length} 个 Markdown 文件`)
-      }
-    } catch (error) {
-      if (controller.signal.aborted) {
-        setIndexProgress(prev => ({
-          phase: 'cancelled',
-          discoveredFiles: prev?.discoveredFiles ?? 0,
-          indexedFiles: prev?.indexedFiles ?? 0,
-          skippedFiles: prev?.skippedFiles ?? 0,
-          currentPath: prev?.currentPath,
-          skippedItems: prev?.skippedItems,
-        }))
-        if (!options.silent) {
-          showToast('索引已取消')
-        }
-        return
-      }
-      console.error('Failed to rebuild index:', error)
-      if (!options.silent) {
-        showToast(`索引失败：${String(error)}`, 'error')
-      }
-      throw error
-    } finally {
-      if (indexAbortControllerRef.current === controller) {
-        indexAbortControllerRef.current = null
-      }
-      setIsIndexing(false)
-    }
-  }, [currentFolderPath, indexPolicy.maxFileSizeBytes, indexPolicy.skipDirectoryNames, refreshIndexedFiles, showToast])
-
-  const cancelFolderIndex = useCallback(() => {
-    indexAbortControllerRef.current?.abort()
-  }, [])
-
-  useEffect(() => {
-    void refreshIndexedFiles(currentFolderPath)
-  }, [currentFolderPath, refreshIndexedFiles])
-
-  useEffect(() => {
-    if (!currentFolderPath) {
-      setIndexSkippedItems([])
-      setIndexDiagnosticsUpdatedAt(null)
-      return
-    }
-    const saved = loadSavedIndexDiagnostics(currentFolderPath)
-    setIndexSkippedItems(saved.skippedItems)
-    setIndexDiagnosticsUpdatedAt(saved.updatedAt)
-  }, [currentFolderPath])
-
-  useEffect(() => {
-    if (showWorkspaces) {
-      void refreshWorkspaceIndexCounts()
-    }
-  }, [refreshWorkspaceIndexCounts, showWorkspaces])
 
   // Sync file settings to global UI state
   useEffect(() => {
@@ -870,7 +731,11 @@ function AppInner() {
   }, [tabs, secondaryTabId])
 
   const outlineItems = useOutline(activeTab?.content || '')
-  const outlineIds = outlineItems.map(item => item.id)
+  const outlineIds = useMemo(() => (
+    outlineItems.length > MAX_SCROLL_SPY_HEADINGS
+      ? outlineItems.slice(0, MAX_SCROLL_SPY_HEADINGS).map(item => item.id)
+      : outlineItems.map(item => item.id)
+  ), [outlineItems])
   const activeHeadingId = useScrollSpy(outlineIds)
   const currentHeading = useMemo(() => {
     const activeItem = outlineItems.find(item => item.id === activeHeadingId)
@@ -888,6 +753,8 @@ function AppInner() {
     !secondaryTab.content &&
     (secondaryTab.contentStatus === 'pending' || secondaryTab.contentStatus === 'loading' || secondaryTab.contentStatus === 'error')
   )
+  const activeRenderMode = useDocumentRenderMode(activeTab?.content || '')
+  const secondaryRenderMode = useDocumentRenderMode(secondaryTab?.content || '')
 
   useEffect(() => {
     if (!activeTab?.filePath || activeTab.content || activeTab.contentStatus === 'loading' || activeTab.contentStatus === 'error') return
@@ -1654,7 +1521,7 @@ function AppInner() {
                       onRetry={activeTab ? () => void loadTabContent(activeTab.id) : undefined}
                     />
                   ) : (
-                    (activeTab?.content && (activeTab.content.length > 300000 || activeTab.content.split('\n').length > 5000)) ? (
+                    activeTab?.content && activeRenderMode.mode === 'virtual' ? (
                       <VirtualMarkdown
                         ref={markdownRef}
                         content={activeTab.content}
@@ -1702,6 +1569,16 @@ function AppInner() {
                     />
                   ) : showSource ? (
                     <SourceView content={secondaryTab.content || ''} />
+                  ) : secondaryTab.content && secondaryRenderMode.mode === 'virtual' ? (
+                    <VirtualMarkdown
+                      content={secondaryTab.content || ''}
+                      filePath={secondaryTab.filePath}
+                      searchQuery={query}
+                      searchRegex={isRegex}
+                      currentMatch={currentMatch}
+                      matchCount={matches.length}
+                      onWikiLinkClick={handleWikiLinkClick}
+                    />
                   ) : (
                     <MarkdownRenderer
                       content={secondaryTab.content || ''}
@@ -1869,33 +1746,10 @@ function AppInner() {
                 indexedFileCount={indexedFileCount}
                 updatedAt={indexDiagnosticsUpdatedAt}
                 onReindex={() => rebuildFolderIndex()}
-                onClear={() => {
-                  setIndexSkippedItems([])
-                  setIndexDiagnosticsUpdatedAt(null)
-                  if (currentFolderPath) {
-                    clearSavedIndexDiagnostics(currentFolderPath)
-                  }
-                }}
-                onSaveSettings={settings => {
-                  const saved = saveIndexSettings(settings)
-                  setIndexSettings(saved)
-                  showToast('索引设置已保存，重新扫描后生效')
-                }}
-                onSaveSettingsAndReindex={settings => {
-                  const saved = saveIndexSettings(settings)
-                  const savedPolicy = getEffectiveIndexPolicy(saved)
-                  setIndexSettings(saved)
-                  showToast('索引设置已保存，开始重新扫描')
-                  void rebuildFolderIndex(currentFolderPath, { silent: true, policy: savedPolicy }).catch(error => {
-                    console.error('Failed to rebuild index after settings save:', error)
-                    showToast(`索引失败：${String(error)}`, 'error')
-                  })
-                }}
-                onResetSettings={() => {
-                  const defaults = resetIndexSettings()
-                  setIndexSettings(defaults)
-                  showToast('索引设置已恢复默认')
-                }}
+                onClear={clearIndexDiagnostics}
+                onSaveSettings={saveIndexSettingsOnly}
+                onSaveSettingsAndReindex={saveIndexSettingsAndReindex}
+                onResetSettings={resetWorkspaceIndexSettings}
                 onClose={() => closePanel('indexDiagnostics')}
               />
             </Suspense>

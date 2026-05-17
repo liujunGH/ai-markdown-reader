@@ -24,6 +24,7 @@ Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。当
 - Markdown 渲染优先走 Web Worker，worker 失败时再回退到主线程解析，降低大文档对界面的阻塞。
 - 启动流程延后非必要任务：不会在启动阶段自动恢复上次文件夹并触发索引。
 - 新增 `npm run perf:startup`，默认生成 12 个 5MB 临时 Markdown 文档，测试空会话和大数据会话启动耗时。
+- 新增 `npm run perf:document`，覆盖单个大文档的打开、首次搜索命中和滚动到底部渲染耗时。
 
 ## 核心功能
 
@@ -102,6 +103,9 @@ npm run electron:preview
 # 启动性能压测
 npm run perf:startup
 
+# 大文档阅读性能压测
+npm run perf:document
+
 # E2E 测试
 npm run e2e
 
@@ -111,7 +115,7 @@ npm run electron:build:mac
 npm run electron:build:linux
 ```
 
-## 启动性能压测
+## 性能压测
 
 `npm run perf:startup` 会先编译 Electron、构建前端，再运行 `scripts/perf-startup.mjs`：
 
@@ -125,6 +129,16 @@ npm run electron:build:linux
 node scripts/perf-startup.mjs --out=tmp/startup-perf.json
 ```
 
+`npm run perf:document` 会先编译 Electron、构建前端，再运行 `scripts/perf-document.mjs`：
+
+- 默认生成 1 个 5MB Markdown 文档，模拟单篇长文档阅读
+- 输出指标：进程启动、DOM ready、根节点可见、当前文档渲染、打开搜索框、输入搜索词、首次搜索高亮、滚动到底部渲染和内存占用
+- 可通过 `--mb=10` 调整文档体积，通过 `--out=tmp/document-perf.json` 保存结果
+
+```bash
+node scripts/perf-document.mjs --mb=10 --out=tmp/document-perf.json
+```
+
 ## 发版
 
 发版前至少运行：
@@ -135,6 +149,7 @@ npm test
 npm run electron:compile
 npm run build
 npm run perf:startup
+npm run perf:document
 ```
 
 准备好 `docs/releases/v版本号.md` 后，可以使用本地脚本创建 tag 和 GitHub Release：
@@ -184,6 +199,7 @@ markdown-reader/
 ├── e2e/                       # Playwright Electron E2E
 ├── docs/releases/             # GitHub Release notes
 ├── scripts/perf-startup.mjs   # 启动性能压测
+├── scripts/perf-document.mjs  # 大文档阅读性能压测
 └── package.json
 ```
 

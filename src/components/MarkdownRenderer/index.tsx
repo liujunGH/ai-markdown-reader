@@ -4,6 +4,7 @@ import { useMarkdownWorker } from '../../hooks/useMarkdownWorker'
 import { getStorageItem, setStorageItem } from '../../utils/storage'
 import { createMermaidRenderId, getInitializedMermaid, hasMermaidLoaded } from '../../utils/mermaidLoader'
 import { resolveLocalImagePath } from '../../utils/imagePaths'
+import { buildSearchPattern } from '../../utils/search'
 import styles from './MarkdownRenderer.module.css'
 import previewStyles from './ImagePreview.module.css'
 
@@ -718,30 +719,42 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       let nodeHtml = textNode.textContent
       let hasMatch = false
 
-      try {
-        const pattern = searchRegex
-          ? new RegExp(`(${searchQuery})`, 'gi')
-          : new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+      const pattern = buildSearchPattern(searchQuery, searchRegex)
+      if (!pattern) return
 
-        if (pattern.test(nodeHtml)) {
-          hasMatch = true
-          nodeHtml = nodeHtml.replace(pattern, '<mark class="search-highlight">$1</mark>')
+      const fragment = document.createDocumentFragment()
+      let lastIndex = 0
+      let match: RegExpExecArray | null
+
+      while ((match = pattern.exec(nodeHtml)) !== null) {
+        hasMatch = true
+        if (match.index > lastIndex) {
+          fragment.appendChild(document.createTextNode(nodeHtml.slice(lastIndex, match.index)))
         }
-      } catch {
-        // Invalid regex, skip
+
+        const mark = document.createElement('mark')
+        mark.className = 'search-highlight'
+        mark.textContent = match[0]
+        fragment.appendChild(mark)
+
+        lastIndex = match.index + match[0].length
+        if (match[0].length === 0) {
+          pattern.lastIndex += 1
+        }
       }
 
       if (hasMatch) {
-        const span = document.createElement('span')
-        span.innerHTML = nodeHtml
-        textNode.parentNode?.replaceChild(span, textNode)
+        if (lastIndex < nodeHtml.length) {
+          fragment.appendChild(document.createTextNode(nodeHtml.slice(lastIndex)))
+        }
+        textNode.parentNode?.replaceChild(fragment, textNode)
       }
     })
 
     // Mark the current active match
     if (matchCount > 0 && containerRef.current) {
       const allMarks = containerRef.current.querySelectorAll('.search-highlight')
-      if (allMarks[currentMatch]) {
+      if (currentMatch >= 0 && allMarks[currentMatch]) {
         allMarks[currentMatch].classList.add('search-highlight-active')
         allMarks[currentMatch].scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
