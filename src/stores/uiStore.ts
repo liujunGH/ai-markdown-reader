@@ -16,20 +16,10 @@ export type PanelName =
   | 'commandPalette'
   | 'globalSearch'
   | 'quickJump'
-  | 'documentHealth'
-  | 'knowledgeHealth'
-  | 'imageInventory'
-  | 'backlinks'
-  | 'markdownGraph'
-  | 'missingLinks'
   | 'indexDiagnostics'
   | 'workspaces'
   | 'readingTimeline'
   | 'readingTools'
-  | 'maintenanceQueue'
-  | 'releasePreflight'
-  | 'workspaceDashboard'
-  | 'actionWorkbench'
 
 interface UIState {
   showOutline: boolean
@@ -46,20 +36,10 @@ interface UIState {
   showCommandPalette: boolean
   showGlobalSearch: boolean
   showQuickJump: boolean
-  showDocumentHealth: boolean
-  showKnowledgeHealth: boolean
-  showImageInventory: boolean
-  showBacklinks: boolean
-  showMarkdownGraph: boolean
-  showMissingLinks: boolean
   showIndexDiagnostics: boolean
   showWorkspaces: boolean
   showReadingTimeline: boolean
   showReadingTools: boolean
-  showMaintenanceQueue: boolean
-  showReleasePreflight: boolean
-  showWorkspaceDashboard: boolean
-  showActionWorkbench: boolean
   fontSize: number
   isSplitView: boolean
   secondaryTabId: string | null
@@ -96,20 +76,10 @@ function panelSetter(_state: UIState, name: PanelName, value: boolean): Partial<
     case 'commandPalette': return { showCommandPalette: value }
     case 'globalSearch': return { showGlobalSearch: value }
     case 'quickJump': return { showQuickJump: value }
-    case 'documentHealth': return { showDocumentHealth: value }
-    case 'knowledgeHealth': return { showKnowledgeHealth: value }
-    case 'imageInventory': return { showImageInventory: value }
-    case 'backlinks': return { showBacklinks: value }
-    case 'markdownGraph': return { showMarkdownGraph: value }
-    case 'missingLinks': return { showMissingLinks: value }
     case 'indexDiagnostics': return { showIndexDiagnostics: value }
     case 'workspaces': return { showWorkspaces: value }
     case 'readingTimeline': return { showReadingTimeline: value }
     case 'readingTools': return { showReadingTools: value }
-    case 'maintenanceQueue': return { showMaintenanceQueue: value }
-    case 'releasePreflight': return { showReleasePreflight: value }
-    case 'workspaceDashboard': return { showWorkspaceDashboard: value }
-    case 'actionWorkbench': return { showActionWorkbench: value }
     default:
       return {}
   }
@@ -131,20 +101,10 @@ function getPanelValue(state: UIState, name: PanelName): boolean {
     case 'commandPalette': return state.showCommandPalette
     case 'globalSearch': return state.showGlobalSearch
     case 'quickJump': return state.showQuickJump
-    case 'documentHealth': return state.showDocumentHealth
-    case 'knowledgeHealth': return state.showKnowledgeHealth
-    case 'imageInventory': return state.showImageInventory
-    case 'backlinks': return state.showBacklinks
-    case 'markdownGraph': return state.showMarkdownGraph
-    case 'missingLinks': return state.showMissingLinks
     case 'indexDiagnostics': return state.showIndexDiagnostics
     case 'workspaces': return state.showWorkspaces
     case 'readingTimeline': return state.showReadingTimeline
     case 'readingTools': return state.showReadingTools
-    case 'maintenanceQueue': return state.showMaintenanceQueue
-    case 'releasePreflight': return state.showReleasePreflight
-    case 'workspaceDashboard': return state.showWorkspaceDashboard
-    case 'actionWorkbench': return state.showActionWorkbench
     default:
       return false
   }
@@ -167,20 +127,10 @@ export const useUIStore = create<UIStore>()(
       showCommandPalette: false,
       showGlobalSearch: false,
       showQuickJump: false,
-      showDocumentHealth: false,
-      showKnowledgeHealth: false,
-      showImageInventory: false,
-      showBacklinks: false,
-      showMarkdownGraph: false,
-      showMissingLinks: false,
       showIndexDiagnostics: false,
       showWorkspaces: false,
       showReadingTimeline: false,
       showReadingTools: false,
-      showMaintenanceQueue: false,
-      showReleasePreflight: false,
-      showWorkspaceDashboard: false,
-      showActionWorkbench: false,
       fontSize: 16,
       isSplitView: false,
       secondaryTabId: null,
@@ -204,20 +154,10 @@ export const useUIStore = create<UIStore>()(
         showFileInfo: false,
         showFilePreview: false,
         showRecent: false,
-        showDocumentHealth: false,
-        showKnowledgeHealth: false,
-        showImageInventory: false,
-        showBacklinks: false,
-        showMarkdownGraph: false,
-        showMissingLinks: false,
         showIndexDiagnostics: false,
         showWorkspaces: false,
         showReadingTimeline: false,
         showReadingTools: false,
-        showMaintenanceQueue: false,
-        showReleasePreflight: false,
-        showWorkspaceDashboard: false,
-        showActionWorkbench: false,
       }),
       setFontSize: (size) => set({ fontSize: size }),
       setSplitView: (enabled, secondaryId = null) => set({ isSplitView: enabled, secondaryTabId: secondaryId }),

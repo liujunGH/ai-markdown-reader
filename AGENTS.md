@@ -8,16 +8,16 @@ AI Markdown Reader 是一个基于 Electron + React 18 + TypeScript + Vite 5 的
 
 | 层 | 技术 |
 |--|--|
-| 桌面框架 | Electron 28.3.3 |
+| 桌面框架 | Electron 35 |
 | 前端框架 | React 18.2 + TypeScript 5.3 |
 | 构建工具 | Vite 5.1 |
-| 打包工具 | electron-builder 24.9 |
+| 打包工具 | electron-builder 25.1 |
 | Markdown 解析 | markdown-it 14.0 |
 | 数学公式 | KaTeX 0.16.45 |
 | 图表渲染 | Mermaid 10.6 |
 | 代码高亮 | PrismJS 1.29 |
 | XSS 防护 | DOMPurify 3.4 |
-| 自动更新 | electron-updater 6.1 |
+| 自动更新 | electron-updater 6.8 |
 
 ## 项目结构
 
@@ -41,10 +41,10 @@ ai-markdown-reader/
 │   │   ├── ExportPanel/      # 导出面板
 │   │   └── ...
 │   ├── hooks/                # 自定义 Hooks
-│   │   ├── useTabs.ts        # 标签管理（含会话恢复）
-│   │   ├── useKeyboardShortcuts.ts  # 全局快捷键
-│   │   ├── useFileWatcher.ts # 文件变更监听
+│   │   ├── useKeyboardShortcuts.ts # 全局快捷键
+│   │   ├── useMarkdownWorker.ts    # Markdown worker 渲染
 │   │   └── ...
+│   ├── stores/               # Zustand 状态管理（标签、UI、文件、Toast）
 │   ├── utils/                # 工具函数
 │   │   ├── markdownParser.ts # Markdown 解析 + DOMPurify 净化
 │   │   ├── searchIndex.ts    # IndexedDB 全文索引
@@ -63,7 +63,7 @@ ai-markdown-reader/
 ## 常用命令
 
 ```bash
-# 开发模式
+# Web 开发模式
 npm run dev
 
 # 构建前端
@@ -72,8 +72,14 @@ npm run build
 # 编译 Electron 主进程
 npm run electron:compile
 
-# 开发运行（编译 + 构建 + 启动 Electron）
+# 桌面开发运行（启动 Vite + 编译主进程 + 启动 Electron）
 npm run electron:dev
+
+# 构建后桌面预览
+npm run electron:preview
+
+# 启动性能压测（默认生成 12 个 5MB 临时 Markdown 文档）
+npm run perf:startup
 
 # 打包
 npm run electron:build       # Windows
@@ -92,8 +98,8 @@ npm run lint                 # tsc --noEmit
 - 路径操作在 preload 中使用纯字符串函数替代
 
 ### 状态管理
-- 不使用 Redux/Zustand，状态通过 React `useState` + 自定义 Hooks 管理
-- `useTabs.ts` 是核心状态 hook，负责标签创建、关闭、恢复、localStorage 持久化
+- 使用 React `useState` + 自定义 Hooks + Zustand stores 管理状态
+- `src/stores/tabStore.ts` 是核心标签状态，负责标签创建、关闭、恢复、localStorage 持久化
 
 ### 样式
 - 使用 CSS Modules（`*.module.css`）

@@ -10,9 +10,12 @@ const mermaidMock = vi.hoisted(() => ({
   render: vi.fn(),
 }))
 
-vi.mock('../../hooks/useMarkdownWorker', () => ({
-  useMarkdownWorker: vi.fn(() => ({ html: '', loading: false })),
-}))
+vi.mock('../../hooks/useMarkdownWorker', async () => {
+  const { parseMarkdown } = await vi.importActual<typeof import('../../utils/markdownParser')>('../../utils/markdownParser')
+  return {
+    useMarkdownWorker: vi.fn((content: string) => ({ html: parseMarkdown(content), loading: false, error: null })),
+  }
+})
 
 vi.mock('mermaid', () => ({
   default: mermaidMock,

@@ -26,3 +26,4 @@ out/
 
 # Playwright
 test-results/
+tmp/

@@ -121,6 +121,7 @@ let splashWindow: BrowserWindow | null = null
 const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
+const isPerfRun = process.env.AI_MARKDOWN_PERF === '1'
 
 function getWindowId(win: BrowserWindow): number {
   return windowIds.get(win) || 0
@@ -242,7 +243,9 @@ function createWindow(filePath?: string, windowState?: WindowState) {
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
-    win.webContents.openDevTools()
+    if (!isPerfRun) {
+      win.webContents.openDevTools()
+    }
   } else {
     win.loadFile(htmlPath).catch(err => {
       logger.error('Failed to load file', { htmlPath, error: String(err) })
@@ -617,6 +620,25 @@ app.whenReady().then(() => {
     ]))
   }
 
+  const filePath = process.argv.find(arg =>
+    arg.endsWith('.md') || arg.endsWith('.markdown')
+  )
+  logger.info('File from argv', { filePath, argv: process.argv })
+
+  const store = loadStore()
+  for (const pathToOpen of filesToOpenBeforeReady) {
+    handleFileOpen(pathToOpen)
+  }
+  if (filePath) {
+    handleFileOpen(filePath)
+  } else if (store.windowStates && store.windowStates.length > 0) {
+    store.windowStates.forEach((state) => {
+      createWindow(undefined, state)
+    })
+  } else {
+    createWindow()
+  }
+
   // System tray with proper icon
   const trayIcon = createTrayIcon()
   tray = new Tray(trayIcon)
@@ -692,9 +714,11 @@ app.whenReady().then(() => {
       sendToAllWindows('update-downloaded', { version: info.version })
     })
 
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      logger.error('Auto-updater check failed', { error: String(err) })
-    })
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        logger.error('Auto-updater check failed', { error: String(err) })
+      })
+    }, 10000)
   }
 
   tray.on('click', () => {
@@ -729,24 +753,6 @@ app.whenReady().then(() => {
     }
   })
 
-  const filePath = process.argv.find(arg =>
-    arg.endsWith('.md') || arg.endsWith('.markdown')
-  )
-  logger.info('File from argv', { filePath, argv: process.argv })
-
-  const store = loadStore()
-  for (const pathToOpen of filesToOpenBeforeReady) {
-    handleFileOpen(pathToOpen)
-  }
-  if (filePath) {
-    handleFileOpen(filePath)
-  } else if (store.windowStates && store.windowStates.length > 0) {
-    store.windowStates.forEach((state) => {
-      createWindow(undefined, state)
-    })
-  } else {
-    createWindow()
-  }
 })
 
 app.on('window-all-closed', () => {

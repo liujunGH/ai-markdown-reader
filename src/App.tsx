@@ -21,10 +21,12 @@ import { WelcomeHome } from './components/WelcomeHome'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
 import FirstUseGuide from './components/FirstUseGuide'
 import QuickSwitcher from './components/QuickSwitcher'
+import { ToolsMenu } from './components/ToolsMenu'
 import { SidebarFileExplorer } from './components/SidebarFileExplorer'
 import { ElectronFolderExplorer } from './components/ElectronFolderExplorer'
 import { FileInfoPanel } from './components/FileInfoPanel'
 import { FilePreviewPanel } from './components/FilePreviewPanel'
+import { DocumentLoadState } from './components/DocumentLoadState'
 import { ResizableSidebar } from './components/ResizableSidebar'
 import { BookmarkPanel, useBookmarks } from './components/Bookmark'
 
@@ -47,57 +49,16 @@ import { Skeleton } from './components/Skeleton'
 
 const ExportPanel = React.lazy(() => import('./components/ExportPanel').then(m => ({ default: m.ExportPanel })))
 const GlobalSearch = React.lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })))
-const DocumentHealthPanel = React.lazy(() => import('./components/DocumentHealthPanel').then(m => ({ default: m.DocumentHealthPanel })))
-const KnowledgeHealthPanel = React.lazy(() => import('./components/KnowledgeHealthPanel').then(m => ({ default: m.KnowledgeHealthPanel })))
-const ImageInventoryPanel = React.lazy(() => import('./components/ImageInventoryPanel').then(m => ({ default: m.ImageInventoryPanel })))
-const BacklinksPanel = React.lazy(() => import('./components/BacklinksPanel').then(m => ({ default: m.BacklinksPanel })))
-const MarkdownGraphPanel = React.lazy(() => import('./components/MarkdownGraphPanel').then(m => ({ default: m.MarkdownGraphPanel })))
-const MissingLinksPanel = React.lazy(() => import('./components/MissingLinksPanel').then(m => ({ default: m.MissingLinksPanel })))
 const IndexDiagnosticsPanel = React.lazy(() => import('./components/IndexDiagnosticsPanel').then(m => ({ default: m.IndexDiagnosticsPanel })))
 const WorkspacePanel = React.lazy(() => import('./components/WorkspacePanel').then(m => ({ default: m.WorkspacePanel })))
 const ReadingTimelinePanel = React.lazy(() => import('./components/ReadingTimelinePanel').then(m => ({ default: m.ReadingTimelinePanel })))
 const ReadingToolsPanel = React.lazy(() => import('./components/ReadingToolsPanel').then(m => ({ default: m.ReadingToolsPanel })))
 const ReadingMediaPanel = React.lazy(() => import('./components/ReadingMediaPanel').then(m => ({ default: m.ReadingMediaPanel })))
-const MaintenanceQueuePanel = React.lazy(() => import('./components/MaintenanceQueuePanel').then(m => ({ default: m.MaintenanceQueuePanel })))
-const ReleasePreflightPanel = React.lazy(() => import('./components/ReleasePreflightPanel').then(m => ({ default: m.ReleasePreflightPanel })))
-const WorkspaceDashboardPanel = React.lazy(() => import('./components/WorkspaceDashboardPanel').then(m => ({ default: m.WorkspaceDashboardPanel })))
-const ActionWorkbenchPanel = React.lazy(() => import('./components/ActionWorkbenchPanel').then(m => ({ default: m.ActionWorkbenchPanel })))
 
 import { UpdateNotification } from './components/UpdateNotification'
-import { indexFolder, getAllMarkdownFiles, getIndexedFiles, getIndexedFileCount, FileIndex, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFileCount, IndexProgress, IndexSkippedItem } from './utils/searchIndex'
 import { useUIStore, useTabStore, useFileStore, useToastStore } from './stores'
 import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from './data/exampleMarkdown'
-import { buildWikiGraph, findBacklinks, findMissingWikiLinks, resolveWikiTargetFile, suggestMissingWikiLinkTargets } from './utils/wikiGraph'
-import { analyzeDocumentHealth } from './utils/documentHealth'
-import { analyzeMarkdownImages } from './utils/imageInventory'
-import { buildKnowledgeHealthReport, formatKnowledgeHealthMarkdown, KnowledgeHealthCard } from './utils/knowledgeHealth'
-import { buildMaintenanceTasks, formatMaintenanceTasksMarkdown, type MaintenanceTask } from './utils/maintenanceTasks'
-import { buildReleasePreflightReport, formatReleasePreflightMarkdown } from './utils/releasePreflight'
-import { buildExecutableFixSuggestions, buildImageAssetPlan, buildLinkRenamePreview, buildReadingAssistant, buildReleasePackageChecks, buildWorkspaceDashboard, type DashboardSection, type ExecutableFixSuggestion } from './utils/workspaceEnhancements'
-import {
-  applyImageLocalizationReplacements,
-  applyRenamePlanToContent,
-  buildArchiveReport,
-  buildDocumentTemplates,
-  buildImageLocalizationPlan,
-  buildRenamePlan,
-  findUnlinkedMentions,
-  renderDocumentTemplate,
-  renderTemplateFileName,
-  type DocumentTemplate,
-  type UnlinkedMention,
-} from './utils/workspaceActions'
-import {
-  buildBatchMovePlan,
-  buildImageAssetAudit,
-  buildOperationPreview,
-  buildReleaseAutomationPlan,
-  buildStaticSiteExportPlan,
-  buildWorkspaceHome,
-  createOperationSnapshot,
-  formatOperationPreviewMarkdown,
-  type OperationSnapshot,
-} from './utils/safetyAutomation'
 import {
   getWorkspaceSession,
   getWorkspaces,
@@ -153,10 +114,6 @@ import {
 
 const HAS_SEEN_GUIDE_KEY = 'has-seen-guide'
 const SEARCH_HISTORY_KEY = 'search-history'
-const HAS_SEEN_INSPECTION_TOOLS_KEY = 'has-seen-inspection-tools'
-const PACKAGE_HISTORY_KEY = 'package-history'
-const OPERATION_SNAPSHOTS_KEY = 'operation-snapshots'
-const RELEASE_AUTOMATION_VERSION = '1.5.6'
 const READER_MARKS_KEY = 'reader-marks'
 const READER_QUEUE_KEY = 'reader-queue'
 const READER_PRESET_KEY = 'reader-preset'
@@ -166,6 +123,16 @@ const READER_CHAPTERS_KEY = 'reader-chapters'
 const READER_ACCESSIBILITY_KEY = 'reader-accessibility'
 const READER_FOCUS_TIMER_KEY = 'reader-focus-timer'
 const READER_SNAPSHOTS_KEY = 'reader-snapshots'
+
+function runAfterFirstPaint(task: () => void, delay = 250): void {
+  globalThis.setTimeout(() => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(task, { timeout: 2000 })
+    } else {
+      globalThis.setTimeout(task, 0)
+    }
+  }, delay)
+}
 
 function loadJsonArray<T>(key: Parameters<typeof getStorageItem>[0]): T[] {
   try {
@@ -188,48 +155,6 @@ function loadJsonObject<T>(key: Parameters<typeof getStorageItem>[0], fallback: 
   }
 }
 
-function loadOperationSnapshots(): OperationSnapshot[] {
-  try {
-    const stored = getStorageItem(OPERATION_SNAPSHOTS_KEY, '[]')
-    const parsed = stored ? JSON.parse(stored) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function saveOperationSnapshot(snapshot: OperationSnapshot): void {
-  const snapshots = [snapshot, ...loadOperationSnapshots()].slice(0, 8)
-  setStorageItem(OPERATION_SNAPSHOTS_KEY, JSON.stringify(snapshots))
-}
-
-function replaceOperationSnapshots(snapshots: OperationSnapshot[]): void {
-  setStorageItem(OPERATION_SNAPSHOTS_KEY, JSON.stringify(snapshots.slice(0, 8)))
-}
-
-function formatStaticSitePlanMarkdown(outputDir: string, pages: Array<{ sourcePath: string; outputPath: string; title: string }>): string {
-  return [
-    '# 静态站点导出计划',
-    '',
-    `- 输出目录：${outputDir}`,
-    `- 页面数量：${pages.length}`,
-    '',
-    ...pages.slice(0, 80).map(page => `- ${page.title}: ${page.sourcePath} -> ${page.outputPath}`),
-  ].join('\n')
-}
-
-function formatBatchMovePlanMarkdown(targetDir: string, operations: Array<{ from: string; to: string }>, affectedLinks: number): string {
-  return [
-    '# 批量移动/重命名计划',
-    '',
-    `- 目标目录：${targetDir}`,
-    `- 文件数量：${operations.length}`,
-    `- 需关注链接：${affectedLinks}`,
-    '',
-    ...operations.slice(0, 80).map(operation => `- ${operation.from} -> ${operation.to}`),
-  ].join('\n')
-}
-
 function wikiPathCandidates(dir: string, target: string): string[] {
   const trimmed = target.trim()
   if (!trimmed) return []
@@ -244,13 +169,6 @@ function wikiPathCandidates(dir: string, target: string): string[] {
   ]
 }
 
-function markdownFileNameForTarget(target: string): string {
-  const withoutAnchor = target.trim().split('#')[0].replace(/^\.?\//, '')
-  if (!withoutAnchor) return 'Untitled.md'
-  if (/\.(md|markdown)$/i.test(withoutAnchor)) return withoutAnchor
-  return `${withoutAnchor}.md`
-}
-
 function AppInner() {
   const { t } = useTranslation()
   const { theme, accentColor, toggleTheme, setTheme } = useTheme()
@@ -260,7 +178,7 @@ function AppInner() {
     showOutline, showSearch, showSource, showRecent, showKeyboardShortcuts,
     showFocusMode, showQuickSwitcher, showFileSidebar, showFileInfo, showFilePreview,
     showExportPanel, showCommandPalette, showGlobalSearch, showQuickJump,
-    showDocumentHealth, showKnowledgeHealth, showImageInventory, showBacklinks, showMarkdownGraph, showMissingLinks, showIndexDiagnostics, showWorkspaces, showReadingTimeline, showReadingTools, showMaintenanceQueue, showReleasePreflight, showWorkspaceDashboard, showActionWorkbench,
+    showIndexDiagnostics, showWorkspaces, showReadingTimeline, showReadingTools,
     fontSize, isSplitView, secondaryTabId,
     highlightedLine, togglePanel, openPanel, closePanel, setFontSize, setSplitView,
     setHighlightedLine, setShowSource, setShowOutline
@@ -269,7 +187,7 @@ function AppInner() {
   const {
     tabs, activeTabId, isRestoringSession, activeTab: getActiveTab, failedRestores,
     newTab, selectTab, closeTab, closeOtherTabs, closeAllTabs, reorderTabs,
-    pinTab, unpinTab, setTabColor, openFile, openRecentFile, updateTabContent,
+    pinTab, unpinTab, setTabColor, openFile, openRecentFile, updateTabContent, loadTabContent,
     clearFailedRestores
   } = useTabStore()
 
@@ -283,10 +201,7 @@ function AppInner() {
   const { toasts, showToast } = useToastStore()
 
   // ── Local state ──
-  const [showGuide, setShowGuide] = useState(() => {
-    const hasSeen = getStorageItem(HAS_SEEN_GUIDE_KEY)
-    return !hasSeen
-  })
+  const [showGuide, setShowGuide] = useState(false)
 
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     try {
@@ -296,8 +211,6 @@ function AppInner() {
       return []
     }
   })
-  const [showToolsMenu, setShowToolsMenu] = useState(false)
-  const [indexedFiles, setIndexedFiles] = useState<FileIndex[]>([])
   const [indexedFileCount, setIndexedFileCount] = useState(0)
   const [workspaceIndexCounts, setWorkspaceIndexCounts] = useState<Record<string, number>>({})
   const [isIndexing, setIsIndexing] = useState(false)
@@ -330,8 +243,6 @@ function AppInner() {
     return stored === 'longform' || stored === 'code-doc' || stored === 'paper' ? stored : 'default'
   })
   const [readingLayoutMode, setReadingLayoutMode] = useState<ReadingLayoutMode>(() => normalizeLayoutMode(getStorageItem(READER_LAYOUT_KEY)))
-  const [focusedMissingTarget, setFocusedMissingTarget] = useState<string | null>(null)
-  const hasRestoredLastFolderRef = useRef(false)
   const indexAbortControllerRef = useRef<AbortController | null>(null)
   const readingSessionRef = useRef<{ filePath: string; fileName: string; startedAt: number; progressStart: number; wordsStart: number } | null>(null)
   const readingProgressRef = useRef(0)
@@ -399,133 +310,6 @@ function AppInner() {
   const { settings: fileSettings, updateSetting: updateFileSetting } = useFileSettings(activeTab?.filePath)
   const { recentFiles, loadRecentFiles, removeRecentFile, clearRecentFiles } = useRecentFiles()
   const indexPolicy = useMemo(() => getEffectiveIndexPolicy(indexSettings), [indexSettings])
-  const wikiGraph = useMemo(() => buildWikiGraph(indexedFiles), [indexedFiles])
-  const backlinks = useMemo(() => (
-    activeTab?.filePath ? findBacklinks(indexedFiles, activeTab.filePath, activeTab.name) : []
-  ), [activeTab?.filePath, activeTab?.name, indexedFiles])
-  const missingLinks = useMemo(() => findMissingWikiLinks(indexedFiles), [indexedFiles])
-  const missingLinkSuggestions = useMemo(() => Object.fromEntries(
-    missingLinks.map(link => [link.normalizedTarget, suggestMissingWikiLinkTargets(indexedFiles, link.target)])
-  ), [indexedFiles, missingLinks])
-  const activeDocumentHealth = useMemo(
-    () => analyzeDocumentHealth(activeTab?.content || '', activeTab?.filePath),
-    [activeTab?.content, activeTab?.filePath],
-  )
-  const activeImageInventory = useMemo(
-    () => analyzeMarkdownImages(activeTab?.content || '', activeTab?.filePath),
-    [activeTab?.content, activeTab?.filePath],
-  )
-  const knowledgeHealthReport = useMemo(() => buildKnowledgeHealthReport({
-    indexedFileCount: indexedFiles.length,
-    missingLinks,
-    orphanNodeCount: wikiGraph.orphanNodes.length,
-    documentIssueCount: activeDocumentHealth.summary.totalIssues,
-    documentErrorCount: activeDocumentHealth.summary.errors,
-    imageWarningCount: activeImageInventory.filter(image => image.warnings.length > 0).length,
-    unresolvedImageCount: activeImageInventory.filter(image => image.type === 'local-relative' && !image.resolvedPath).length,
-    indexSkippedCount: indexSkippedItems.length,
-  }), [activeDocumentHealth.summary.errors, activeDocumentHealth.summary.totalIssues, activeImageInventory, indexSkippedItems.length, indexedFiles.length, missingLinks, wikiGraph.orphanNodes.length])
-  const maintenanceTasks = useMemo(() => buildMaintenanceTasks({
-    missingLinks,
-    images: activeImageInventory,
-    indexSkippedItems,
-    documentIssues: activeDocumentHealth.issues,
-  }), [activeDocumentHealth.issues, activeImageInventory, indexSkippedItems, missingLinks])
-  const executableFixes = useMemo(() => buildExecutableFixSuggestions(maintenanceTasks), [maintenanceTasks])
-  const releasePreflightReport = useMemo(() => buildReleasePreflightReport({
-    healthScore: knowledgeHealthReport.score,
-    healthStatus: knowledgeHealthReport.status,
-    maintenanceTaskCount: maintenanceTasks.length,
-    maintenanceErrorCount: maintenanceTasks.filter(task => task.severity === 'error').length,
-    indexedFileCount,
-    indexSkippedCount: indexSkippedItems.length,
-  }), [indexedFileCount, indexSkippedItems.length, knowledgeHealthReport.score, knowledgeHealthReport.status, maintenanceTasks])
-  const imageAssetPlan = useMemo(() => buildImageAssetPlan(activeImageInventory), [activeImageInventory])
-  const linkRenamePreview = useMemo(() => (
-    activeTab?.filePath
-      ? buildLinkRenamePreview(indexedFiles, activeTab.filePath, join(dirname(activeTab.filePath), `${basename(activeTab.filePath).replace(/\.(md|markdown)$/i, '')}-renamed.md`))
-      : buildLinkRenamePreview(indexedFiles, 'Old.md', 'New.md')
-  ), [activeTab?.filePath, indexedFiles])
-  const documentTemplates = useMemo(() => buildDocumentTemplates(), [])
-  const actionRenamePlan = useMemo(() => (
-    activeTab?.filePath
-      ? buildRenamePlan(indexedFiles, activeTab.filePath, join(dirname(activeTab.filePath), `${basename(activeTab.filePath).replace(/\.(md|markdown)$/i, '')}-renamed.md`))
-      : buildRenamePlan(indexedFiles, 'Old.md', 'New.md')
-  ), [activeTab?.filePath, indexedFiles])
-  const imageLocalizationPlan = useMemo(() => (
-    activeTab?.filePath ? buildImageLocalizationPlan(activeTab.filePath, activeImageInventory) : buildImageLocalizationPlan('Untitled.md', activeImageInventory)
-  ), [activeImageInventory, activeTab?.filePath])
-  const activeIndexedFile = useMemo(() => (
-    activeTab?.filePath ? indexedFiles.find(file => file.path === activeTab.filePath) || { path: activeTab.filePath, name: activeTab.name, content: activeTab.content } : null
-  ), [activeTab?.content, activeTab?.filePath, activeTab?.name, indexedFiles])
-  const unlinkedMentions = useMemo(() => (
-    activeIndexedFile ? findUnlinkedMentions(indexedFiles, activeIndexedFile) : []
-  ), [activeIndexedFile, indexedFiles])
-  const readingAssistant = useMemo(() => buildReadingAssistant({
-    activeFilePath: activeTab?.filePath || null,
-    activeFileName: activeTab?.name || '',
-    readingHistory,
-    readLaterCount: Number(getStorageItem('read-later-count', '0') || 0),
-  }), [activeTab?.filePath, activeTab?.name, readingHistory])
-  const releasePackageChecks = useMemo(() => buildReleasePackageChecks({
-    preflightStatus: releasePreflightReport.status,
-    version: '1.5.4',
-    hasBuildOutput: true,
-    packageHistoryCount: Number(getStorageItem(PACKAGE_HISTORY_KEY, '0') || 0),
-  }), [releasePreflightReport.status])
-  const workspaceDashboard = useMemo(() => buildWorkspaceDashboard({
-    healthScore: knowledgeHealthReport.score,
-    maintenanceTasks,
-    imagePlan: imageAssetPlan,
-    readingAssistant,
-    releaseChecks: releasePackageChecks,
-    linkRenamePreview,
-  }), [imageAssetPlan, knowledgeHealthReport.score, linkRenamePreview, maintenanceTasks, readingAssistant, releasePackageChecks])
-  const archiveReport = useMemo(() => buildArchiveReport({
-    files: indexedFiles,
-    healthScore: knowledgeHealthReport.score,
-    maintenanceTaskCount: maintenanceTasks.length,
-    remoteImageCount: imageAssetPlan.summary.remote,
-    missingLinkCount: missingLinks.length,
-  }), [imageAssetPlan.summary.remote, indexedFiles, knowledgeHealthReport.score, maintenanceTasks.length, missingLinks.length])
-  const operationPreview = useMemo(() => buildOperationPreview({
-    id: 'rename-links-preview',
-    title: '重命名链接安全预览',
-    changes: actionRenamePlan.changedFiles.map(file => {
-      const indexedFile = indexedFiles.find(item => item.path === file.path)
-      const before = indexedFile?.content || ''
-      return {
-        path: file.path,
-        before,
-        after: applyRenamePlanToContent(before, actionRenamePlan),
-      }
-    }).filter(change => change.before !== change.after),
-  }), [actionRenamePlan, indexedFiles])
-  const imageAudit = useMemo(() => buildImageAssetAudit({
-    files: indexedFiles,
-    imageFiles: activeImageInventory.map(image => image.resolvedPath).filter((path): path is string => Boolean(path)),
-    duplicateGroups: [],
-    remoteImageCount: imageAssetPlan.summary.remote,
-  }), [activeImageInventory, imageAssetPlan.summary.remote, indexedFiles])
-  const batchMovePlan = useMemo(() => buildBatchMovePlan(
-    indexedFiles,
-    currentFolderPath ? join(currentFolderPath, 'archive') : 'archive',
-  ), [currentFolderPath, indexedFiles])
-  const workspaceHomeCards = useMemo(() => buildWorkspaceHome({
-    recentFileName: readingHistory[0]?.name || activeTab?.name || '未打开文件',
-    healthScore: knowledgeHealthReport.score,
-    taskCount: maintenanceTasks.length,
-    modifiedCount: indexedFiles.length,
-    unlinkedMentionCount: unlinkedMentions.length,
-  }).cards, [activeTab?.name, indexedFiles.length, knowledgeHealthReport.score, maintenanceTasks.length, readingHistory, unlinkedMentions.length])
-  const staticSitePlan = useMemo(() => buildStaticSiteExportPlan(
-    indexedFiles,
-    currentFolderPath ? join(currentFolderPath, 'site') : 'site',
-  ), [currentFolderPath, indexedFiles])
-  const releaseAutomationPlan = useMemo(() => buildReleaseAutomationPlan(
-    RELEASE_AUTOMATION_VERSION,
-    `docs/releases/v${RELEASE_AUTOMATION_VERSION}.md`,
-  ), [])
   const readingPresets = useMemo(() => getDefaultReadingPresets(), [])
   const activeReadingPreset = useMemo(() => (
     readingPresets.find(preset => preset.id === activeReaderPresetId) || readingPresets[0]
@@ -583,34 +367,25 @@ function AppInner() {
 
   // ── Effects ──
 
-  // Restore session on mount
+  // Restore previous reading tabs after the first paint. This keeps the app
+  // feeling responsive while preserving the reader's last session.
   useEffect(() => {
-    useTabStore.getState().restoreSession()
+    runAfterFirstPaint(() => {
+      void useTabStore.getState().restoreSession()
+    }, 300)
   }, [])
-
-  useEffect(() => {
-    if (getStorageItem(HAS_SEEN_INSPECTION_TOOLS_KEY)) return
-    showToast('新增工具：文档健康检查、图片检查面板，外部链接会用系统浏览器打开')
-    setStorageItem(HAS_SEEN_INSPECTION_TOOLS_KEY, 'true')
-  }, [showToast])
 
   const refreshIndexedFiles = useCallback(async (folderPath: string | null) => {
     if (!folderPath) {
-      setIndexedFiles([])
       setIndexedFileCount(0)
       return
     }
     try {
-      const [files, count] = await Promise.all([
-        getIndexedFiles(folderPath),
-        getIndexedFileCount(folderPath),
-      ])
-      setIndexedFiles(files)
+      const count = await getIndexedFileCount(folderPath)
       setIndexedFileCount(count)
       setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: count }))
     } catch (error) {
       console.error('Failed to load indexed files:', error)
-      setIndexedFiles([])
       setIndexedFileCount(0)
       setWorkspaceIndexCounts(prev => ({ ...prev, [folderPath]: 0 }))
     }
@@ -730,12 +505,6 @@ function AppInner() {
     indexAbortControllerRef.current?.abort()
   }, [])
 
-  const scheduleFolderIndex = useCallback((folderPath: string) => {
-    void rebuildFolderIndex(folderPath, { silent: true }).catch(error => {
-      console.error('Background folder indexing failed:', error)
-    })
-  }, [rebuildFolderIndex])
-
   useEffect(() => {
     void refreshIndexedFiles(currentFolderPath)
   }, [currentFolderPath, refreshIndexedFiles])
@@ -752,8 +521,10 @@ function AppInner() {
   }, [currentFolderPath])
 
   useEffect(() => {
-    void refreshWorkspaceIndexCounts()
-  }, [refreshWorkspaceIndexCounts])
+    if (showWorkspaces) {
+      void refreshWorkspaceIndexCounts()
+    }
+  }, [refreshWorkspaceIndexCounts, showWorkspaces])
 
   // Sync file settings to global UI state
   useEffect(() => {
@@ -884,7 +655,6 @@ function AppInner() {
     await window.electronAPI.setLastFolder(folderPath)
     openPanel('fileSidebar')
     closePanel('workspaces')
-    scheduleFolderIndex(folderPath)
 
     const workspace = getWorkspaces().find(item => item.folderPath === folderPath)
     const session = workspace ? getWorkspaceSession(workspace.id) : null
@@ -902,13 +672,47 @@ function AppInner() {
         await openFileAtLine(firstFile.filePath)
       }
     }
-  }, [closeAllTabs, closePanel, openFileAtLine, openPanel, saveCurrentWorkspaceSession, scheduleFolderIndex, setFolder, showToast, t])
+  }, [closeAllTabs, closePanel, openFileAtLine, openPanel, saveCurrentWorkspaceSession, setFolder, showToast, t])
 
   const handleSaveWorkspace = useCallback(() => {
     if (!currentFolderPath) return
     saveCurrentWorkspaceSession()
     showToast('工作区已保存')
   }, [currentFolderPath, saveCurrentWorkspaceSession, showToast])
+
+  const handleOpenFileDialog = useCallback(async () => {
+    if (!window.electronAPI) return
+    try {
+      const result = await window.electronAPI.openFileDialog()
+      if (!result) return
+      if (result.error) {
+        showToast(result.error, 'error')
+        return
+      }
+      handleFileOpen(result.content, basename(result.filePath) || '未命名.md', result.filePath)
+    } catch (err) {
+      console.error('[handleOpenFileDialog] error:', err)
+      showToast(`打开文件失败：${String(err)}`, 'error')
+    }
+  }, [handleFileOpen, showToast])
+
+  const toggleSourceView = useCallback(() => {
+    const next = !showSource
+    setShowSource(next)
+    if (activeTab?.filePath) updateFileSetting('showSource', next)
+  }, [activeTab?.filePath, setShowSource, showSource, updateFileSetting])
+
+  const zoomIn = useCallback(() => {
+    const next = Math.min(32, fontSize + 2)
+    setFontSize(next)
+    if (activeTab?.filePath) updateFileSetting('fontSize', next)
+  }, [activeTab?.filePath, fontSize, setFontSize, updateFileSetting])
+
+  const zoomOut = useCallback(() => {
+    const next = Math.max(12, fontSize - 2)
+    setFontSize(next)
+    if (activeTab?.filePath) updateFileSetting('fontSize', next)
+  }, [activeTab?.filePath, fontSize, setFontSize, updateFileSetting])
 
   const handleRemoveWorkspace = useCallback((id: string) => {
     removeWorkspace(id)
@@ -944,63 +748,6 @@ function AppInner() {
     showToast(`已清理 ${invalidIds.length} 个失效工作区`)
   }, [showToast])
 
-  const handleCreateMissingLink = useCallback(async (target: string) => {
-    if (!window.electronAPI || !currentFolderPath) {
-      showToast('请先打开一个文件夹', 'error')
-      return
-    }
-    const relativeName = markdownFileNameForTarget(target)
-    const filePath = join(currentFolderPath, relativeName)
-    const title = basename(relativeName).replace(/\.(md|markdown)$/i, '') || target
-    const result = await window.electronAPI.writeFile(filePath, `# ${title}\n\n`)
-    if (!result.success) {
-      showToast(result.error || '创建文档失败', 'error')
-      return
-    }
-    await openFileAtLine(filePath)
-    scheduleFolderIndex(currentFolderPath)
-    closePanel('missingLinks')
-    setFocusedMissingTarget(null)
-    showToast(`已创建 ${basename(filePath)}`)
-  }, [closePanel, currentFolderPath, openFileAtLine, scheduleFolderIndex, showToast])
-
-  const handleOpenMissingLinkFromGraph = useCallback((target: string) => {
-    setFocusedMissingTarget(target)
-    openPanel('missingLinks')
-  }, [openPanel])
-
-  const handleOpenKnowledgeHealthDetail = useCallback((detail: KnowledgeHealthCard['id']) => {
-    closePanel('knowledgeHealth')
-    if (detail === 'missing-links') openPanel('missingLinks')
-    if (detail === 'orphan-docs') openPanel('markdownGraph')
-    if (detail === 'document-issues') openPanel('documentHealth')
-    if (detail === 'image-warnings') openPanel('imageInventory')
-  }, [closePanel, openPanel])
-
-  const handleOpenFirstKnowledgeIssue = useCallback(() => {
-    const firstCard = knowledgeHealthReport.cards.find(card => card.value > 0 && card.severity !== 'good')
-    if (firstCard) {
-      handleOpenKnowledgeHealthDetail(firstCard.id)
-      return
-    }
-    showToast('没有需要定位的问题')
-  }, [handleOpenKnowledgeHealthDetail, knowledgeHealthReport.cards, showToast])
-
-  const handleCopyKnowledgeHealthReport = useCallback(() => {
-    void navigator.clipboard?.writeText(formatKnowledgeHealthMarkdown(knowledgeHealthReport))
-    showToast('健康报告已复制')
-  }, [knowledgeHealthReport, showToast])
-
-  const handleCopyMaintenanceTasks = useCallback(() => {
-    void navigator.clipboard?.writeText(formatMaintenanceTasksMarkdown(maintenanceTasks))
-    showToast('待处理清单已复制')
-  }, [maintenanceTasks, showToast])
-
-  const handleCopyReleasePreflightReport = useCallback(() => {
-    void navigator.clipboard?.writeText(formatReleasePreflightMarkdown(releasePreflightReport))
-    showToast('发布前检查报告已复制')
-  }, [releasePreflightReport, showToast])
-
   // Open folder
   const handleOpenFolder = useCallback(async () => {
     if (!window.electronAPI) return
@@ -1027,7 +774,6 @@ function AppInner() {
         setFolder(folderPath, basename(folderPath) || folderPath)
         await window.electronAPI.setLastFolder(folderPath)
         openPanel('fileSidebar')
-        scheduleFolderIndex(folderPath)
       } else {
         showToast(fileResult.error || t('app.readFileFailed'), 'error')
       }
@@ -1035,34 +781,7 @@ function AppInner() {
       console.error('[handleOpenFolder] error:', err)
       showToast(t('app.openFolderFailedWithError', { error: String(err) }), 'error')
     }
-  }, [handleFileOpen, setFolder, openPanel, scheduleFolderIndex, showToast, t])
-
-  useEffect(() => {
-    if (!window.electronAPI || isRestoringSession || hasRestoredLastFolderRef.current) return
-    hasRestoredLastFolderRef.current = true
-
-    const restoreLastFolder = async () => {
-      const folderPath = await window.electronAPI?.getLastFolder()
-      if (!folderPath) return
-
-      const result = await window.electronAPI?.readFolder(folderPath)
-      if (!result?.success || !result.files || result.files.length === 0) return
-
-      setFolder(folderPath, basename(folderPath) || folderPath)
-      openPanel('fileSidebar')
-      scheduleFolderIndex(folderPath)
-
-      const hasRestoredFile = tabs.some(tab => tab.filePath?.startsWith(folderPath))
-      if (!hasRestoredFile) {
-        const firstFile = result.files.find(file => !file.isDirectory)
-        if (firstFile) {
-          await openFileAtLine(firstFile.filePath)
-        }
-      }
-    }
-
-    void restoreLastFolder()
-  }, [isRestoringSession, openFileAtLine, openPanel, scheduleFolderIndex, setFolder, tabs])
+  }, [handleFileOpen, setFolder, openPanel, showToast, t])
 
   // Folder file select
   const handleFolderFileSelect = useCallback((fileContent: string, fileName: string, filePath: string) => {
@@ -1094,188 +813,10 @@ function AppInner() {
     }
   }, [scrollHistory])
 
-  const handleJumpToLine = useCallback((line: number) => {
-    closePanel('documentHealth')
-    setShowSource(true)
-    window.setTimeout(() => setHighlightedLine(line), 0)
-  }, [closePanel, setHighlightedLine, setShowSource])
-
-  const handleOpenMaintenanceTask = useCallback((task: MaintenanceTask) => {
-    closePanel('maintenanceQueue')
-    if (task.kind === 'document-issue' && task.line) {
-      handleJumpToLine(task.line)
-      return
-    }
-    if (task.kind === 'missing-link') openPanel('missingLinks')
-    if (task.kind === 'image-issue') openPanel('imageInventory')
-    if (task.kind === 'index-skip') openPanel('indexDiagnostics')
-  }, [closePanel, handleJumpToLine, openPanel])
-
-  const handleOpenDashboardSection = useCallback((sectionId: DashboardSection['id']) => {
-    closePanel('workspaceDashboard')
-    if (sectionId === 'quality') openPanel('knowledgeHealth')
-    if (sectionId === 'fixes') openPanel('actionWorkbench')
-    if (sectionId === 'links') openPanel('actionWorkbench')
-    if (sectionId === 'images') openPanel('actionWorkbench')
-    if (sectionId === 'reading') openPanel('readingTimeline')
-    if (sectionId === 'release') openPanel('releasePreflight')
-  }, [closePanel, openPanel])
-
-  const handleExecuteFix = useCallback((fix: ExecutableFixSuggestion) => {
-    const task = maintenanceTasks.find(item => item.id === fix.taskId)
-    if (fix.action === 'create-missing-doc') {
-      const link = missingLinks.find(item => `missing-link:${item.normalizedTarget}` === fix.taskId)
-      if (link) {
-        void handleCreateMissingLink(link.target)
-      } else {
-        showToast('未找到对应缺失链接', 'error')
-      }
-      return
-    }
-    if (fix.action === 'localize-remote-image') {
-      void handleLocalizeImages()
-      return
-    }
-    if (task) {
-      handleOpenMaintenanceTask(task)
-      return
-    }
-    openPanel('maintenanceQueue')
-  }, [handleCreateMissingLink, handleOpenMaintenanceTask, maintenanceTasks, missingLinks, openPanel, showToast])
-
-  const handleApplyRenamePlan = useCallback(async () => {
-    if (!window.electronAPI || actionRenamePlan.changedFiles.length === 0) {
-      showToast('没有需要更新的链接')
-      return
-    }
-    if (operationPreview.changes.length > 0) {
-      saveOperationSnapshot(createOperationSnapshot(operationPreview))
-    }
-    let updated = 0
-    for (const file of actionRenamePlan.changedFiles) {
-      const result = await window.electronAPI.readFile(file.path)
-      if (!result.success || result.content === undefined) continue
-      const nextContent = applyRenamePlanToContent(result.content, actionRenamePlan)
-      const write = await window.electronAPI.updateMarkdownFile(file.path, nextContent)
-      if (write.success) {
-        updateTabContent(file.path, nextContent, file.name)
-        updated += 1
-      }
-    }
-    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
-    showToast(updated > 0 ? `已更新 ${updated} 个文件的链接` : '没有文件被更新')
-  }, [actionRenamePlan, currentFolderPath, operationPreview, scheduleFolderIndex, showToast, updateTabContent])
-
-  const handleLocalizeImages = useCallback(async () => {
-    if (!window.electronAPI || !activeTab?.filePath || imageLocalizationPlan.items.length === 0) {
-      showToast('当前文档没有可本地化的网络图片')
-      return
-    }
-    let downloaded = 0
-    for (const item of imageLocalizationPlan.items) {
-      const result = await window.electronAPI.downloadRemoteImage(item.src, item.assetPath)
-      if (result.success) downloaded += 1
-    }
-    if (downloaded === 0) {
-      showToast('图片下载失败', 'error')
-      return
-    }
-    const nextContent = applyImageLocalizationReplacements(activeTab.content, imageLocalizationPlan)
-    const write = await window.electronAPI.updateMarkdownFile(activeTab.filePath, nextContent)
-    if (!write.success) {
-      showToast(write.error || '图片链接更新失败', 'error')
-      return
-    }
-    updateTabContent(activeTab.filePath, nextContent, activeTab.name)
-    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
-    showToast(`已本地化 ${downloaded} 张图片`)
-  }, [activeTab?.content, activeTab?.filePath, activeTab?.name, currentFolderPath, imageLocalizationPlan, scheduleFolderIndex, showToast, updateTabContent])
-
-  const handleCreateFromTemplate = useCallback(async (template: DocumentTemplate) => {
-    if (!window.electronAPI || !currentFolderPath) {
-      showToast('请先打开一个文件夹', 'error')
-      return
-    }
-    const today = new Date().toISOString().slice(0, 10)
-    const title = window.prompt('新文档标题', template.name) || template.name
-    const context = { title, date: today, folderName: currentFolderName || basename(currentFolderPath) || currentFolderPath }
-    const fileName = renderTemplateFileName(template, context)
-    const filePath = join(currentFolderPath, fileName)
-    const result = await window.electronAPI.writeFile(filePath, renderDocumentTemplate(template, context))
-    if (!result.success) {
-      showToast(result.error || '创建模板文档失败', 'error')
-      return
-    }
-    await openFileAtLine(filePath)
-    scheduleFolderIndex(currentFolderPath)
-    showToast(`已创建 ${basename(filePath)}`)
-  }, [currentFolderName, currentFolderPath, openFileAtLine, scheduleFolderIndex, showToast])
-
-  const handleOpenUnlinkedMention = useCallback((mention: UnlinkedMention) => {
-    void openFileAtLine(mention.targetPath)
-  }, [openFileAtLine])
-
-  const handleCopyArchiveReport = useCallback(() => {
-    void navigator.clipboard?.writeText(archiveReport)
-    showToast('归档报告已复制')
-  }, [archiveReport, showToast])
-
-  const handleCopyOperationPreview = useCallback(() => {
-    void navigator.clipboard?.writeText(formatOperationPreviewMarkdown(operationPreview))
-    showToast(operationPreview.changes.length > 0 ? 'diff 预览已复制' : '当前没有可预览的变更')
-  }, [operationPreview, showToast])
-
-  const handleUndoLastOperation = useCallback(async () => {
-    if (!window.electronAPI) {
-      showToast('当前环境不支持撤销写入', 'error')
-      return
-    }
-    const [snapshot, ...rest] = loadOperationSnapshots()
-    if (!snapshot) {
-      showToast('没有可撤销的操作')
-      return
-    }
-    let restored = 0
-    for (const file of snapshot.files) {
-      const result = await window.electronAPI.updateMarkdownFile(file.path, file.content)
-      if (result.success) {
-        updateTabContent(file.path, file.content, basename(file.path))
-        restored += 1
-      }
-    }
-    replaceOperationSnapshots(rest)
-    if (currentFolderPath) scheduleFolderIndex(currentFolderPath)
-    showToast(restored > 0 ? `已撤销 ${restored} 个文件` : '没有文件被撤销')
-  }, [currentFolderPath, scheduleFolderIndex, showToast, updateTabContent])
-
-  const handleCopyBatchMovePlan = useCallback(() => {
-    void navigator.clipboard?.writeText(formatBatchMovePlanMarkdown(
-      batchMovePlan.targetDir,
-      batchMovePlan.operations,
-      batchMovePlan.affectedLinks,
-    ))
-    showToast('批量整理计划已复制')
-  }, [batchMovePlan, showToast])
-
-  const handleCopyStaticSitePlan = useCallback(() => {
-    void navigator.clipboard?.writeText(formatStaticSitePlanMarkdown(staticSitePlan.outputDir, staticSitePlan.pages))
-    showToast('静态站点计划已复制')
-  }, [showToast, staticSitePlan])
-
-  const handleCopyReleaseCommands = useCallback(() => {
-    void navigator.clipboard?.writeText(releaseAutomationPlan.commands.join('\n'))
-    showToast('Release 命令已复制')
-  }, [releaseAutomationPlan.commands, showToast])
-
   // Wiki link click
   const handleWikiLinkClick = useCallback(async (target: string, altTarget?: string) => {
     if (!activeTab?.filePath || !window.electronAPI) {
       showToast(t('app.wikiLinkNoPath'), 'error')
-      return
-    }
-    const indexedMatch = resolveWikiTargetFile(indexedFiles, target, altTarget)
-    if (indexedMatch) {
-      await openFileAtLine(indexedMatch.path)
       return
     }
     const dir = dirname(activeTab.filePath)
@@ -1292,7 +833,7 @@ function AppInner() {
       }
     }
     showToast(t('app.fileNotFound', { name: target }), 'error')
-  }, [activeTab?.filePath, handleFileOpen, indexedFiles, openFileAtLine, showToast, t])
+  }, [activeTab?.filePath, handleFileOpen, showToast, t])
 
   // Toggle split view
   const toggleSplitView = useCallback(() => {
@@ -1336,6 +877,27 @@ function AppInner() {
     return activeItem?.text || ''
   }, [outlineItems, activeHeadingId])
   const isWelcomeTab = activeTab?.name === '欢迎使用.md' && !activeTab.filePath
+  const showHome = !activeTab || isWelcomeTab
+  const activeTabNeedsContent = Boolean(
+    activeTab?.filePath &&
+    !activeTab.content &&
+    (activeTab.contentStatus === 'pending' || activeTab.contentStatus === 'loading' || activeTab.contentStatus === 'error')
+  )
+  const secondaryTabNeedsContent = Boolean(
+    secondaryTab?.filePath &&
+    !secondaryTab.content &&
+    (secondaryTab.contentStatus === 'pending' || secondaryTab.contentStatus === 'loading' || secondaryTab.contentStatus === 'error')
+  )
+
+  useEffect(() => {
+    if (!activeTab?.filePath || activeTab.content || activeTab.contentStatus === 'loading' || activeTab.contentStatus === 'error') return
+    void loadTabContent(activeTab.id)
+  }, [activeTab?.content, activeTab?.contentStatus, activeTab?.filePath, activeTab?.id, loadTabContent])
+
+  useEffect(() => {
+    if (!isSplitView || !secondaryTab?.filePath || secondaryTab.content || secondaryTab.contentStatus === 'loading' || secondaryTab.contentStatus === 'error') return
+    void loadTabContent(secondaryTab.id)
+  }, [isSplitView, loadTabContent, secondaryTab?.content, secondaryTab?.contentStatus, secondaryTab?.filePath, secondaryTab?.id])
 
   const {
     query,
@@ -2006,227 +1568,19 @@ function AppInner() {
                 >
                   🔍
                 </button>
-                <button
-                  onClick={() => openPanel('globalSearch')}
-                  className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary}`}
-                  aria-label={t('toolbar.globalSearch')} data-tooltip={t('toolbar.globalSearchTooltip')}
-                >
-                  🔎
-                </button>
-                <button
-                  onClick={() => {
-                    const next = !showSource
-                    setShowSource(next)
-                    if (activeTab?.filePath) updateFileSetting('showSource', next)
-                  }}
-                  data-guide="source"
-                  className={`${styles.toolbarBtn} ${showSource ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.source')} data-tooltip={t('toolbar.sourceTooltip')}
-                >
-                  📄
-                </button>
-                <button
-                  onClick={() => openPanel('exportPanel')}
-                  className={styles.toolbarBtn}
-                  aria-label={t('toolbar.export')} data-tooltip={t('toolbar.exportTooltip')}
-                >
-                  📤
-                </button>
-                <div className={styles.toolsMenu}>
-                  <button
-                    onClick={() => setShowToolsMenu(open => !open)}
-                    className={`${styles.toolbarBtn} ${showKnowledgeHealth || showDocumentHealth || showImageInventory || showIndexDiagnostics || showReadingTools || showMaintenanceQueue || showReleasePreflight || showWorkspaceDashboard || showActionWorkbench ? styles.toolbarBtnActive : ''}`}
-                    aria-label={t('toolbar.tools')}
-                    aria-expanded={showToolsMenu}
-                    data-tooltip={t('toolbar.toolsTooltip')}
-                  >
-                    🧰
-                  </button>
-                  {showToolsMenu && (
-                    <div className={styles.toolsDropdown} role="menu">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('knowledgeHealth')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>◉</span>
-                        {t('toolbar.knowledgeHealth')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('workspaceDashboard')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>▦</span>
-                        运营仪表盘
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('actionWorkbench')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>▧</span>
-                        增强操作台
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('documentHealth')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>✓</span>
-                        {t('toolbar.documentHealth')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('imageInventory')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>▣</span>
-                        {t('toolbar.imageInventory')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('backlinks')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>↩</span>
-                        {t('toolbar.backlinks')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('markdownGraph')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>◎</span>
-                        {t('toolbar.markdownGraph')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('missingLinks')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>⊕</span>
-                        {t('toolbar.missingLinks')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('indexDiagnostics')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>!</span>
-                        索引诊断
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('maintenanceQueue')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>□</span>
-                        待处理队列
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('releasePreflight')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>◇</span>
-                        发布前检查
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('workspaces')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>▤</span>
-                        {t('toolbar.workspaces')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('readingTimeline')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>◷</span>
-                        {t('toolbar.readingTimeline')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          openPanel('readingTools')
-                          setShowToolsMenu(false)
-                        }}
-                      >
-                        <span>◫</span>
-                        阅读工具
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => togglePanel('focusMode')}
-                  className={`${styles.toolbarBtn} ${showFocusMode ? styles.toolbarBtnActive : ''}`}
-                  aria-label={t('toolbar.focusMode')} data-tooltip={t('toolbar.focusModeTooltip')}
-                >
-                  🎯
-                </button>
-                <div className={styles.fontSizeControls} data-guide="font-size">
-                  <button
-                    onClick={() => setFontSize(Math.max(10, fontSize - 1))}
-                    className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                    aria-label={t('toolbar.zoomOut')}
-                  >
-                    A-
-                  </button>
-                  <span className={styles.fontSizeDisplay}>
-                    {fontSize}
-                  </span>
-                  <button
-                    onClick={() => setFontSize(Math.min(32, fontSize + 1))}
-                    className={`${styles.toolbarBtn} ${styles.toolbarBtnSecondary} ${styles.toolbarBtnSmall}`}
-                    aria-label={t('toolbar.zoomIn')}
-                  >
-                    A+
-                  </button>
-                </div>
+                <ToolsMenu
+                  buttonClassName={styles.toolbarBtn}
+                  activeButtonClassName={styles.toolbarBtnActive}
+                  isActive={showIndexDiagnostics || showReadingTools || showWorkspaces || showReadingTimeline || showGlobalSearch || showSource || showExportPanel || showFocusMode || showQuickJump || showFileInfo}
+                  onOpenPanel={openPanel}
+                  showSource={showSource}
+                  showFocusMode={showFocusMode}
+                  fontSize={fontSize}
+                  onToggleSource={toggleSourceView}
+                  onToggleFocusMode={() => togglePanel('focusMode')}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                />
                 <BookmarkPanel
                   bookmarks={bookmarks}
                   onAdd={addBookmark}
@@ -2263,17 +1617,19 @@ function AppInner() {
               </ResizableSidebar>
             )}
             <main ref={mainRef} className={styles.main} style={{ flex: isSplitView ? 1 : undefined, fontSize: `${fontSize}px` }}>
-              {!showFocusMode && !showSource && outlineItems.length >= 3 && (
+              {!showFocusMode && !showSource && !showHome && outlineItems.length >= 3 && (
                 <FloatingTOC outlineItems={outlineItems} activeHeadingId={activeHeadingId} onNavigate={handleOutlineClick} />
               )}
 
-              {isRestoringSession ? (
-                <div style={{ padding: '20px' }}>
-                  <Skeleton lines={20} />
-                </div>
-              ) : (
-                <div key={`content-${activeTabId}`} className="tab-content">
-                  {!showSource && isWelcomeTab && (
+              <div key={`content-${activeTabId || 'home'}`} className="tab-content">
+                  {showSource ? (
+                    <SourceView
+                      content={activeTab?.content || ''}
+                      highlightedLine={highlightedLine}
+                      editable={Boolean(activeTab?.filePath)}
+                      onSave={saveSourceEdit}
+                    />
+                  ) : showHome ? (
                     <WelcomeHome
                       recentFileCount={recentFiles.length}
                       readingHistoryCount={readingHistory.length}
@@ -2282,19 +1638,20 @@ function AppInner() {
                       indexProgress={indexProgress}
                       currentFolderName={currentFolderName}
                       currentFolderPath={currentFolderPath}
+                      latestReadingName={readingHistory[0]?.name}
+                      onOpenFile={handleOpenFileDialog}
                       onOpenFolder={handleOpenFolder}
                       onOpenRecent={() => openPanel('recent')}
-                      onOpenWorkspaces={() => openPanel('workspaces')}
                       onOpenReadingTimeline={() => openPanel('readingTimeline')}
+                      onShowGuide={() => setShowGuide(true)}
                       onReindex={() => rebuildFolderIndex()}
                     />
-                  )}
-                  {showSource ? (
-                    <SourceView
-                      content={activeTab?.content || ''}
-                      highlightedLine={highlightedLine}
-                      editable={Boolean(activeTab?.filePath)}
-                      onSave={saveSourceEdit}
+                  ) : activeTabNeedsContent ? (
+                    <DocumentLoadState
+                      fileName={activeTab?.name}
+                      status={activeTab?.contentStatus}
+                      error={activeTab?.contentError}
+                      onRetry={activeTab ? () => void loadTabContent(activeTab.id) : undefined}
                     />
                   ) : (
                     (activeTab?.content && (activeTab.content.length > 300000 || activeTab.content.split('\n').length > 5000)) ? (
@@ -2331,13 +1688,19 @@ function AppInner() {
                       />
                     )
                   )}
-                </div>
-              )}
+              </div>
             </main>
             {isSplitView && secondaryTab && (
               <main className={`${styles.main} ${styles.splitPane}`} style={{ fontSize: `${fontSize}px` }}>
                 <div key={`secondary-${secondaryTabId}`} className="tab-content">
-                  {showSource ? (
+                  {secondaryTabNeedsContent ? (
+                    <DocumentLoadState
+                      fileName={secondaryTab?.name}
+                      status={secondaryTab?.contentStatus}
+                      error={secondaryTab?.contentError}
+                      onRetry={secondaryTab ? () => void loadTabContent(secondaryTab.id) : undefined}
+                    />
+                  ) : showSource ? (
                     <SourceView content={secondaryTab.content || ''} />
                   ) : (
                     <MarkdownRenderer
@@ -2357,7 +1720,7 @@ function AppInner() {
                 </div>
               </main>
             )}
-            {!showFocusMode && !showSource && (showFilePreview || outlineItems.length > 0) && (
+            {!showFocusMode && !showSource && !isWelcomeTab && (showFilePreview || outlineItems.length > 0) && (
               <ResizableSidebar side="right" storageKey="right-sidebar" isOpen={showOutline} onToggle={() => closePanel('outline')}>
                 {showOutline && (
                   <div style={{ display: 'flex', flexDirection: 'row', height: '100%', width: '100%' }}>
@@ -2495,78 +1858,6 @@ function AppInner() {
               />
             </Suspense>
           )}
-          {showKnowledgeHealth && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <KnowledgeHealthPanel
-                report={knowledgeHealthReport}
-                onOpenDetail={handleOpenKnowledgeHealthDetail}
-                onOpenFirstIssue={handleOpenFirstKnowledgeIssue}
-                onCopyReport={handleCopyKnowledgeHealthReport}
-                onClose={() => closePanel('knowledgeHealth')}
-              />
-            </Suspense>
-          )}
-          {showDocumentHealth && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <DocumentHealthPanel
-                content={activeTab?.content || ''}
-                filePath={activeTab?.filePath}
-                onIssueSelect={handleJumpToLine}
-                onClose={() => closePanel('documentHealth')}
-              />
-            </Suspense>
-          )}
-          {showImageInventory && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <ImageInventoryPanel
-                content={activeTab?.content || ''}
-                filePath={activeTab?.filePath}
-                onClose={() => closePanel('imageInventory')}
-              />
-            </Suspense>
-          )}
-          {showBacklinks && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <BacklinksPanel
-                backlinks={backlinks}
-                filePath={activeTab?.filePath}
-                onOpenFile={openFileAtLine}
-                onClose={() => closePanel('backlinks')}
-              />
-            </Suspense>
-          )}
-          {showMarkdownGraph && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <MarkdownGraphPanel
-                graph={wikiGraph}
-                folderPath={currentFolderPath || undefined}
-                onOpenFile={openFileAtLine}
-                onReindex={() => rebuildFolderIndex()}
-                isIndexing={isIndexing}
-                indexProgress={indexProgress}
-                onCancelIndex={cancelFolderIndex}
-                onOpenMissingLink={handleOpenMissingLinkFromGraph}
-                onClose={() => closePanel('markdownGraph')}
-              />
-            </Suspense>
-          )}
-          {showMissingLinks && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <MissingLinksPanel
-                links={missingLinks}
-                folderPath={currentFolderPath || undefined}
-                focusedTarget={focusedMissingTarget}
-                suggestions={missingLinkSuggestions}
-                onCreateFile={handleCreateMissingLink}
-                onOpenSource={openFileAtLine}
-                onOpenSuggestion={path => openFileAtLine(path)}
-                onClose={() => {
-                  setFocusedMissingTarget(null)
-                  closePanel('missingLinks')
-                }}
-              />
-            </Suspense>
-          )}
           {showIndexDiagnostics && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <IndexDiagnosticsPanel
@@ -2609,68 +1900,6 @@ function AppInner() {
               />
             </Suspense>
           )}
-          {showMaintenanceQueue && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <MaintenanceQueuePanel
-                tasks={maintenanceTasks}
-                onOpenTask={handleOpenMaintenanceTask}
-                onCopyTasks={handleCopyMaintenanceTasks}
-                onClose={() => closePanel('maintenanceQueue')}
-              />
-            </Suspense>
-          )}
-          {showReleasePreflight && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <ReleasePreflightPanel
-                report={releasePreflightReport}
-                onOpenMaintenance={() => {
-                  closePanel('releasePreflight')
-                  openPanel('maintenanceQueue')
-                }}
-                onCopyReport={handleCopyReleasePreflightReport}
-                onClose={() => closePanel('releasePreflight')}
-              />
-            </Suspense>
-          )}
-          {showWorkspaceDashboard && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <WorkspaceDashboardPanel
-                dashboard={workspaceDashboard}
-                onOpenSection={handleOpenDashboardSection}
-                onClose={() => closePanel('workspaceDashboard')}
-              />
-            </Suspense>
-          )}
-          {showActionWorkbench && (
-            <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
-              <ActionWorkbenchPanel
-                fixes={executableFixes}
-                templates={documentTemplates}
-                renamePlan={actionRenamePlan}
-                imagePlan={imageLocalizationPlan}
-                unlinkedMentions={unlinkedMentions}
-                archiveReport={archiveReport}
-                operationPreview={operationPreview}
-                imageAudit={imageAudit}
-                batchMovePlan={batchMovePlan}
-                workspaceHomeCards={workspaceHomeCards}
-                staticSitePlan={staticSitePlan}
-                releasePlan={releaseAutomationPlan}
-                onExecuteFix={handleExecuteFix}
-                onApplyRename={handleApplyRenamePlan}
-                onLocalizeImages={handleLocalizeImages}
-                onCreateFromTemplate={handleCreateFromTemplate}
-                onOpenMention={handleOpenUnlinkedMention}
-                onCopyArchive={handleCopyArchiveReport}
-                onCopyPreview={handleCopyOperationPreview}
-                onUndoLast={handleUndoLastOperation}
-                onCopyBatchMove={handleCopyBatchMovePlan}
-                onCopyStaticSite={handleCopyStaticSitePlan}
-                onCopyReleaseCommands={handleCopyReleaseCommands}
-                onClose={() => closePanel('actionWorkbench')}
-              />
-            </Suspense>
-          )}
           {showWorkspaces && (
             <Suspense fallback={<div style={{ padding: 20 }}><Skeleton lines={6} /></div>}>
               <WorkspacePanel
@@ -2688,14 +1917,6 @@ function AppInner() {
                 onOpenGlobalSearch={() => {
                   closePanel('workspaces')
                   openPanel('globalSearch')
-                }}
-                onOpenKnowledgeHealth={() => {
-                  closePanel('workspaces')
-                  openPanel('knowledgeHealth')
-                }}
-                onOpenMarkdownGraph={() => {
-                  closePanel('workspaces')
-                  openPanel('markdownGraph')
                 }}
                 onOpenReadingTimeline={() => {
                   closePanel('workspaces')
@@ -2842,9 +2063,7 @@ function AppInner() {
               if (activeTabId) closeTab(activeTabId)
               break
             case 'toggle-source': {
-              const next = !showSource
-              setShowSource(next)
-              if (activeTab?.filePath) updateFileSetting('showSource', next)
+              toggleSourceView()
               break
             }
             case 'toggle-outline':
@@ -2863,15 +2082,11 @@ function AppInner() {
               toggleSplitView()
               break
             case 'zoom-in': {
-              const newSize = Math.min(fontSize + 2, 32)
-              setFontSize(newSize)
-              if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
+              zoomIn()
               break
             }
             case 'zoom-out': {
-              const newSize = Math.max(fontSize - 2, 12)
-              setFontSize(newSize)
-              if (activeTab?.filePath) updateFileSetting('fontSize', newSize)
+              zoomOut()
               break
             }
             case 'export-html':
@@ -2892,26 +2107,8 @@ function AppInner() {
             case 'file-info':
               openPanel('fileInfo')
               break
-            case 'knowledge-health':
-              openPanel('knowledgeHealth')
-              break
-            case 'document-health':
-              openPanel('documentHealth')
-              break
-            case 'image-inventory':
-              openPanel('imageInventory')
-              break
             case 'global-search':
               openPanel('globalSearch')
-              break
-            case 'backlinks':
-              openPanel('backlinks')
-              break
-            case 'markdown-graph':
-              openPanel('markdownGraph')
-              break
-            case 'missing-links':
-              openPanel('missingLinks')
               break
             case 'index-diagnostics':
               openPanel('indexDiagnostics')
@@ -2924,18 +2121,6 @@ function AppInner() {
               break
             case 'reading-tools':
               openPanel('readingTools')
-              break
-            case 'maintenance-queue':
-              openPanel('maintenanceQueue')
-              break
-            case 'release-preflight':
-              openPanel('releasePreflight')
-              break
-            case 'workspace-dashboard':
-              openPanel('workspaceDashboard')
-              break
-            case 'action-workbench':
-              openPanel('actionWorkbench')
               break
             case 'export-reading-backup':
               exportReadingDataBackup()

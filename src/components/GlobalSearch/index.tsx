@@ -293,7 +293,7 @@ export function GlobalSearch({
         {hasEmptyIndex && (
           <div className={styles.indexHint} role="status">
             <strong>尚未建立索引</strong>
-            <span>全文搜索、反链和图谱都需要先扫描当前文件夹。</span>
+            <span>全文搜索需要先扫描当前文件夹。</span>
             {onReindex && (
               <button type="button" className={styles.indexHintBtn} onClick={handleReindex} disabled={isReindexBusy}>
                 {isLocalReindexing ? '正在重建索引...' : '立即重建索引'}

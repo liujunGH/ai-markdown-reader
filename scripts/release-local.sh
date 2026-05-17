@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: scripts/release-local.sh <version> [asset ...]"
-  echo "Example: scripts/release-local.sh 1.5.6 release/Markdown\\ Reader-1.5.6-arm64.dmg"
+  echo "Example: scripts/release-local.sh 1.5.7 release/Markdown\\ Reader-1.5.7-arm64.dmg"
   exit 1
 fi
 

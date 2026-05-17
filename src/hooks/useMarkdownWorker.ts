@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 let workerInstance: Worker | null = null
 let messageId = 0
-const pending = new Map<number, (html: string) => void>()
+const pending = new Map<number, (response: WorkerResponse) => void>()
 
 type WorkerResponse = {
   id: number
@@ -24,7 +24,7 @@ function getWorker(): Worker {
       const resolve = pending.get(id)
       if (resolve) {
         pending.delete(id)
-        resolve(html)
+        resolve({ id, html, error })
       }
     }
     workerInstance.onerror = (err) => {
@@ -39,9 +39,10 @@ export function cancelPendingWorkerOperations(): void {
   pending.clear()
 }
 
-export function useMarkdownWorker(content: string): { html: string; loading: boolean } {
+export function useMarkdownWorker(content: string): { html: string; loading: boolean; error: string | null } {
   const [html, setHtml] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const idRef = useRef<number>(0)
   const mountedRef = useRef(true)
 
@@ -54,17 +55,29 @@ export function useMarkdownWorker(content: string): { html: string; loading: boo
 
   const parse = useCallback((text: string) => {
     cancelCurrentOperation()
+    setHtml('')
+    setError(null)
     setLoading(true)
     const currentId = ++messageId
     idRef.current = currentId
 
-    const worker = getWorker()
-    worker.postMessage({ content: text, id: currentId })
+    let worker: Worker
+    try {
+      worker = getWorker()
+      worker.postMessage({ content: text, id: currentId })
+    } catch (err) {
+      if (mountedRef.current && idRef.current === currentId) {
+        setError(err instanceof Error ? err.message : String(err))
+        setLoading(false)
+      }
+      return
+    }
 
-    pending.set(currentId, (result: string) => {
+    pending.set(currentId, (result: WorkerResponse) => {
       pending.delete(currentId)
       if (mountedRef.current && idRef.current === currentId) {
-        setHtml(result)
+        setHtml(result.html)
+        setError(result.error || null)
         setLoading(false)
       }
     })
@@ -82,5 +95,5 @@ export function useMarkdownWorker(content: string): { html: string; loading: boo
     parse(content)
   }, [content, parse])
 
-  return { html, loading }
+  return { html, loading, error }
 }

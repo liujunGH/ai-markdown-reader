@@ -9,7 +9,6 @@ test.describe('Reading Flow', () => {
   let fixturePath: string
   let fixturePath2: string
   let fixturePath3: string
-  let inspectionPath: string
   let smokeTestPath: string
   let wikiFolderPath: string
   let userDataDir: string
@@ -19,21 +18,12 @@ test.describe('Reading Flow', () => {
     fixturePath = path.join(tmpDir, 'ai-markdown-reader-sample.md')
     fixturePath2 = path.join(tmpDir, 'ai-markdown-reader-sample2.md')
     fixturePath3 = path.join(tmpDir, 'ai-markdown-reader-sample3.md')
-    inspectionPath = path.join(tmpDir, 'ai-markdown-reader-inspection.md')
     smokeTestPath = path.join(__dirname, '../examples/smoke-test.md')
     wikiFolderPath = path.join(tmpDir, 'ai-markdown-reader-wiki-fixture')
 
     fs.writeFileSync(fixturePath, fs.readFileSync(path.join(__dirname, 'fixtures/sample.md'), 'utf-8'))
     fs.writeFileSync(fixturePath2, '# Second Document\n\nThis is the second test document.\n\n## Section A\n\nContent for section A.\n\n## Section B\n\nContent for section B.\n')
     fs.writeFileSync(fixturePath3, '# Third Document\n\nThis is the third test document.\n')
-    fs.writeFileSync(inspectionPath, [
-      '# Inspection Document',
-      '',
-      '[bad](javascript:alert(1))',
-      '',
-      '![Remote](https://example.com/image.png)',
-      '![Local](images/missing.png)'
-    ].join('\n'))
     fs.rmSync(wikiFolderPath, { recursive: true, force: true })
     fs.mkdirSync(wikiFolderPath, { recursive: true })
     fs.writeFileSync(path.join(wikiFolderPath, '00-index.md'), [
@@ -74,7 +64,6 @@ test.describe('Reading Flow', () => {
     try { fs.unlinkSync(fixturePath) } catch {}
     try { fs.unlinkSync(fixturePath2) } catch {}
     try { fs.unlinkSync(fixturePath3) } catch {}
-    try { fs.unlinkSync(inspectionPath) } catch {}
     try { fs.rmSync(wikiFolderPath, { recursive: true, force: true }) } catch {}
   })
 
@@ -129,51 +118,32 @@ test.describe('Reading Flow', () => {
     await expect(marks.first()).toBeVisible()
   })
 
-  test('should expose inspection tools, jump to health issues, and filter images', async () => {
-    await mockOpenFileDialog([inspectionPath])
+  test('should expose reading-first tools and hide removed maintenance tools', async () => {
+    await mockOpenFileDialog([fixturePath])
 
-    await dismissFirstUseGuide()
     await window.locator('[data-guide="file-opener"]').click()
-    await expect(window.getByRole('heading', { name: 'Inspection Document' })).toBeVisible()
+    await expect(window.getByRole('heading', { name: 'Sample Document' })).toBeVisible()
 
     await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /文档健康检查/ }).click()
-    const healthPanel = window.locator('section[aria-label="文档健康检查"]')
-    await expect(healthPanel).toBeVisible()
-    await healthPanel.getByRole('button', { name: /行 3/ }).click()
-    await expect(healthPanel).not.toBeVisible()
-    await expect(window.locator('[class*="highlighted"]').filter({ hasText: '[bad](javascript:alert(1))' }).first()).toBeVisible()
+    const menu = window.getByRole('menu')
+    await expect(menu.getByRole('menuitem', { name: /阅读工具/ })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: /阅读时间线/ })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: /索引诊断/ })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: /文件信息/ })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: /文档健康检查/ })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /图片检查面板/ })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /反向引用/ })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /文档图谱/ })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /缺失链接/ })).toHaveCount(0)
+
+    await menu.getByRole('menuitem', { name: /阅读工具/ }).click()
+    const readingTools = window.locator('section[aria-label="阅读工具侧栏"]')
+    await expect(readingTools).toBeVisible()
+    await readingTools.getByRole('button', { name: '关闭' }).click()
 
     await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /图片检查面板/ }).click()
-    const imagePanel = window.locator('section[aria-label="图片检查面板"]')
-    await expect(imagePanel).toBeVisible()
-    await imagePanel.getByRole('button', { name: /网络/ }).click()
-    await expect(imagePanel.getByText('https://example.com/image.png')).toBeVisible()
-    await expect(imagePanel.getByText('images/missing.png')).not.toBeVisible()
-
-    await imagePanel.getByRole('button', { name: '关闭' }).click()
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /反向引用/ }).click()
-    const backlinksPanel = window.locator('section[aria-label="反向链接面板"]')
-    await expect(backlinksPanel).toBeVisible()
-    await backlinksPanel.getByRole('button', { name: '关闭' }).click()
-
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /文档图谱/ }).click()
-    const graphPanel = window.locator('section[aria-label="Markdown 图谱"]')
-    await expect(graphPanel).toBeVisible()
-    await graphPanel.getByRole('button', { name: '关闭' }).click()
-
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /工作区/ }).click()
-    const workspacePanel = window.locator('section[aria-label="工作区"]')
-    await expect(workspacePanel).toBeVisible()
-    await workspacePanel.getByRole('button', { name: '关闭' }).click()
-
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /阅读时间线/ }).click()
-    await expect(window.locator('section[aria-label="阅读时间线"]')).toBeVisible()
+    await window.getByRole('menuitem', { name: /文件信息/ }).click()
+    await expect(window.getByRole('heading', { name: /文件信息/ })).toBeVisible()
   })
 
   test('should manage tabs', async () => {
@@ -259,27 +229,9 @@ test.describe('Reading Flow', () => {
     await expect(window.getByRole('heading', { name: 'Target Note' })).toBeVisible()
     await expect(window.getByText('Jump worked.')).toBeVisible()
     await expect(window.getByRole('tab', { name: 'Target Note.md' })).toBeVisible()
-
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /反向引用/ }).click()
-    const backlinksPanel = window.locator('section[aria-label="反向链接面板"]')
-    await expect(backlinksPanel).toBeVisible()
-    await expect(backlinksPanel.locator('[class*="sourceName"]', { hasText: '00-index.md' })).toHaveCount(2)
-    await expect(backlinksPanel.getByText('Open [[Target Note|目标文档]].')).toBeVisible()
-    await expect(backlinksPanel.getByText('Open legacy [[旧显示名|Target Note]].')).toBeVisible()
-
-    await backlinksPanel.getByRole('button', { name: '关闭' }).click()
-    await window.getByRole('button', { name: '工具' }).click()
-    await window.getByRole('menuitem', { name: /缺失链接/ }).click()
-    const missingLinksPanel = window.locator('section[aria-label="缺失链接面板"]')
-    await expect(missingLinksPanel).toBeVisible()
-    await expect(missingLinksPanel.getByRole('heading', { name: 'Missing Note' })).toBeVisible()
-    await missingLinksPanel.getByRole('button', { name: '创建' }).click()
-    await expect(window.getByRole('heading', { name: 'Missing Note' })).toBeVisible()
-    await expect(window.getByRole('tab', { name: 'Missing Note.md' })).toBeVisible()
   })
 
-  test('should restore the last opened folder on restart', async () => {
+  test('should restore file tabs without reopening the folder tree on restart', async () => {
     await mockOpenFileDialog([wikiFolderPath])
 
     await window.getByRole('button', { name: '打开文件夹' }).click()
@@ -298,8 +250,7 @@ test.describe('Reading Flow', () => {
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
 
-    await expect(window.getByText(path.basename(wikiFolderPath))).toBeVisible()
-    await expect(window.getByRole('button', { name: '打开文件：00-index.md' })).toBeVisible()
     await expect(window.getByRole('heading', { name: 'Wiki Index' })).toBeVisible()
+    await expect(window.getByRole('button', { name: '打开文件：00-index.md' })).toHaveCount(0)
   })
 })

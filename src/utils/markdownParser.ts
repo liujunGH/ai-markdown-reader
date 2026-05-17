@@ -23,7 +23,7 @@ async function loadPrismLanguage(lang: string): Promise<void> {
   if (loadedLanguages.has(lang)) return
   if (!lang || Prism.languages[lang]) return
   try {
-    await import(`prismjs/components/prism-${lang}`)
+    await import(/* @vite-ignore */ `prismjs/components/prism-${lang}`)
     loadedLanguages.add(lang)
   } catch {
     // Language not available, fall back to plain text

@@ -325,7 +325,7 @@ describe('tabStore', () => {
     expect(removeRecentFile).not.toHaveBeenCalled()
   })
 
-  it('reports and removes missing files from restored session', async () => {
+  it('restores tab metadata and reports missing files when lazily loaded', async () => {
     const readFile = vi.fn(async (filePath: string) => {
       if (filePath === '/docs/valid.md') {
         return { success: true, content: 'valid content' }
@@ -354,16 +354,30 @@ describe('tabStore', () => {
     await useTabStore.getState().restoreSession()
 
     const state = useTabStore.getState()
-    expect(state.tabs).toHaveLength(1)
+    expect(state.tabs).toHaveLength(2)
     expect(state.tabs[0].id).toBe('tab-valid')
     expect(state.tabs[0].content).toBe('valid content')
+    expect(state.tabs[0].contentStatus).toBe('ready')
     expect(state.tabs[0].isPinned).toBe(true)
+    expect(state.tabs[1].id).toBe('tab-missing')
+    expect(state.tabs[1].content).toBe('')
+    expect(state.tabs[1].contentStatus).toBe('pending')
     expect(state.activeTabId).toBe('tab-valid')
-    expect(state.failedRestores).toEqual(['/docs/missing.md'])
+    expect(state.failedRestores).toEqual([])
+    expect(readFile).toHaveBeenCalledWith('/docs/valid.md')
+    expect(readFile).not.toHaveBeenCalledWith('/docs/missing.md')
+
+    await useTabStore.getState().loadTabContent('tab-missing')
+
+    const stateAfterMissingLoad = useTabStore.getState()
+    expect(stateAfterMissingLoad.tabs[1].contentStatus).toBe('error')
+    expect(stateAfterMissingLoad.tabs[1].contentError).toBe('ENOENT')
+    expect(stateAfterMissingLoad.failedRestores).toEqual(['/docs/missing.md'])
     expect(removeRecentFile).toHaveBeenCalledWith('/docs/missing.md')
 
     const storedTabs = JSON.parse(window.localStorage.getItem('session-tabs') || '[]')
-    expect(storedTabs).toHaveLength(1)
+    expect(storedTabs).toHaveLength(2)
     expect(storedTabs[0].filePath).toBe('/docs/valid.md')
+    expect(storedTabs[1].filePath).toBe('/docs/missing.md')
   })
 })

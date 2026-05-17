@@ -38,7 +38,7 @@ describe('GlobalSearch', () => {
     await waitFor(() => {
       expect(screen.getByText('尚未建立索引')).toBeInTheDocument()
     })
-    expect(screen.getByText('全文搜索、反链和图谱都需要先扫描当前文件夹。')).toBeInTheDocument()
+    expect(screen.getByText('全文搜索需要先扫描当前文件夹。')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '立即重建索引' }))
 

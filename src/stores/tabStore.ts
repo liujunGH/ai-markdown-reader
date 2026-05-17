@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { produce } from 'immer'
 
-import { Tab, TabColor, createTab, getWelcomeTab } from '../types/Tab'
+import { Tab, TabColor, TabContentStatus, createTab, getWelcomeTab } from '../types/Tab'
 import { RecentFile } from '../types/electron'
 import { getStorageItem, setStorageItem } from '../utils/storage'
 
@@ -47,6 +47,7 @@ interface TabActions {
   openFile: (content: string, name: string, filePath?: string, size?: number, lastModified?: number) => void
   openRecentFile: (file: RecentFile) => Promise<boolean>
   updateTabContent: (filePath: string, content: string, name?: string) => void
+  loadTabContent: (id: string) => Promise<boolean>
   restoreSession: () => Promise<void>
   clearFailedRestores: () => void
 }
@@ -58,7 +59,12 @@ function getMaxTabs(): number {
   return stored ? parseInt(stored, 10) : DEFAULT_MAX_TABS
 }
 
-function createRestoredTab(storedTab: StoredTab, content: string): Tab {
+function createRestoredTab(
+  storedTab: StoredTab,
+  content: string,
+  contentStatus: TabContentStatus = 'ready',
+  contentError?: string
+): Tab {
   const tab = createTab(
     storedTab.name,
     content,
@@ -70,6 +76,8 @@ function createRestoredTab(storedTab: StoredTab, content: string): Tab {
   )
   tab.id = storedTab.id || tab.id
   tab.isPinned = storedTab.isPinned
+  tab.contentStatus = contentStatus
+  tab.contentError = contentError
   return tab
 }
 
@@ -94,7 +102,7 @@ export const useTabStore = create<TabStore>()(
     (set, get) => ({
       tabs: [],
       activeTabId: '',
-      isRestoringSession: true,
+      isRestoringSession: false,
       failedRestores: [],
       closedTabs: [],
       maxTabs: getMaxTabs(),
@@ -115,6 +123,7 @@ export const useTabStore = create<TabStore>()(
 
       selectTab: (id) => {
         set({ activeTabId: id })
+        void get().loadTabContent(id)
       },
 
       closeTab: (id) => {
@@ -124,7 +133,12 @@ export const useTabStore = create<TabStore>()(
           const tabToClose = state.tabs[tabIndex]
           if (tabToClose) {
             // Strip large content from closed tab to free memory
-            const lightweightTab = { ...tabToClose, content: '' }
+            const lightweightTab = {
+              ...tabToClose,
+              content: '',
+              contentStatus: tabToClose.filePath ? 'pending' as TabContentStatus : tabToClose.contentStatus,
+              contentError: undefined,
+            }
             state.closedTabs = [lightweightTab, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           }
           state.tabs = state.tabs.filter((t: Tab) => t.id !== id)
@@ -145,7 +159,12 @@ export const useTabStore = create<TabStore>()(
           if (!tab) return
           const tabsToClose = state.tabs
             .filter((t: Tab) => t.id !== id)
-            .map((t: Tab) => ({ ...t, content: '' }))
+            .map((t: Tab) => ({
+              ...t,
+              content: '',
+              contentStatus: t.filePath ? 'pending' as TabContentStatus : t.contentStatus,
+              contentError: undefined,
+            }))
           state.closedTabs = [...tabsToClose, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           state.activeTabId = id
           state.tabs = [tab]
@@ -156,7 +175,12 @@ export const useTabStore = create<TabStore>()(
         set(produce(state => {
           const tabsToClose = state.tabs
             .filter((t: Tab) => t.name !== '欢迎使用.md')
-            .map((t: Tab) => ({ ...t, content: '' }))
+            .map((t: Tab) => ({
+              ...t,
+              content: '',
+              contentStatus: t.filePath ? 'pending' as TabContentStatus : t.contentStatus,
+              contentError: undefined,
+            }))
           state.closedTabs = [...tabsToClose, ...state.closedTabs].slice(0, MAX_CLOSED_TABS)
           const welcomeTab = getWelcomeTab()
           state.activeTabId = welcomeTab.id
@@ -205,6 +229,7 @@ export const useTabStore = create<TabStore>()(
       },
 
       restoreTab: () => {
+        let restoredId = ''
         set(produce(state => {
           if (state.closedTabs.length === 0) return
           const [tabToRestore, ...rest] = state.closedTabs
@@ -227,9 +252,15 @@ export const useTabStore = create<TabStore>()(
             }
           }
 
+          if (tabToRestore.filePath && !tabToRestore.content) {
+            tabToRestore.contentStatus = 'pending'
+            tabToRestore.contentError = undefined
+          }
           state.tabs.push(tabToRestore)
           state.activeTabId = tabToRestore.id
+          restoredId = tabToRestore.id
         }))
+        if (restoredId) void get().loadTabContent(restoredId)
       },
 
       openFile: (content, name, filePath = '', size, lastModified) => {
@@ -240,6 +271,11 @@ export const useTabStore = create<TabStore>()(
             (!filePath || t.filePath === filePath)
           )
           if (existingTab) {
+            existingTab.content = content
+            existingTab.size = size ?? new Blob([content]).size
+            existingTab.lastModified = lastModified ?? existingTab.lastModified
+            existingTab.contentStatus = 'ready'
+            existingTab.contentError = undefined
             state.activeTabId = existingTab.id
             return
           }
@@ -271,6 +307,11 @@ export const useTabStore = create<TabStore>()(
           set(produce(state => {
             const existingTab = state.tabs.find((t: Tab) => t.filePath === file.filePath && !t.isModified)
             if (existingTab) {
+              existingTab.content = content
+              existingTab.name = file.name
+              existingTab.size = new Blob([content]).size
+              existingTab.contentStatus = 'ready'
+              existingTab.contentError = undefined
               state.activeTabId = existingTab.id
               return
             }
@@ -301,8 +342,60 @@ export const useTabStore = create<TabStore>()(
             tab.content = content
             if (name) tab.name = name
             tab.size = new Blob([content]).size
+            tab.contentStatus = 'ready'
+            tab.contentError = undefined
           }
         }))
+      },
+
+      loadTabContent: async (id) => {
+        const currentTab = get().tabs.find(t => t.id === id)
+        if (!currentTab?.filePath || !window.electronAPI) return false
+        const filePath = currentTab.filePath
+        if (currentTab.content && currentTab.contentStatus !== 'error') return true
+        if (currentTab.contentStatus === 'loading') return false
+
+        set(produce(state => {
+          const tab = state.tabs.find((t: Tab) => t.id === id)
+          if (!tab) return
+          tab.contentStatus = 'loading'
+          tab.contentError = undefined
+        }))
+
+        let result: Awaited<ReturnType<NonNullable<typeof window.electronAPI>['readFile']>>
+        try {
+          result = await window.electronAPI.readFile(filePath)
+        } catch (err) {
+          result = {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          }
+        }
+        if (result.success && result.content !== undefined) {
+          set(produce(state => {
+            const tab = state.tabs.find((t: Tab) => t.id === id)
+            if (!tab) return
+            tab.content = result.content || ''
+            tab.size = new Blob([tab.content]).size
+            tab.contentStatus = 'ready'
+            tab.contentError = undefined
+          }))
+          return true
+        }
+
+        const error = result.error || '文件读取失败'
+        set(produce(state => {
+          const tab = state.tabs.find((t: Tab) => t.id === id)
+          if (tab) {
+            tab.contentStatus = 'error'
+            tab.contentError = error
+          }
+          if (!state.failedRestores.includes(filePath)) {
+            state.failedRestores.push(filePath)
+          }
+        }))
+        await window.electronAPI.removeRecentFile?.(filePath)
+        return false
       },
 
       restoreSession: async () => {
@@ -319,14 +412,8 @@ export const useTabStore = create<TabStore>()(
           try {
             const storedTabs: StoredTab[] = JSON.parse(oldStored)
             for (const storedTab of storedTabs) {
-              if (storedTab.filePath && window.electronAPI) {
-                const result = await window.electronAPI.readFile(storedTab.filePath)
-                if (result.success && result.content !== undefined) {
-                  restoredTabs.push(createRestoredTab(storedTab, result.content))
-                } else {
-                  failedRestores.push(storedTab.filePath)
-                  await window.electronAPI.removeRecentFile?.(storedTab.filePath)
-                }
+              if (storedTab.filePath) {
+                restoredTabs.push(createRestoredTab(storedTab, '', 'pending'))
               } else if (storedTab.content !== undefined) {
                 restoredTabs.push(createRestoredTab(storedTab, storedTab.content))
               }
@@ -354,6 +441,7 @@ export const useTabStore = create<TabStore>()(
         })
 
         persistSessionSnapshot(restoredTabs, restoredActiveTabId)
+        await get().loadTabContent(restoredActiveTabId)
       },
 
       clearFailedRestores: () => {

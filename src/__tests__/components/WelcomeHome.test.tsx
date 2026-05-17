@@ -8,9 +8,10 @@ describe('WelcomeHome', () => {
   it('shows workspace recovery signals and actions', async () => {
     const user = userEvent.setup()
     const onOpenFolder = vi.fn()
+    const onOpenFile = vi.fn()
     const onOpenRecent = vi.fn()
-    const onOpenWorkspaces = vi.fn()
     const onOpenReadingTimeline = vi.fn()
+    const onShowGuide = vi.fn()
     const onReindex = vi.fn()
 
     render(
@@ -21,30 +22,36 @@ describe('WelcomeHome', () => {
         isIndexing={false}
         currentFolderName="docs"
         currentFolderPath="/Users/me/docs"
+        latestReadingName="guide.md"
+        onOpenFile={onOpenFile}
         onOpenFolder={onOpenFolder}
         onOpenRecent={onOpenRecent}
-        onOpenWorkspaces={onOpenWorkspaces}
         onOpenReadingTimeline={onOpenReadingTimeline}
+        onShowGuide={onShowGuide}
         onReindex={onReindex}
       />
     )
 
+    expect(screen.getByText('今天想读什么？')).toBeInTheDocument()
+    expect(screen.getByText('guide.md')).toBeInTheDocument()
     expect(screen.getByText('docs')).toBeInTheDocument()
     expect(screen.getByText('/Users/me/docs')).toBeInTheDocument()
-    expect(screen.getByText('3 个最近文件')).toBeInTheDocument()
+    expect(screen.getByText('最近文件 (3)')).toBeInTheDocument()
     expect(screen.getByText('2 条阅读记录')).toBeInTheDocument()
     expect(screen.getByText('已索引 12 个文件')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: '从欢迎页打开 Markdown 文件' }))
     await user.click(screen.getByRole('button', { name: '从欢迎页选择资料夹' }))
-    await user.click(screen.getByRole('button', { name: '从欢迎页查看最近文件' }))
-    await user.click(screen.getByRole('button', { name: '从欢迎页打开工作区' }))
-    await user.click(screen.getByRole('button', { name: '从欢迎页打开阅读时间线' }))
+    await user.click(screen.getByRole('button', { name: '最近文件 (3)' }))
+    await user.click(screen.getByRole('button', { name: '从欢迎页继续阅读' }))
+    await user.click(screen.getByRole('button', { name: '使用提示' }))
     await user.click(screen.getByRole('button', { name: '从欢迎页重建索引' }))
 
+    expect(onOpenFile).toHaveBeenCalled()
     expect(onOpenFolder).toHaveBeenCalled()
     expect(onOpenRecent).toHaveBeenCalled()
-    expect(onOpenWorkspaces).toHaveBeenCalled()
     expect(onOpenReadingTimeline).toHaveBeenCalled()
+    expect(onShowGuide).toHaveBeenCalled()
     expect(onReindex).toHaveBeenCalled()
   })
 
@@ -57,16 +64,17 @@ describe('WelcomeHome', () => {
         isIndexing={false}
         currentFolderName=""
         currentFolderPath={null}
+        onOpenFile={vi.fn()}
         onOpenFolder={vi.fn()}
         onOpenRecent={vi.fn()}
-        onOpenWorkspaces={vi.fn()}
         onOpenReadingTimeline={vi.fn()}
+        onShowGuide={vi.fn()}
         onReindex={vi.fn()}
       />
     )
 
     expect(screen.getByText('未打开文件夹')).toBeInTheDocument()
-    expect(screen.getByText('0 个最近文件')).toBeInTheDocument()
+    expect(screen.getByText('还没有阅读记录')).toBeInTheDocument()
     expect(screen.getByText('0 条阅读记录')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '从欢迎页重建索引' })).toBeDisabled()
   })
@@ -81,10 +89,11 @@ describe('WelcomeHome', () => {
         indexProgress={{ discoveredFiles: 10, indexedFiles: 4, skippedFiles: 1 }}
         currentFolderName="docs"
         currentFolderPath="/Users/me/docs"
+        onOpenFile={vi.fn()}
         onOpenFolder={vi.fn()}
         onOpenRecent={vi.fn()}
-        onOpenWorkspaces={vi.fn()}
         onOpenReadingTimeline={vi.fn()}
+        onShowGuide={vi.fn()}
         onReindex={vi.fn()}
       />
     )

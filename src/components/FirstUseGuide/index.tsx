@@ -47,21 +47,9 @@ export function FirstUseGuide({ onComplete, onSkip }: Props) {
       position: 'bottom'
     },
     {
-      target: '[data-guide="source"]',
-      title: t('guide.steps.source.title'),
-      description: t('guide.steps.source.description'),
-      position: 'bottom'
-    },
-    {
-      target: '[data-guide="font-size"]',
-      title: t('guide.steps.fontSize.title'),
-      description: t('guide.steps.fontSize.description'),
-      position: 'bottom'
-    },
-    {
-      target: '[data-guide="focus-mode"]',
-      title: t('guide.steps.focusMode.title'),
-      description: t('guide.steps.focusMode.description'),
+      target: '[data-guide="tools"]',
+      title: '工具菜单',
+      description: '阅读工具、全局搜索、索引诊断和导出功能都集中在这里。',
       position: 'bottom'
     },
     {

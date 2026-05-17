@@ -1,6 +1,5 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback, useMemo } from 'react'
 import DOMPurify from 'dompurify'
-import { parseMarkdown } from '../../utils/markdownParser'
 import { useMarkdownWorker } from '../../hooks/useMarkdownWorker'
 import { getStorageItem, setStorageItem } from '../../utils/storage'
 import { createMermaidRenderId, getInitializedMermaid, hasMermaidLoaded } from '../../utils/mermaidLoader'
@@ -205,10 +204,36 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
     getContainer: () => containerRef.current
   }))
 
-  const { html: workerHtml } = useMarkdownWorker(content)
+  const { html: workerHtml, loading: workerLoading, error: workerError } = useMarkdownWorker(content)
+  const [fallbackHtml, setFallbackHtml] = useState('')
+
+  useEffect(() => {
+    setFallbackHtml('')
+  }, [content])
+
+  useEffect(() => {
+    if (!workerError || workerHtml) return
+
+    let cancelled = false
+    import('../../utils/markdownParser')
+      .then(({ parseMarkdownAsync }) => parseMarkdownAsync(content))
+      .then((result) => {
+        if (!cancelled) setFallbackHtml(result)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFallbackHtml(`<pre class="language-text"><code class="language-text">${escapeHtml(content)}</code></pre>`)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [content, workerError, workerHtml])
 
   const html = useMemo(() => {
-    const raw = workerHtml || parseMarkdown(content)
+    const raw = workerHtml || fallbackHtml
+    if (!raw) return ''
     return DOMPurify.sanitize(raw, {
       ALLOWED_TAGS: [
         'p', 'br', 'hr', 'div', 'span',
@@ -228,7 +253,9 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
       ],
       ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|wikilink):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     })
-  }, [workerHtml, content])
+  }, [workerHtml, fallbackHtml])
+
+  const isParsing = !html && (workerLoading || Boolean(workerError))
 
   const renderMermaidDiagrams = useCallback(async () => {
     if (!containerRef.current) return
@@ -601,7 +628,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         }
       })
     })
-  }, [content, filePath, renderMermaidDiagrams, onTextSelect, onWikiLinkClick])
+  }, [content, filePath, html, renderMermaidDiagrams, onTextSelect, onWikiLinkClick])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -719,7 +746,7 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
         allMarks[currentMatch].scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }
-  }, [searchQuery, searchRegex, currentMatch, matchCount])
+  }, [html, searchQuery, searchRegex, currentMatch, matchCount])
 
   const handleClosePreview = () => {
     setPreviewImage(null)
@@ -825,8 +852,10 @@ export const MarkdownRenderer = forwardRef<MarkdownRendererRef, Props>(({ conten
           letterSpacing: `${readingStyle.letterSpacing ?? 0}em`,
           ['--reader-paragraph-spacing' as string]: `${readingStyle.paragraphSpacing ?? 1}em`,
         } : undefined}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+        dangerouslySetInnerHTML={isParsing ? undefined : { __html: html }}
+      >
+        {isParsing ? <div className={styles.loading}>正在解析文档...</div> : null}
+      </div>
       {ttsButton && (
         <button
           className="tts-float-btn"

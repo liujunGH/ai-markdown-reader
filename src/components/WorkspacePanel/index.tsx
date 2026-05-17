@@ -23,8 +23,6 @@ interface Props {
   onRenameWorkspace: (id: string, name: string) => void
   onCleanInvalidWorkspaces: () => void
   onOpenGlobalSearch?: () => void
-  onOpenKnowledgeHealth?: () => void
-  onOpenMarkdownGraph?: () => void
   onOpenReadingTimeline?: () => void
   onClose: () => void
 }
@@ -42,8 +40,6 @@ export function WorkspacePanel({
   onRenameWorkspace,
   onCleanInvalidWorkspaces,
   onOpenGlobalSearch,
-  onOpenKnowledgeHealth,
-  onOpenMarkdownGraph,
   onOpenReadingTimeline,
   onClose,
 }: Props) {
@@ -113,28 +109,6 @@ export function WorkspacePanel({
           >
             <span>◷</span>
             时间线
-          </button>
-          <button
-            type="button"
-            className={styles.quickAction}
-            onClick={onOpenKnowledgeHealth}
-            disabled={!currentFolderPath}
-            aria-label="查看知识健康报告"
-            title={currentFolderPath ? '查看知识健康报告' : '打开文件夹后可用'}
-          >
-            <span>✓</span>
-            健康
-          </button>
-          <button
-            type="button"
-            className={styles.quickAction}
-            onClick={onOpenMarkdownGraph}
-            disabled={!currentFolderPath}
-            aria-label="查看文档图谱"
-            title={currentFolderPath ? '查看文档图谱' : '打开文件夹后可用'}
-          >
-            <span>◎</span>
-            图谱
           </button>
         </section>
 

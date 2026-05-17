@@ -1,0 +1,61 @@
+.container {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner[data-error="true"] {
+  border-color: var(--danger-color, #dc2626);
+  animation: none;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(520px, 70vw);
+}
+
+.copy strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.copy span,
+.copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.retryButton {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

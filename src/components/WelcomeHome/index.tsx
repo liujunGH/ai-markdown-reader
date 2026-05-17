@@ -14,10 +14,12 @@ interface Props {
   indexProgress?: IndexProgressSummary | null
   currentFolderName: string
   currentFolderPath: string | null
+  latestReadingName?: string
+  onOpenFile: () => void
   onOpenFolder: () => void
   onOpenRecent: () => void
-  onOpenWorkspaces: () => void
   onOpenReadingTimeline: () => void
+  onShowGuide: () => void
   onReindex: () => void
 }
 
@@ -29,10 +31,12 @@ export function WelcomeHome({
   indexProgress,
   currentFolderName,
   currentFolderPath,
+  latestReadingName,
+  onOpenFile,
   onOpenFolder,
   onOpenRecent,
-  onOpenWorkspaces,
   onOpenReadingTimeline,
+  onShowGuide,
   onReindex,
 }: Props) {
   const indexStatus = isIndexing && indexProgress
@@ -42,48 +46,59 @@ export function WelcomeHome({
       : '未打开工作区'
 
   return (
-    <section className={styles.home} aria-label="开始工作">
-      <div className={styles.summary}>
-        <div className={styles.workspace}>
-          <span className={styles.label}>当前工作区</span>
-          <strong title={currentFolderName || '未打开文件夹'}>
-            {currentFolderName || '未打开文件夹'}
-          </strong>
+    <section className={styles.home} aria-label="开始阅读">
+      <div className={styles.intro}>
+        <span className={styles.eyebrow}>Markdown Reader</span>
+        <h1>今天想读什么？</h1>
+        <p>
+          打开一个 Markdown 文件，选择一个资料夹，或回到上次停下的阅读位置。
+        </p>
+      </div>
+
+      <div className={styles.primaryActions}>
+        <button type="button" className={styles.primaryAction} onClick={onOpenFile} aria-label="从欢迎页打开 Markdown 文件">
+          打开文件
+        </button>
+        <button type="button" className={styles.action} onClick={onOpenFolder} aria-label="从欢迎页选择资料夹">
+          打开文件夹
+        </button>
+        <button type="button" className={styles.action} onClick={onOpenReadingTimeline} aria-label="从欢迎页继续阅读">
+          继续阅读
+        </button>
+      </div>
+
+      <div className={styles.context} aria-label="阅读状态">
+        <div className={styles.contextItem}>
+          <span className={styles.label}>最近阅读</span>
+          <strong title={latestReadingName || undefined}>{latestReadingName || '还没有阅读记录'}</strong>
+        </div>
+        <div className={styles.contextItem}>
+          <span className={styles.label}>当前文件夹</span>
+          <strong title={currentFolderName || '未打开文件夹'}>{currentFolderName || '未打开文件夹'}</strong>
           <span className={styles.path} title={currentFolderPath || undefined}>
-            {currentFolderPath || '打开文件夹后可以建立索引、查看图谱和恢复会话'}
+            {currentFolderPath || '打开文件夹后可使用全文搜索和索引诊断'}
           </span>
-        </div>
-        <div className={styles.stats} aria-label="恢复状态">
-          <span>{recentFileCount} 个最近文件</span>
-          <span>{readingHistoryCount} 条阅读记录</span>
-        </div>
-        <div className={styles.indexStatus} aria-label="索引状态">
-          <span>{indexStatus}</span>
-          <button
-            type="button"
-            className={styles.indexButton}
-            onClick={onReindex}
-            disabled={!currentFolderPath || isIndexing}
-            aria-label="从欢迎页重建索引"
-          >
-            {isIndexing ? '索引中' : '重建索引'}
-          </button>
         </div>
       </div>
 
-      <div className={styles.actions}>
-        <button type="button" className={styles.primaryAction} onClick={onOpenFolder} aria-label="从欢迎页选择资料夹">
-          打开文件夹
+      <div className={styles.secondaryActions}>
+        <button type="button" className={styles.textAction} data-guide="recent-files" onClick={onOpenRecent}>
+          最近文件 {recentFileCount > 0 ? `(${recentFileCount})` : ''}
         </button>
-        <button type="button" className={styles.action} onClick={onOpenRecent} aria-label="从欢迎页查看最近文件">
-          最近文件
+        <button type="button" className={styles.textAction} onClick={onShowGuide}>
+          使用提示
         </button>
-        <button type="button" className={styles.action} onClick={onOpenWorkspaces} aria-label="从欢迎页打开工作区">
-          工作区
+        <button
+          type="button"
+          className={styles.textAction}
+          onClick={onReindex}
+          disabled={!currentFolderPath || isIndexing}
+          aria-label="从欢迎页重建索引"
+        >
+          {isIndexing ? '索引中' : '重建索引'}
         </button>
-        <button type="button" className={styles.action} onClick={onOpenReadingTimeline} aria-label="从欢迎页打开阅读时间线">
-          时间线
-        </button>
+        <span className={styles.indexStatus}>{indexStatus}</span>
+        <span className={styles.indexStatus}>{readingHistoryCount} 条阅读记录</span>
       </div>
     </section>
   )
