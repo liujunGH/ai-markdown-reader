@@ -231,6 +231,38 @@ test.describe('Reading Flow', () => {
     await expect(window.getByRole('tab', { name: 'Target Note.md' })).toBeVisible()
   })
 
+  test('should resize the folder sidebar content when dragging the handle', async () => {
+    await mockOpenFileDialog([wikiFolderPath])
+
+    await window.getByRole('button', { name: '打开文件夹' }).click()
+    await expect(window.getByText(path.basename(wikiFolderPath))).toBeVisible()
+
+    const leftSidebar = window.locator('[class*="sidebar-left"]').first()
+    await expect(leftSidebar).toBeVisible()
+
+    const initialWidth = await getFolderSidebarWidths()
+    expect(initialWidth.outer).toBeGreaterThan(200)
+    expect(Math.abs(initialWidth.inner - initialWidth.outer)).toBeLessThanOrEqual(2)
+
+    const handle = leftSidebar.getByTitle('拖拽调整宽度')
+    const box = await handle.boundingBox()
+    expect(box).not.toBeNull()
+
+    await window.mouse.move(box!.x + box!.width / 2, box!.y + 20)
+    await window.mouse.down()
+    await window.mouse.move(box!.x + 120, box!.y + 20)
+    await window.mouse.up()
+
+    await expect.poll(getFolderSidebarWidths).toMatchObject({
+      outer: expect.any(Number),
+      inner: expect.any(Number),
+    })
+
+    const resizedWidth = await getFolderSidebarWidths()
+    expect(resizedWidth.outer).toBeGreaterThan(initialWidth.outer + 80)
+    expect(Math.abs(resizedWidth.inner - resizedWidth.outer)).toBeLessThanOrEqual(2)
+  })
+
   test('should restore file tabs without reopening the folder tree on restart', async () => {
     await mockOpenFileDialog([wikiFolderPath])
 
@@ -253,4 +285,16 @@ test.describe('Reading Flow', () => {
     await expect(window.getByRole('heading', { name: 'Wiki Index' })).toBeVisible()
     await expect(window.getByRole('button', { name: '打开文件：00-index.md' })).toHaveCount(0)
   })
+
+  async function getFolderSidebarWidths() {
+    return window.locator('[class*="sidebar-left"]').first().evaluate(element => {
+      const content = element.querySelector(':scope > div')
+      const folderPanel = content?.querySelector(':scope > div') as HTMLElement | null
+
+      return {
+        outer: Math.round(element.getBoundingClientRect().width),
+        inner: Math.round(folderPanel?.getBoundingClientRect().width ?? 0),
+      }
+    })
+  }
 })

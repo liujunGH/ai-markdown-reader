@@ -1,6 +1,7 @@
 .sidebar {
-  width: 240px;
-  border-right: 1px solid var(--border);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
