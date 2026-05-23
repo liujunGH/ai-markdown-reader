@@ -33,6 +33,11 @@ export function ResizableSidebar({
   const [isResizing, setIsResizing] = useState(false)
   const startXRef = useRef(0)
   const startWidthRef = useRef(width)
+  const latestWidthRef = useRef(width)
+
+  useEffect(() => {
+    latestWidthRef.current = width
+  }, [width])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -41,6 +46,7 @@ export function ResizableSidebar({
       setIsResizing(true)
       startXRef.current = e.clientX
       startWidthRef.current = width
+      latestWidthRef.current = width
     },
     [width]
   )
@@ -51,13 +57,14 @@ export function ResizableSidebar({
     const handleMouseMove = (e: MouseEvent) => {
       const delta = side === 'left' ? e.clientX - startXRef.current : startXRef.current - e.clientX
       const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidthRef.current + delta))
+      latestWidthRef.current = newWidth
       setWidth(newWidth)
     }
 
     const handleMouseUp = () => {
       setIsResizing(false)
       try {
-        localStorage.setItem(`sidebar-width-${storageKey}`, String(startWidthRef.current))
+        localStorage.setItem(`sidebar-width-${storageKey}`, String(latestWidthRef.current))
       } catch {
         // ignore
       }

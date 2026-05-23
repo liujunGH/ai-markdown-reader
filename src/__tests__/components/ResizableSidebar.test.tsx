@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ResizableSidebar } from '../../components/ResizableSidebar'
@@ -124,5 +124,23 @@ describe('ResizableSidebar', () => {
 
     const sidebar = screen.getByTitle('收起文件列表').parentElement
     expect(sidebar).toHaveStyle({ width: '160px' })
+  })
+
+  it('resizes a left sidebar and persists the final width', () => {
+    render(
+      <ResizableSidebar side="left" storageKey="left" isOpen defaultWidth={240} minWidth={160} maxWidth={500}>
+        <div>Content</div>
+      </ResizableSidebar>
+    )
+
+    const resizer = screen.getByTitle('拖拽调整宽度')
+    const sidebar = screen.getByTitle('收起文件列表').parentElement
+
+    fireEvent.mouseDown(resizer, { clientX: 240 })
+    fireEvent.mouseMove(document, { clientX: 360 })
+    fireEvent.mouseUp(document)
+
+    expect(sidebar).toHaveStyle({ width: '360px' })
+    expect(window.localStorage.getItem('sidebar-width-left')).toBe('360')
   })
 })

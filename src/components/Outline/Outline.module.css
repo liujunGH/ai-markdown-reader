@@ -1,6 +1,7 @@
 .outline {
   width: 100%;
-  border-left: 1px solid var(--border);
+  min-width: 0;
+  box-sizing: border-box;
   padding: 16px;
   background: var(--bg-secondary);
   height: 100%;
@@ -26,6 +27,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
   max-height: 60px;
   opacity: 1;
   overflow: hidden;
@@ -69,7 +71,10 @@
   border-radius: 4px;
   flex: 1;
   min-width: 0;
+  box-sizing: border-box;
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .link:hover {
