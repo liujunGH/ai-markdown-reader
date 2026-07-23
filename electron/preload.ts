@@ -217,4 +217,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   offUpdateError: (callback: (info: { error: string }) => void) => {
     updateErrorCallbacks.delete(callback)
   },
+  // DB IPC（主进程 SQLite 访问，阶段 1 新增）
+  dbQuery: createIPCCall<(sql: string, params?: unknown[]) => Promise<{ success: boolean; rows?: Record<string, unknown>[]; error?: string }>>('db:query'),
+  dbExec: createIPCCall<(sql: string, params?: unknown[]) => Promise<{ success: boolean; changes?: number; lastInsertRowid?: number | bigint; error?: string }>>('db:exec'),
 })
