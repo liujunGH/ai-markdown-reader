@@ -1,45 +1,44 @@
-export interface RecentFile {
-  name: string
-  filePath: string
-  openedAt: number
+/**
+ * 渲染进程 IPC 类型契约
+ *
+ * 共享数据类型（RecentFile / FolderFile / WindowState / MarkdownScan* 等）
+ * 统一定义在 shared/ipc-channels.ts，此处 re-export 以保持现有导入路径
+ * （`from '../types/electron'`）不变，消除重复定义。
+ *
+ * 修改 IPC 时，shared 层是唯一改动点。
+ */
+import type {
+  RecentFile,
+  FolderFile,
+  WindowState,
+  MarkdownScanOptions,
+  MarkdownScanSkippedItem,
+  FileInfo,
+  FileDialogFilter,
+} from '../../shared'
+
+export type {
+  RecentFile,
+  FolderFile,
+  WindowState,
+  MarkdownScanOptions,
+  MarkdownScanSkippedItem,
+  FileInfo,
+  FileDialogFilter,
 }
 
-export interface FolderFile {
-  name: string
-  filePath: string
-  size?: number
-  lastModified?: number
-  isDirectory?: boolean
-}
-
-export interface MarkdownScanOptions {
-  maxFileSizeBytes?: number
-  skipDirectoryNames?: string[]
-}
-
-export interface MarkdownScanSkippedItem {
-  path: string
-  name: string
-  reason: 'ignored-directory' | 'large-file' | 'read-error'
-  detail?: string
-  size?: number
-  maxSize?: number
-}
-
-export interface WindowState {
-  width: number
-  height: number
-  x?: number
-  y?: number
-  isMaximized?: boolean
-  isFullScreen?: boolean
-}
-
+/**
+ * window.electronAPI 的完整类型表面。
+ * 必须与 preload.ts 暴露的方法、shared/ipc-channels.ts 的 channel 名逐一对齐。
+ */
 export interface ElectronAPI {
   openFileDialog: () => Promise<{ filePath: string; content: string; error?: string } | null>
   openFolderDialog: () => Promise<string | null>
   readFolder: (folderPath: string) => Promise<{ success: boolean; files?: FolderFile[]; error?: string }>
-  scanMarkdownFiles: (folderPath: string, options?: MarkdownScanOptions) => Promise<{
+  scanMarkdownFiles: (
+    folderPath: string,
+    options?: MarkdownScanOptions
+  ) => Promise<{
     success: boolean
     files?: Array<{ name: string; filePath: string }>
     skippedItems?: MarkdownScanSkippedItem[]
@@ -50,16 +49,7 @@ export interface ElectronAPI {
   updateMarkdownFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
   downloadRemoteImage: (url: string, outputPath: string) => Promise<{ success: boolean; error?: string }>
   readImageAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>
-  getFileInfo: (filePath: string) => Promise<{
-    success: boolean
-    info?: {
-      name: string
-      size: number
-      lastModified: number
-      created: number
-    }
-    error?: string
-  }>
+  getFileInfo: (filePath: string) => Promise<{ success: boolean; info?: FileInfo; error?: string }>
   showInFolder: (filePath: string) => Promise<void>
   onOpenFile: (callback: (filePath: string) => void) => void
   offOpenFile: (callback: (filePath: string) => void) => void
@@ -82,9 +72,19 @@ export interface ElectronAPI {
   pathJoin: (...paths: string[]) => string
   setProgressBar: (progress: number) => Promise<void>
   clearProgressBar: () => Promise<void>
-  exportHTMLToPDF: (options: { html: string; defaultPath: string; title: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>
-  saveTextFile: (options: { defaultPath: string; content: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; error?: string; cancelled?: boolean }>
-  openTextFile: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; filePath?: string; content?: string; error?: string; cancelled?: boolean }>
+  exportHTMLToPDF: (options: {
+    html: string
+    defaultPath: string
+    title: string
+  }) => Promise<{ success: boolean; filePath?: string; error?: string }>
+  saveTextFile: (options: {
+    defaultPath: string
+    content: string
+    filters?: FileDialogFilter[]
+  }) => Promise<{ success: boolean; filePath?: string; error?: string; cancelled?: boolean }>
+  openTextFile: (options?: {
+    filters?: FileDialogFilter[]
+  }) => Promise<{ success: boolean; filePath?: string; content?: string; error?: string; cancelled?: boolean }>
   setTitle: (title: string) => Promise<void>
   onSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
   offSystemThemeChange: (callback: (theme: 'light' | 'dark') => void) => void
@@ -96,28 +96,24 @@ export interface ElectronAPI {
   // Auto-updater events
   onUpdateAvailable: (callback: (info: { version: string }) => void) => void
   offUpdateAvailable: (callback: (info: { version: string }) => void) => void
-  onUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void
-  offUpdateProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void
+  onUpdateProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => void
+  offUpdateProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => void
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => void
   offUpdateDownloaded: (callback: (info: { version: string }) => void) => void
   onUpdateError: (callback: (info: { error: string }) => void) => void
   offUpdateError: (callback: (info: { error: string }) => void) => void
-  showSaveDialog: (options?: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string } | null>
-  showOpenDialog: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePaths: string[] } | null>
+  // ★新增：DB IPC（主进程 SQLite 查询通道）
+  dbQuery: <T = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<{ success: boolean; rows?: T[]; error?: string }>
+  dbExec: (sql: string, params?: unknown[]) => Promise<{ success: boolean; changes?: number; lastInsertRowid?: number | bigint; error?: string }>
 }
 
 declare global {
   interface Window {
-    showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>
     electronAPI?: ElectronAPI
-  }
-
-  interface FileSystemDirectoryHandle {
-    values(): AsyncIterableIterator<FileSystemFileHandle>
-    getFile(): Promise<File>
-    getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle>
-    queryPermission(options?: { mode?: string }): Promise<PermissionState>
-    requestPermission(options?: { mode?: string }): Promise<PermissionState>
   }
 }
 

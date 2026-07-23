@@ -7,7 +7,7 @@ import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFile
 import { isExternalUrl } from './lib/externalLinks'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const APP_VERSION = require('../package.json').version
+const APP_VERSION = require('../../package.json').version
 
 const logger = createLogger('main')
 

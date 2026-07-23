@@ -20,11 +20,11 @@ files:
   - package.json
 
 extraResources:
-  - from: dist-electron/preload.js
+  - from: dist-electron/electron/preload.js
     to: electron/preload.js
 
 extraMetadata:
-  main: dist-electron/main.js
+  main: dist-electron/electron/main.js
 
 # Ad-hoc signing when no real Apple Developer ID certificate is available.
 # This allows the app to run on macOS with right-click > Open.
