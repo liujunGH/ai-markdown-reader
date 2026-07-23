@@ -42,6 +42,11 @@ export function encodeBase64(str: string): string {
   return btoa(binString)
 }
 
+/** Base64 解码（Latin1 兼容，与旧 MarkdownRenderer.decodeBase64 一致） */
+export function decodeBase64(str: string): string {
+  return decodeURIComponent(escape(atob(str)))
+}
+
 export function simpleHash(str: string): string {
   let hash = 5381
   for (let i = 0; i < str.length; i++) {

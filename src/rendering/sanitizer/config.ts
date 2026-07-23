@@ -44,6 +44,7 @@ export const SANITIZE_CONFIG = {
     'class', 'id',
     'data-content', 'data-code', 'data-lines', 'data-code-hash', 'data-alt-target',
     'data-original-src', 'data-mermaid-code', 'data-mermaid-rendered', 'data-latex',
+    'data-enhanced', 'data-wiki-bound', 'data-mermaid-code-stored',
     // KaTeX / SVG 属性
     'style', 'aria-hidden', 'role', 'viewBox', 'fill', 'stroke', 'stroke-width',
     'd', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry',

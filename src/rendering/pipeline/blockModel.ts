@@ -270,7 +270,11 @@ function buildBlock(
   }
 }
 
-/** 内容指纹（用于 task list checkbox / 代码折叠等持久化 key） */
+/**
+ * 内容指纹（用于 task list checkbox / 代码折叠等持久化 key）。
+ * 用全文 simpleHash（与旧 MarkdownRenderer 的 simpleHash(content) 一致），
+ * 保证新旧版持久化 key 兼容，用户升级后折叠/勾选状态不丢失。
+ */
 export function contentHash(content: string): string {
-  return simpleHash(content.slice(0, 200))
+  return simpleHash(content)
 }
