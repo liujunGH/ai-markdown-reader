@@ -18,8 +18,8 @@ test.describe('App Launch', () => {
     })
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
-    // Wait for React to render the welcome home
-    await window.waitForSelector('section[aria-label="开始阅读"]', { timeout: 10000 })
+    // v2 AppShell: 等待 header 渲染（含 "Markdown Reader (v2)"）
+    await window.waitForSelector('header', { timeout: 10000 })
   })
 
   test.afterEach(async () => {
@@ -29,18 +29,15 @@ test.describe('App Launch', () => {
   })
 
   test('should launch application successfully', async () => {
-    // Verify the app has rendered the welcome home section
-    const welcomeSection = window.locator('section[aria-label="开始阅读"]')
-    await expect(welcomeSection).toBeVisible()
-    // Verify version is shown in the status bar
-    await expect(window.getByText(/v\d+\.\d+\.\d+/)).toBeVisible()
+    // v2: 验证 AppShell header 渲染
+    const header = window.locator('header')
+    await expect(header).toBeVisible()
+    await expect(header).toContainText('Markdown Reader')
   })
 
   test('should have basic UI elements', async () => {
-    // The welcome home should be visible with primary action buttons.
-    // Use data-guide selector: '打开文件' substring-matches the toolbar's
-    // '打开文件夹' button, so role+name is ambiguous here.
-    await expect(window.locator('button[data-guide="file-opener"]')).toBeVisible()
-    await expect(window.getByRole('button', { name: '打开文件夹' })).toBeVisible()
+    // v2: 工具栏按钮（title 属性匹配，按钮文本是 emoji）
+    const openFileBtn = window.locator('header button[title="打开文件"]')
+    await expect(openFileBtn).toBeVisible()
   })
 })

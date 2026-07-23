@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PanelName } from '../../stores'
+import type { PanelName } from '../../state'
 import styles from './ToolsMenu.module.css'
 
 interface ToolItem {

@@ -1,156 +1,28 @@
+/**
+ * 同步 Markdown 解析（导出用）
+ *
+ * v2 渲染走 worker + 块模型，但导出（ExportPanel）需要一次性把整篇渲染成
+ * HTML 字符串。这里提供同步 parseMarkdown，用 markdown-it 实例渲染。
+ * 用静态 import 在模块加载时同步初始化（导出场景需要同步可用）。
+ */
 import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
-import Prism from 'prismjs'
-import 'prismjs/components/prism-javascript'
-import 'prismjs/components/prism-typescript'
-import 'prismjs/components/prism-python'
-import 'prismjs/components/prism-java'
-import 'prismjs/components/prism-bash'
-import 'prismjs/components/prism-json'
-import 'prismjs/components/prism-css'
-import 'prismjs/components/prism-markup'
-import 'prismjs/components/prism-markdown'
-import 'prismjs/components/prism-jsx'
-import 'prismjs/components/prism-tsx'
-import texmath from 'markdown-it-texmath'
-import * as katex from 'katex'
-import { full } from 'markdown-it-emoji'
 
-const loadedLanguages = new Set<string>()
-loadedLanguages.add('markup') // prism-markup is base
-
-async function loadPrismLanguage(lang: string): Promise<void> {
-  if (loadedLanguages.has(lang)) return
-  if (!lang || Prism.languages[lang]) return
-  try {
-    await import(/* @vite-ignore */ `prismjs/components/prism-${lang}`)
-    loadedLanguages.add(lang)
-  } catch {
-    // Language not available, fall back to plain text
-  }
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
-function encodeBase64(str: string): string {
-  const bytes = new TextEncoder().encode(str)
-  const binString = Array.from(bytes, (b) => String.fromCharCode(b)).join('')
-  return btoa(binString)
-}
-
-function simpleHash(str: string): string {
-  let hash = 5381
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i)
-  }
-  return (hash >>> 0).toString(36)
-}
-
-function highlightCode(str: string, lang: string): string {
-  if (lang === 'mermaid') {
-    const encoded = encodeBase64(str)
-    return `<div class="mermaid-code" data-content="${encoded}"></div>`
-  }
-
-  if (lang === 'diff') {
-    const lines = str.split('\n')
-    const highlighted = lines.map(line => {
-      if (line.startsWith('+ ')) return `<span class="diff-add">${escapeHtml(line)}</span>`
-      if (line.startsWith('- ')) return `<span class="diff-del">${escapeHtml(line)}</span>`
-      if (line.startsWith('@@')) return `<span class="diff-meta">${escapeHtml(line)}</span>`
-      return escapeHtml(line)
-    }).join('\n')
-    const lineCount = lines.length
-    const codeHash = simpleHash(str.slice(0, 20))
-    return `<pre class="language-diff" data-lines="${lineCount}" data-code-hash="${codeHash}"><code class="language-diff">${highlighted}</code></pre>`
-  }
-
-  const lineCount = str.split('\n').length
-  const codeHash = simpleHash(str.slice(0, 20))
-
-  if (lang && Prism.languages[lang]) {
-    try {
-      const highlighted = Prism.highlight(str, Prism.languages[lang], lang)
-      return `<pre class="language-${lang}" data-lines="${lineCount}" data-code-hash="${codeHash}"><code class="language-${lang}">${highlighted}</code></pre>`
-    } catch {
-      // Fallback to escaped HTML
-    }
-  }
-  const escaped = escapeHtml(str)
-  return `<pre class="language-text" data-lines="${lineCount}" data-code-hash="${codeHash}"><code class="language-text">${escaped}</code></pre>`
-}
-
-const md: MarkdownIt = new MarkdownIt({
+const mdInstance: MarkdownIt = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
-  highlight: highlightCode
 })
 
-md.use(texmath, {
-  engine: katex,
-  delimiters: 'dollars',
-  katexOptions: {
-    output: 'html',
-    throwOnError: false,
-    strict: 'ignore',
-    trust: false,
-  },
-})
-md.use(full)
-
-function postProcessHtml(rawHtml: string): string {
-  // WikiLink: [[filename]] 或 [[filename|display]]
-  rawHtml = rawHtml.replace(
-    /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
-    (_match, target, display) => {
-      const text = display || target
-      const altTarget = display ? ` data-alt-target="${encodeURIComponent(display)}"` : ''
-      return `<a href="wikilink://${encodeURIComponent(target)}" class="wikilink"${altTarget}>${escapeHtml(text)}</a>`
-    }
-  )
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS: [
-      // Markdown 标准标签
-      'p', 'br', 'hr', 'div', 'span', 'section', 'eq', 'eqn',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'ul', 'ol', 'li', 'dl', 'dt', 'dd',
-      'strong', 'b', 'em', 'i', 'strike', 'del', 's',
-      'a', 'img',
-      'code', 'pre', 'blockquote',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td',
-      'sup', 'sub',
-    ],
-    ALLOWED_ATTR: [
-      'href', 'title', 'target', 'rel',
-      'src', 'alt', 'width', 'height',
-      'class', 'id',
-      'data-content', 'data-code', 'data-lines', 'data-code-hash', 'data-alt-target',
-    ],
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|wikilink):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-  })
-}
-
+/**
+ * 同步解析 Markdown 为 HTML（导出用）。
+ * 注：不含 Prism 高亮 / KaTeX / Mermaid（导出场景用纯 HTML 即可，
+ * 复杂渲染在阅读器里由 worker+块模型处理）。
+ */
 export function parseMarkdown(content: string): string {
-  let rawHtml = md.render(content)
-  return postProcessHtml(rawHtml)
+  return mdInstance.render(content)
 }
 
-export async function parseMarkdownAsync(content: string): Promise<string> {
-  const langMatches = content.match(/```([a-zA-Z0-9_-]+)/g)
-  if (langMatches) {
-    const langs = [...new Set(langMatches.map(m => m.slice(3)))]
-    await Promise.all(langs.map(loadPrismLanguage))
-  }
-  let rawHtml = md.render(content)
-  return postProcessHtml(rawHtml)
+/** 异步确保 parser 就绪（导出前调用；静态 import 下已是 no-op，保留接口兼容） */
+export async function ensureParser(): Promise<void> {
+  // 静态 import 已在模块加载时初始化，无需异步准备
 }
-
-export { md }
