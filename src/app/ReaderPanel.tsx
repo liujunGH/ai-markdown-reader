@@ -9,19 +9,34 @@
  *
  * 后续阶段接入：Outline/Minimap/搜索/阅读工具等围绕此面板。
  */
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { useTabStore, useUIStore } from '../state'
 import { useDocument } from '../rendering/hooks/useDocument'
-import { DocumentView } from '../rendering/DocumentView'
+import { DocumentView, type DocumentViewHandle } from '../rendering/DocumentView'
 import { getDocHash } from '../rendering/enhancements'
 import { getContent } from '../resources/DocumentCache'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderOutline } from '../features/reader/ReaderOutline'
+import { registerReaderScroll } from './readerScrollRegistry'
 
 export function ReaderPanel() {
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
   const fontSize = useUIStore((s) => s.fontSize)
   const { syncWindowTitle } = useDocumentActions()
+  const docViewRef = useRef<DocumentViewHandle>(null)
+
+  // 注册 scroll handle 供阅读工具等兄弟组件触发
+  useEffect(() => {
+    registerReaderScroll(
+      docViewRef.current
+        ? {
+            scrollToHeading: (id) => docViewRef.current?.scrollToHeading(id),
+            scrollToLine: (line) => docViewRef.current?.scrollToLine(line),
+          }
+        : null
+    )
+    return () => registerReaderScroll(null)
+  })
 
   const tabId = activeTab?.id ?? ''
   const filePath = activeTab?.filePath
@@ -74,6 +89,7 @@ export function ReaderPanel() {
         }}
       >
         <DocumentView
+          ref={docViewRef}
           document={document}
           contentVersion={contentVersion}
           enhance={{

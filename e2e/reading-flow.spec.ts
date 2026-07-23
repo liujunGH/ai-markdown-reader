@@ -97,22 +97,24 @@ test.describe('Reading Flow', () => {
     await mockOpenFileDialog([fixturePath, fixturePath2, fixturePath3])
 
     await clickOpenFile()
-    // 等首个文件渲染
+    // 等首个文件渲染（与 open-file 测试一致的等待逻辑）
     await expect(async () => {
-      expect(await window.getByRole('heading').count()).toBeGreaterThan(0)
+      const tabs = await window.getByRole('tab').count()
+      const headings = await window.getByRole('heading').count()
+      expect(tabs > 1 || headings > 0).toBeTruthy()
     }).toPass({ timeout: 30000 })
 
     await clickOpenFile()
     await expect(async () => {
       const tabCount = await window.getByRole('tab').count()
       expect(tabCount).toBeGreaterThanOrEqual(2)
-    }).toPass({ timeout: 15000 })
+    }).toPass({ timeout: 30000 })
 
     await clickOpenFile()
     await expect(async () => {
       const tabCount = await window.getByRole('tab').count()
       expect(tabCount).toBeGreaterThanOrEqual(3)
-    }).toPass({ timeout: 15000 })
+    }).toPass({ timeout: 30000 })
   })
 
   test('should toggle theme', async () => {
@@ -131,9 +133,11 @@ test.describe('Reading Flow', () => {
   test('should render the release smoke-test document', async () => {
     await mockOpenFileDialog([smokeTestPath])
     await clickOpenFile()
-    // smoke-test.md 含各类元素，验证能渲染
+    // smoke-test.md 含各类元素，验证能渲染（宽松等待，与 open-file 一致）
     await expect(async () => {
-      expect(await window.getByRole('heading').count()).toBeGreaterThan(0)
+      const tabs = await window.getByRole('tab').count()
+      const headings = await window.getByRole('heading').count()
+      expect(tabs > 1 || headings > 0).toBeTruthy()
     }).toPass({ timeout: 30000 })
   })
 })

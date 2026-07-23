@@ -54,6 +54,10 @@ export interface DocumentViewProps {
 export interface DocumentViewHandle {
   /** 取滚动容器 DOM（供外部 scrollTo / scrollSpy 用） */
   getScrollElement: () => HTMLElement | null
+  /** 滚动到指定 heading id（锚点跳转） */
+  scrollToHeading: (headingId: string) => void
+  /** 滚动到指定行号（快速跳转/搜索定位） */
+  scrollToLine: (line: number) => void
 }
 
 export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
@@ -78,8 +82,24 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
       ref,
       () => ({
         getScrollElement: () => scrollRef.current,
+        scrollToHeading: (headingId: string) => {
+          const el = scrollRef.current?.querySelector(`#${CSS.escape(headingId)}`)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        },
+        scrollToLine: (line: number) => {
+          // 找到覆盖该行的块（块的 startLine <= line <= endLine）
+          const blockIdx = blocks.findIndex(
+            (b) => b.startLine <= line && line <= b.endLine
+          )
+          if (blockIdx >= 0) {
+            virtualizer.scrollToIndex(blockIdx, { align: 'center' })
+          }
+        },
       }),
-      []
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [blocks]
     )
 
     const virtualItems = virtualizer.getVirtualItems()

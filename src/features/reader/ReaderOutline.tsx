@@ -11,6 +11,7 @@ import { useMemo } from 'react'
 import { Outline } from '../../components/Outline'
 import type { OutlineItem } from '../../hooks/useOutline'
 import type { ParsedDocument } from '../../rendering/types'
+import { scrollToHeading } from '../../app/readerScrollRegistry'
 
 interface ReaderOutlineProps {
   document: ParsedDocument
@@ -35,7 +36,10 @@ export function ReaderOutline({ document, filePath, activeId, onItemClick }: Rea
     <Outline
       items={items}
       activeId={activeId ?? null}
-      onItemClick={(id) => onItemClick?.(id)}
+      onItemClick={(id) => {
+        scrollToHeading(id)
+        onItemClick?.(id)
+      }}
       filePath={filePath}
     />
   )

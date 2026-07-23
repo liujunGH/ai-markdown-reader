@@ -10,6 +10,7 @@ import { useDocument } from '../../rendering/hooks/useDocument'
 import { getContent } from '../../resources/DocumentCache'
 import QuickJump from '../../components/QuickJump'
 import type { OutlineItem } from '../../hooks/useOutline'
+import { scrollToHeading, scrollToLine } from '../../app/readerScrollRegistry'
 
 export function ReaderQuickJump() {
   const activeTabId = useTabStore((s) => s.activeTabId)
@@ -32,13 +33,13 @@ export function ReaderQuickJump() {
     [document]
   )
 
-  // 跳转：阶段 4.10 先 console（需接 DocumentView 的 scrollTo）
+  // 跳转：通过 readerScrollRegistry 滚动 DocumentView
   const handleJumpToLine = (line: number) => {
-    console.log('[v2] jump to line', line)
+    scrollToLine(line)
     closePanel('quickJump')
   }
   const handleJumpToHeading = (id: string) => {
-    console.log('[v2] jump to heading', id)
+    scrollToHeading(id)
     closePanel('quickJump')
   }
 

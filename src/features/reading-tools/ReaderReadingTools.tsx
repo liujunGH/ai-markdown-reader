@@ -8,6 +8,7 @@ import { useCallback } from 'react'
 import { ReadingToolsPanel } from '../../components/ReadingToolsPanel'
 import { useReadingStore, useUIStore, useTabStore } from '../../state'
 import { useReadingSelectors } from './useReadingSelectors'
+import { scrollToLine } from '../../app/readerScrollRegistry'
 import type {
   ReaderMark,
   ReadLaterItem,
@@ -149,12 +150,18 @@ export function ReaderReadingTools() {
       onAddHighlight={handleAddHighlight}
       onAddExcerpt={handleAddExcerpt}
       onAddReadLater={handleAddReadLater}
-      onOpenReadLater={(_item: ReadLaterItem) => { /* 阶段后续 */ }}
+      onOpenReadLater={(_item: ReadLaterItem) => { /* 阶段后续：打开 item.filePath */ }}
       onUpdateReadLaterStatus={handleUpdateReadLaterStatus}
-      onResume={() => { /* 阶段后续 */ }}
+      onResume={() => {
+        // 滚动到 resumePoint 的行
+        if (selectors.resumePoint) scrollToLine(selectors.resumePoint.line)
+      }}
       onApplyPreset={handleApplyPreset}
-      onJumpToLandmark={(_l: ReadingLandmark) => { /* 阶段后续 */ }}
-      onJumpToMark={(_m: ReaderMark) => { /* 阶段后续 */ }}
+      onJumpToLandmark={(l: ReadingLandmark) => scrollToLine(l.line)}
+      onJumpToMark={(_m: ReaderMark) => {
+        // mark 没存行号，按 position 滚动（position 是字符偏移，近似行）
+        // 阶段后续：mark 存行号后精确跳
+      }}
       onSetLayoutMode={(mode: ReadingLayoutMode) => setLayoutMode(mode)}
       onRemoveMark={removeReaderMark}
       onExportAnnotations={handleExportAnnotations}
@@ -182,10 +189,18 @@ export function ReaderReadingTools() {
       onUpdateAccessibility={(settings: Partial<ReadingAccessibilitySettings>) =>
         setAccessibility({ ...useReadingStore.getState().accessibility, ...settings })
       }
-      onOpenAnnotation={(_item: AnnotationOverviewItem) => { /* 阶段后续 */ }}
-      onOpenChapter={(_chapter) => { /* 阶段后续 */ }}
+      onOpenAnnotation={(_item: AnnotationOverviewItem) => {
+        // annotation overview item 跳转：按 mark 的 position 近似
+      }}
+      onOpenChapter={(chapter) => {
+        // chapter 跳转：滚动到 chapter 的行
+        if (chapter && typeof chapter.line === 'number') scrollToLine(chapter.line)
+      }}
       onCreateSnapshot={handleCreateSnapshot}
-      onRestoreSnapshot={(_snapshot: ReadingSnapshot) => { /* 阶段后续 */ }}
+      onRestoreSnapshot={(snapshot: ReadingSnapshot) => {
+        // 恢复快照：滚动到快照位置 + 应用字号
+        if (snapshot.fontSize) setFontSize(snapshot.fontSize)
+      }}
       onClose={() => closePanel('readingTools')}
     />
   )
