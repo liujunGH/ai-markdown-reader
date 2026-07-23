@@ -21,6 +21,7 @@ import { ReaderSearch } from '../features/search/ReaderSearch'
 import { ReaderQuickJump } from '../features/search/ReaderQuickJump'
 import { ReaderCommandPalette } from '../features/search/ReaderCommandPalette'
 import { ReaderWorkspace } from '../features/workspace/ReaderWorkspace'
+import { ReaderToolbar } from '../features/shell/ReaderToolbar'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -29,11 +30,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [ready, setReady] = useState(false)
-  const {
-    handleOpenFileEvent,
-    openFileDialog,
-    openExample,
-  } = useDocumentActions()
+  const { handleOpenFileEvent } = useDocumentActions()
 
   // 一次性初始化：安装副作用 + 恢复会话
   useEffect(() => {
@@ -64,21 +61,13 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>{children ?? <MinimalAppShell onOpenFile={openFileDialog} onOpenExample={openExample} />}</ThemeProvider>
+      <ThemeProvider>{children ?? <MinimalAppShell />}</ThemeProvider>
     </ErrorBoundary>
   )
 }
 
-/** 最小可用 UI：工具栏（打开文件/示例）+ ReaderPanel + 搜索/命令面板 */
-function MinimalAppShell({
-  onOpenFile,
-  onOpenExample,
-}: {
-  onOpenFile: () => Promise<string | null>
-  onOpenExample: () => void
-}) {
-  const tabsCount = useTabStore((s) => s.tabs.length)
-  const activeTabName = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.name)
+/** 最小可用 UI：工具栏 + ReaderPanel + 侧栏 + 搜索/命令面板 */
+function MinimalAppShell() {
   const togglePanel = useUIStore((s) => s.togglePanel)
   const showSearch = useUIStore((s) => s.panels.search)
   const showFileSidebar = useUIStore((s) => s.panels.fileSidebar)
@@ -115,22 +104,7 @@ function MinimalAppShell({
         }}
       >
         <strong style={{ marginRight: 8 }}>Markdown Reader (v2)</strong>
-        <button type="button" onClick={() => void onOpenFile()}>
-          📂 打开文件
-        </button>
-        <button type="button" onClick={onOpenExample}>
-          📄 示例文档
-        </button>
-        <button type="button" onClick={() => togglePanel('search')}>
-          🔍 搜索
-        </button>
-        <button type="button" onClick={() => togglePanel('fileSidebar')}>
-          📁 文件
-        </button>
-        <span style={{ marginLeft: 'auto', color: '#888', fontSize: 13 }}>
-          标签 {tabsCount}
-          {activeTabName ? ` · ${activeTabName}` : ''}
-        </span>
+        <ReaderToolbar />
       </header>
       <TabBar />
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -149,7 +123,6 @@ function MinimalAppShell({
         </main>
       </div>
       <StatusBar />
-      {/* 浮层面板（命令面板/快速跳转） */}
       <ReaderCommandPalette />
       <ReaderQuickJump />
     </div>
