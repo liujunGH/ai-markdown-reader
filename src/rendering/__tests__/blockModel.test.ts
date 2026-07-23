@@ -158,6 +158,14 @@ describe('splitIntoBlocks — 标题与大纲', () => {
     expect(outline[0].text).toBe('中文标题')
   })
 
+  it('heading id 注入到块 HTML（供大纲/锚点/scrollspy 定位）', () => {
+    const content = '# Hello World'
+    const tokens = md.parse(content, {})
+    const { blocks } = splitIntoBlocks(tokens, md, content)
+    // HTML 应含 <h1 id="hello-world">
+    expect(blocks[0].html).toContain('<h1 id="hello-world">')
+  })
+
   it('行号范围正确（1-based）', () => {
     const content = `第一行标题上方
 

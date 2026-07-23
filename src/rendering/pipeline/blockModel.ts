@@ -241,12 +241,22 @@ function buildBlock(
   startLine: number,
   endLine: number
 ): DocumentBlock {
+  // 先收集元数据（heading id 等需注入到 HTML）
+  const meta = collectBlockMeta(kind, blockTokens)
+
   // 用 markdown-it 渲染这一组 token 成 HTML 片段
   let html = md.renderer.render(blockTokens, md.options, {})
+
+  // heading 块注入 id（供大纲/scrollspy/锚点跳转，与旧渲染器 heading.id = slugify 一致）
+  if (kind === 'heading' && meta.headingId && meta.headingLevel) {
+    const tag = `h${meta.headingLevel}`
+    // 在开标签后注入 id="<headingId>"
+    html = html.replace(new RegExp(`<${tag}>`), `<${tag} id="${meta.headingId}">`)
+  }
+
   // WikiLink 后处理（与旧 worker 一致）
   html = processWikiLinks(html)
 
-  const meta = collectBlockMeta(kind, blockTokens)
   const estimatedHeight = estimateBlockHeight(kind, html, meta)
 
   return {
