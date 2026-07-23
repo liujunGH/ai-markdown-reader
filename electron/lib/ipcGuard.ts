@@ -52,7 +52,7 @@ export function validateFilePath(filePath: string): boolean {
   const desktopDir = app.getPath('desktop')
   const documentsDir = app.getPath('documents')
   const downloadsDir = app.getPath('downloads')
-  const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir, '/tmp']
+  const safeRoots = [homeDir, userDataDir, tempDir, desktopDir, documentsDir, downloadsDir]
 
   const safeRootRealPaths = safeRoots.map(root => getRealPathOrResolved(root))
   const targetRealPath = getTargetRealPath(resolved)

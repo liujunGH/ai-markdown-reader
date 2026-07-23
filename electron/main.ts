@@ -6,6 +6,9 @@ import { createLogger } from './lib/logger'
 import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFileSize } from './lib/ipcGuard'
 import { isExternalUrl } from './lib/externalLinks'
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const APP_VERSION = require('../package.json').version
+
 const logger = createLogger('main')
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
@@ -483,7 +486,7 @@ function createMenu() {
             const win = getTargetWindow()
             const detail = `一款沉浸式的 Markdown 阅读器
 
-版本: 1.5.2
+版本: ${APP_VERSION}
 
 功能特性:
 • 多标签页支持，标签拖拽重排序

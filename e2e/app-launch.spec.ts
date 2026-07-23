@@ -18,6 +18,8 @@ test.describe('App Launch', () => {
     })
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
+    // Wait for React to render the welcome home
+    await window.waitForSelector('section[aria-label="开始阅读"]', { timeout: 10000 })
   })
 
   test.afterEach(async () => {
@@ -27,12 +29,16 @@ test.describe('App Launch', () => {
   })
 
   test('should launch application successfully', async () => {
-    const title = await window.title()
-    expect(title).toBe('Markdown Reader')
+    // Verify the app has rendered the welcome home section
+    const welcomeSection = window.locator('section[aria-label="开始阅读"]')
+    await expect(welcomeSection).toBeVisible()
+    // Verify version is shown in the status bar
+    await expect(window.getByText(/v\d+\.\d+\.\d+/)).toBeVisible()
   })
 
   test('should have basic UI elements', async () => {
-    const root = window.locator('#root')
-    await expect(root).toBeVisible()
+    // The welcome home should be visible with primary action buttons
+    await expect(window.getByRole('button', { name: '打开文件' })).toBeVisible()
+    await expect(window.getByRole('button', { name: '打开文件夹' })).toBeVisible()
   })
 })
