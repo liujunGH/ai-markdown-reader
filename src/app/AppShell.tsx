@@ -11,12 +11,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ThemeProvider } from '../context/ThemeContext'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-import { useTabStore, installTabSideEffects } from '../state'
+import { useTabStore, installTabSideEffects, useUIStore } from '../state'
 import { useOpenFileEvent, useOpenFolderEvent, useFileChangedEvent } from '../ipc/events'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderPanel } from './ReaderPanel'
 import { TabBar } from '../features/tabs/TabBar'
 import { StatusBar } from '../features/reader/StatusBar'
+import { ReaderSearch } from '../features/search/ReaderSearch'
+import { ReaderQuickJump } from '../features/search/ReaderQuickJump'
+import { ReaderCommandPalette } from '../features/search/ReaderCommandPalette'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -65,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
   )
 }
 
-/** 最小可用 UI：工具栏（打开文件/示例）+ ReaderPanel */
+/** 最小可用 UI：工具栏（打开文件/示例）+ ReaderPanel + 搜索/命令面板 */
 function MinimalAppShell({
   onOpenFile,
   onOpenExample,
@@ -75,6 +78,27 @@ function MinimalAppShell({
 }) {
   const tabsCount = useTabStore((s) => s.tabs.length)
   const activeTabName = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.name)
+  const togglePanel = useUIStore((s) => s.togglePanel)
+  const showSearch = useUIStore((s) => s.panels.search)
+
+  // 全局快捷键（搜索/命令面板/快速跳转）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === 'f' && !e.shiftKey) {
+        e.preventDefault()
+        togglePanel('search')
+      } else if (mod && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault()
+        togglePanel('commandPalette')
+      } else if (mod && e.key === 'g') {
+        e.preventDefault()
+        togglePanel('quickJump')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [togglePanel])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -95,16 +119,27 @@ function MinimalAppShell({
         <button type="button" onClick={onOpenExample}>
           📄 示例文档
         </button>
+        <button type="button" onClick={() => togglePanel('search')}>
+          🔍 搜索
+        </button>
         <span style={{ marginLeft: 'auto', color: '#888', fontSize: 13 }}>
           标签 {tabsCount}
           {activeTabName ? ` · ${activeTabName}` : ''}
         </span>
       </header>
       <TabBar />
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <ReaderPanel />
+        {showSearch && (
+          <div style={{ position: 'absolute', top: 8, right: 16, zIndex: 100 }}>
+            <ReaderSearch />
+          </div>
+        )}
       </main>
       <StatusBar />
+      {/* 浮层面板（命令面板/快速跳转） */}
+      <ReaderCommandPalette />
+      <ReaderQuickJump />
     </div>
   )
 }
