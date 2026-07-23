@@ -28,6 +28,9 @@ export function ReaderToolbar() {
       <span style={{ fontSize: 12, color: '#888' }}>{fontSize}</span>
       <button type="button" onClick={() => setFontSize(Math.min(32, fontSize + 1))} title="放大">A+</button>
       <button type="button" onClick={() => togglePanel('commandPalette')} title="命令">⌘</button>
+      <button type="button" onClick={() => togglePanel('readingTools')} title="阅读工具">📖</button>
+      <button type="button" onClick={() => togglePanel('globalSearch')} title="全局搜索">🔎</button>
+      <button type="button" onClick={() => togglePanel('exportPanel')} title="导出">📤</button>
       <div style={{ marginLeft: 'auto' }}>
         <ThemeToggle />
       </div>
