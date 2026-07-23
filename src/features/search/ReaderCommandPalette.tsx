@@ -80,16 +80,11 @@ export function ReaderCommandPalette() {
         case 'toggle-outline':
         case 'toggle-search':
         case 'toggle-focus':
-        case 'toggle-recent':
         case 'global-search':
         case 'quick-jump':
         case 'reading-tools':
-        case 'reading-timeline':
         case 'show-shortcuts':
-        case 'file-info':
         case 'export-html':
-        case 'workspaces':
-        case 'index-diagnostics':
           togglePanel(mapCommandToPanel(commandId))
           break
         case 'toggle-theme':
@@ -132,13 +127,10 @@ function mapCommandToPanel(commandId: string): Parameters<ReturnType<typeof useU
     'toggle-outline': 'outline',
     'toggle-search': 'search',
     'toggle-focus': 'focusMode',
-    'toggle-recent': 'recent',
     'global-search': 'globalSearch',
     'quick-jump': 'quickJump',
     'reading-tools': 'readingTools',
-    'reading-timeline': 'readingTimeline',
     'show-shortcuts': 'keyboardShortcuts',
-    'file-info': 'fileInfo',
     'export-html': 'exportPanel',
   }
   return (map[commandId] || commandId) as any

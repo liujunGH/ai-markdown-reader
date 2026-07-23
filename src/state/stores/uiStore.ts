@@ -17,31 +17,23 @@ export type PanelName =
   | 'outline'
   | 'search'
   | 'source'
-  | 'recent'
   | 'keyboardShortcuts'
   | 'focusMode'
-  | 'quickSwitcher'
   | 'fileSidebar'
-  | 'fileInfo'
-  | 'filePreview'
   | 'exportPanel'
   | 'commandPalette'
   | 'globalSearch'
   | 'quickJump'
-  | 'indexDiagnostics'
-  | 'workspaces'
-  | 'readingTimeline'
   | 'readingTools'
 
 /** 所有面板名（迭代用） */
 export const ALL_PANELS: PanelName[] = [
-  'outline', 'search', 'source', 'recent', 'keyboardShortcuts', 'focusMode',
-  'quickSwitcher', 'fileSidebar', 'fileInfo', 'filePreview', 'exportPanel',
-  'commandPalette', 'globalSearch', 'quickJump', 'indexDiagnostics',
-  'workspaces', 'readingTimeline', 'readingTools',
+  'outline', 'search', 'source', 'keyboardShortcuts', 'focusMode',
+  'fileSidebar', 'exportPanel', 'commandPalette', 'globalSearch',
+  'quickJump', 'readingTools',
 ]
 
-/** closeAllPanels 时保持开启的面板（与旧 closeAllPanels 行为一致） */
+/** closeAllPanels 时保持开启的面板 */
 const PANELS_PERSIST_ON_CLOSE_ALL: ReadonlySet<PanelName> = new Set([
   'outline',
   'source',
@@ -53,20 +45,13 @@ const DEFAULT_PANELS: Record<PanelName, boolean> = {
   outline: true,
   search: false,
   source: false,
-  recent: false,
   keyboardShortcuts: false,
   focusMode: false,
-  quickSwitcher: false,
   fileSidebar: false,
-  fileInfo: false,
-  filePreview: false,
   exportPanel: false,
   commandPalette: false,
   globalSearch: false,
   quickJump: false,
-  indexDiagnostics: false,
-  workspaces: false,
-  readingTimeline: false,
   readingTools: false,
 }
 

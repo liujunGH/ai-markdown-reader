@@ -101,35 +101,6 @@ export function ReaderPanels() {
         </PanelOverlay>
       )}
 
-      {/* 复杂面板（需大量派生数据，暂用占位提示） */}
-      {panels.fileInfo && (
-        <PanelOverlay title="文件信息" onClose={() => closePanel('fileInfo')}>
-          <p>文件：{activeTab?.name ?? '未打开'}</p>
-          {activeTab?.filePath && <p>路径：{activeTab.filePath}</p>}
-          {activeTab?.size !== undefined && <p>大小：{activeTab.size} 字节</p>}
-        </PanelOverlay>
-      )}
-      {panels.filePreview && (
-        <PanelOverlay title="文件预览" onClose={() => closePanel('filePreview')}>
-          <p>大纲项数：{outlineItems.length}</p>
-        </PanelOverlay>
-      )}
-      {panels.readingTimeline && (
-        <PanelOverlay title="阅读时间线" onClose={() => closePanel('readingTimeline')}>
-          <p>阅读历史记录（数据来自 readingStore.sessions）</p>
-        </PanelOverlay>
-      )}
-      {panels.indexDiagnostics && (
-        <PanelOverlay title="索引诊断" onClose={() => closePanel('indexDiagnostics')}>
-          <p>索引状态（基于 SQLite FTS5）</p>
-        </PanelOverlay>
-      )}
-      {panels.workspaces && (
-        <PanelOverlay title="工作区" onClose={() => closePanel('workspaces')}>
-          <p>工作区管理</p>
-        </PanelOverlay>
-      )}
-
       {/* 首次使用引导 */}
       <FirstUseGuide onComplete={() => {}} onSkip={() => {}} />
     </>

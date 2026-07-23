@@ -37,7 +37,6 @@ function buildSections(showSource: boolean, showFocusMode: boolean): ToolSection
     title: '阅读',
     items: [
       { id: 'readingTools', label: '阅读工具', icon: '◫' },
-      { id: 'readingTimeline', label: '阅读时间线', icon: '◷' },
       { label: '专注模式', icon: '🎯', action: 'toggleFocusMode', active: showFocusMode },
       { label: '放大字体', icon: 'A+', action: 'zoomIn' },
       { label: '缩小字体', icon: 'A-', action: 'zoomOut' },
@@ -49,7 +48,6 @@ function buildSections(showSource: boolean, showFocusMode: boolean): ToolSection
       { id: 'search', label: '文内搜索', icon: '⌕' },
       { id: 'globalSearch', label: '全局搜索', icon: '⌕' },
       { id: 'quickJump', label: '快速跳转', icon: '↗' },
-      { id: 'indexDiagnostics', label: '索引诊断', icon: '!' },
     ],
   },
   {
@@ -57,7 +55,6 @@ function buildSections(showSource: boolean, showFocusMode: boolean): ToolSection
     items: [
       { label: showSource ? '返回阅读视图' : '源码视图', icon: '📄', action: 'toggleSource', active: showSource },
       { id: 'exportPanel', label: '导出', icon: '📤' },
-      { id: 'fileInfo', label: '文件信息', icon: 'ℹ' },
     ],
   },
 ]

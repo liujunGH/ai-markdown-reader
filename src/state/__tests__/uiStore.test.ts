@@ -14,11 +14,10 @@ import { useUIStore, usePanelVisible, ALL_PANELS } from '../stores/uiStore'
 beforeEach(() => {
   useUIStore.setState({
     panels: {
-      outline: true, search: false, source: false, recent: false,
-      keyboardShortcuts: false, focusMode: false, quickSwitcher: false,
-      fileSidebar: false, fileInfo: false, filePreview: false, exportPanel: false,
+      outline: true, search: false, source: false,
+      keyboardShortcuts: false, focusMode: false,
+      fileSidebar: false, exportPanel: false,
       commandPalette: false, globalSearch: false, quickJump: false,
-      indexDiagnostics: false, workspaces: false, readingTimeline: false,
       readingTools: false,
     },
     fontSize: 16,
