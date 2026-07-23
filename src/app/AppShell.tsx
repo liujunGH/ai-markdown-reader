@@ -15,6 +15,7 @@ import { useTabStore, installTabSideEffects } from '../state'
 import { useOpenFileEvent, useOpenFolderEvent, useFileChangedEvent } from '../ipc/events'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderPanel } from './ReaderPanel'
+import { TabBar } from '../features/tabs/TabBar'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -98,6 +99,7 @@ function MinimalAppShell({
           {activeTabName ? ` · ${activeTabName}` : ''}
         </span>
       </header>
+      <TabBar />
       <main style={{ flex: 1, overflow: 'hidden' }}>
         <ReaderPanel />
       </main>
