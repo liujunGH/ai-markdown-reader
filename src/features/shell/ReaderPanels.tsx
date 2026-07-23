@@ -4,7 +4,7 @@
  * 把 uiStore 面板开关映射到组件渲染。props 简单的组件直接接入；
  * 复杂面板（需大量派生数据）用占位提示，后续逐步完善。
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useUIStore, useTabStore } from '../../state'
 import { SourceView } from '../../components/SourceView'
 import { ProgressBar } from '../../components/ProgressBar'
@@ -103,8 +103,28 @@ export function ReaderPanels() {
         </PanelOverlay>
       )}
 
-      {/* 首次使用引导 */}
-      <FirstUseGuide onComplete={() => {}} onSkip={() => {}} />
+      {/* 首次使用引导（仅未看过时显示） */}
+      <FirstUseGuideConditional />
     </>
   )
+}
+
+/** 条件渲染首次引导（useState 初始化时检查 localStorage，避免渲染时序问题） */
+function FirstUseGuideConditional() {
+  const [seen] = useState(() => {
+    try {
+      return localStorage.getItem('has-seen-guide') === '1'
+    } catch {
+      return true
+    }
+  })
+  if (seen) return null
+  const markSeen = () => {
+    try {
+      localStorage.setItem('has-seen-guide', '1')
+    } catch {
+      // ignore
+    }
+  }
+  return <FirstUseGuide onComplete={markSeen} onSkip={markSeen} />
 }

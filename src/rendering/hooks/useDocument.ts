@@ -124,7 +124,8 @@ export function useDocument(tabId: string, filePath?: string): UseDocumentResult
       setLoading(false)
     } catch (err) {
       if (reqId !== currentRequestRef.current || !mountedRef.current) return
-      setError(err instanceof Error ? err.message : String(err))
+      console.error('[useDocument] fetch/parse error:', err)
+      setError(err instanceof Error ? `${err.message}` : String(err))
       setLoading(false)
     }
   }, [tabId, filePath])

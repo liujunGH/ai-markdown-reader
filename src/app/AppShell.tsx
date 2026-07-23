@@ -117,28 +117,19 @@ function MinimalAppShell() {
   }, [togglePanel])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 16px',
-          borderBottom: '1px solid var(--border, #e0e0e0)',
-          background: 'var(--bg-secondary, #f5f5f5)',
-        }}
-      >
+    <div className="_appShell" >
+      <header className="_appHeader">
         <strong style={{ marginRight: 8 }}>Markdown Reader (v2)</strong>
         <ReaderToolbar />
       </header>
       <TabBar />
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="_appBody">
         {showFileSidebar && (
           <aside style={{ width: 280, borderRight: '1px solid var(--border, #e0e0e0)', overflow: 'hidden' }}>
             <ReaderWorkspace />
           </aside>
         )}
-        <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <main className="_appMain">
           <ReaderPanel />
           {showSearch && (
             <div style={{ position: 'absolute', top: 8, right: 16, zIndex: 100 }}>

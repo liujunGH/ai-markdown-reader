@@ -87,20 +87,19 @@ async function doCreateParser(): Promise<ParserBundle> {
   ])
 
   const Prism = moduleDefault<typeof PrismType>(PrismModule)
-  // 预加载常用语言（与旧 worker 一致）
-  await Promise.all([
-    import('prismjs/components/prism-markup'),
-    import('prismjs/components/prism-css'),
-    import('prismjs/components/prism-javascript'),
-    import('prismjs/components/prism-typescript'),
-    import('prismjs/components/prism-jsx'),
-    import('prismjs/components/prism-tsx'),
-    import('prismjs/components/prism-python'),
-    import('prismjs/components/prism-java'),
-    import('prismjs/components/prism-bash'),
-    import('prismjs/components/prism-json'),
-    import('prismjs/components/prism-markdown'),
-  ])
+  // 预加载常用语言——串行加载有依赖的（jsx→tsx, javascript→typescript/markup→css→javascript）
+  // Promise.all 并行会导致 tsx 在 jsx 前执行，Prism 抛 "Cannot convert undefined or null to object"
+  await import('prismjs/components/prism-markup')
+  await import('prismjs/components/prism-css')
+  await import('prismjs/components/prism-javascript')
+  await import('prismjs/components/prism-typescript')
+  await import('prismjs/components/prism-jsx')
+  await import('prismjs/components/prism-tsx')
+  await import('prismjs/components/prism-python')
+  await import('prismjs/components/prism-java')
+  await import('prismjs/components/prism-bash')
+  await import('prismjs/components/prism-json')
+  await import('prismjs/components/prism-markdown')
   ;['javascript', 'typescript', 'python', 'java', 'bash', 'json', 'css', 'markdown', 'jsx', 'tsx'].forEach(
     (lang) => loadedLanguages.add(lang)
   )

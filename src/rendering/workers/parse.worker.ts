@@ -38,7 +38,9 @@ self.onmessage = async (e: MessageEvent<ParseRequest>) => {
     const response: ParseResponse = {
       id,
       document: null,
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error
+        ? `${error.message}\n${error.stack || ''}`
+        : String(error),
     }
     self.postMessage(response)
   }
