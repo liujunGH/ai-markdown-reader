@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import styles from './GlobalSearch.module.css'
-import { searchInFolder, getIndexedFileCount, SearchScope, SearchResult, IndexProgress, formatIndexSkippedItem } from '../../utils/searchIndex'
+import { searchInFolder, getIndexedFileCount, SearchScope, SearchResult, IndexProgress, formatIndexSkippedItem } from '../../utils/searchIndexSqlite'
 import { basename } from '../../utils/path'
 
 interface GlobalSearchProps {

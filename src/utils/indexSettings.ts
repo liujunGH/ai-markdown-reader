@@ -1,4 +1,4 @@
-import { getDefaultIndexSkipDirectoryNames } from './searchIndex'
+import { getDefaultIndexSkipDirectoryNames } from './searchIndexSqlite'
 import { getStorageItem, removeStorageItem, setStorageItem } from './storage'
 
 const INDEX_SETTINGS_KEY = 'index-settings'

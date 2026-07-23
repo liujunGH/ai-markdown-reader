@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { indexFolder, getAllMarkdownFiles, getIndexedFileCount, type IndexProgress, type IndexSkippedItem } from '../utils/searchIndex'
+import { indexFolder, getAllMarkdownFiles, getIndexedFileCount, type IndexProgress, type IndexSkippedItem } from '../utils/searchIndexSqlite'
 import { clearSavedIndexDiagnostics, loadSavedIndexDiagnostics, saveIndexDiagnostics } from '../utils/indexDiagnostics'
 import { getEffectiveIndexPolicy, loadIndexSettings, resetIndexSettings, saveIndexSettings, type IndexSettings } from '../utils/indexSettings'
 import type { Workspace } from '../utils/workspaces'

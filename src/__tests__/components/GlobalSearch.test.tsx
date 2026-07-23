@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { GlobalSearch } from '../../components/GlobalSearch'
-import { getIndexedFileCount } from '../../utils/searchIndex'
+import { getIndexedFileCount } from '../../utils/searchIndexSqlite'
 
-vi.mock('../../utils/searchIndex', () => ({
+vi.mock('../../utils/searchIndexSqlite', () => ({
   getIndexedFileCount: vi.fn(async () => 0),
   searchInFolder: vi.fn(async () => []),
   formatIndexSkippedItem: vi.fn(item => {

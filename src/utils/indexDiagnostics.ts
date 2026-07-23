@@ -1,5 +1,5 @@
 import { getStorageItem, removeStorageItem, setStorageItem } from './storage'
-import type { IndexSkippedItem } from './searchIndex'
+import type { IndexSkippedItem } from './searchIndexSqlite'
 
 const MAX_SAVED_SKIPPED_ITEMS = 200
 

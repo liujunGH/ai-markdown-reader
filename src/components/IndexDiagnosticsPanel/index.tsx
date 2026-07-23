@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatIndexPolicy, type IndexPolicy } from '../../utils/indexDiagnostics'
 import type { IndexSettings } from '../../utils/indexSettings'
-import { formatIndexSkippedItem, type IndexSkippedItem } from '../../utils/searchIndex'
+import { formatIndexSkippedItem, type IndexSkippedItem } from '../../utils/searchIndexSqlite'
 import styles from './IndexDiagnosticsPanel.module.css'
 
 interface Props {
