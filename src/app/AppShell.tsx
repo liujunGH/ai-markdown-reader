@@ -27,6 +27,7 @@ import { ReaderExportPanel } from '../features/export/ReaderExportPanel'
 import { ReaderGlobalSearch } from '../features/search/ReaderGlobalSearch'
 import { ReaderReadingTools } from '../features/reading-tools/ReaderReadingTools'
 import { ImagePreviewOverlay } from '../features/reader/ImagePreviewOverlay'
+import { ReaderPanels } from '../features/shell/ReaderPanels'
 import { UpdateNotification } from '../components/UpdateNotification'
 import { basename } from '../utils/path'
 
@@ -153,6 +154,7 @@ function MinimalAppShell() {
       <ReaderGlobalSearch />
       <ReaderReadingTools />
       <ImagePreviewOverlay />
+      <ReaderPanels />
       <UpdateNotification />
     </div>
   )
