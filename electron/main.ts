@@ -1,30 +1,26 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu, MenuItemConstructorOptions, Tray, nativeImage, nativeTheme } from 'electron'
+/**
+ * Electron 主进程入口
+ *
+ * v2 架构：本文件只负责窗口管理、菜单、托盘、自动更新、生命周期。
+ * 全部 IPC handler 按领域拆分到 electron/ipc/*.ts，通过 registerAllHandlers(ctx)
+ * 统一注册。共享状态封装在 IpcContext 中，由本文件创建唯一实例。
+ */
+import { app, BrowserWindow, dialog, shell, Menu, Tray, nativeImage, nativeTheme } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
 import { createLogger } from './lib/logger'
-import { createTimeoutHandler, createRateLimiter, validateFilePath, validateFileSize } from './lib/ipcGuard'
+import { createRateLimiter } from './lib/ipcGuard'
 import { isExternalUrl } from './lib/externalLinks'
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const APP_VERSION = require('../../package.json').version
+import { registerAllHandlers, type IpcContext, type ConfigStoreData } from './ipc'
+import { closeDatabase, getDatabase } from './db/connection'
+import { EVENT_CHANNELS } from '../shared'
 
 const logger = createLogger('main')
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
-const MAX_IMAGE_SIZE = 20 * 1024 * 1024 // 20MB
-const IMAGE_MIME_TYPES: Record<string, string> = {
-  '.avif': 'image/avif',
-  '.bmp': 'image/bmp',
-  '.gif': 'image/gif',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-}
-
-const watchers = new Map<string, fs.FSWatcher>()
+// 版本号：用 electron app 取得，避免脆弱的相对路径 require
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const APP_VERSION = require('../../package.json').version
 
 interface RecentFile {
   name: string
@@ -49,17 +45,6 @@ interface StoreData {
 }
 
 const DEFAULT_MAX_RECENT_FILES = 100
-const DEFAULT_SKIP_DIRECTORIES = new Set([
-  '.git',
-  '.hg',
-  '.svn',
-  'node_modules',
-  'dist',
-  'build',
-  'release',
-  '.next',
-  '.cache',
-])
 
 const storePath = path.join(app.getPath('userData'), 'config.json')
 
@@ -75,7 +60,7 @@ function loadStore(): StoreData {
             recentFiles: data.recentFiles || [],
             lastFolder: data.lastFolder ?? null,
             maxRecentFiles: data.maxRecentFiles || DEFAULT_MAX_RECENT_FILES,
-            windowStates: data.windowStates
+            windowStates: data.windowStates,
           }
         }
       }
@@ -103,24 +88,18 @@ function saveStore(data: StoreData): void {
   }
 }
 
-function isPathSafe(filePath: string): boolean {
-  return validateFilePath(filePath)
-}
-
-function shouldSkipScanDirectory(name: string, extraSkipNames: string[] = []): boolean {
-  if (name.startsWith('.')) return true
-  if (DEFAULT_SKIP_DIRECTORIES.has(name)) return true
-  return extraSkipNames.includes(name)
-}
-
+// ============================================================
+// 共享可变状态（IPC 上下文的数据源）
+// ============================================================
+const watchers = new Map<string, fs.FSWatcher>()
 const windows = new Map<number, BrowserWindow>()
 const windowIds = new WeakMap<BrowserWindow, number>()
 const windowOpenFiles = new Map<number, Set<string>>()
-let windowIdCounter = 0
-let lastFocusedWindowId = 0
-let tray: Tray | null = null
-let isQuiting = false
+const windowIdCounter = { value: 0 }
+const lastFocusedWindowId = { value: 0 }
+const isQuiting = { value: false }
 let splashWindow: BrowserWindow | null = null
+let tray: Tray | null = null
 const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
@@ -136,7 +115,7 @@ function getFocusedOrLastWindow(): BrowserWindow | undefined {
       return win
     }
   }
-  const lastWin = windows.get(lastFocusedWindowId)
+  const lastWin = windows.get(lastFocusedWindowId.value)
   if (lastWin && !lastWin.isDestroyed()) {
     return lastWin
   }
@@ -168,8 +147,6 @@ function saveWindowState() {
 }
 
 function createTrayIcon(): Electron.NativeImage {
-  // Create a simple 16x16 colored square icon programmatically
-  // Base64-encoded 16x16 blue (#2b7de1) PNG
   const base64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADBJREFUOE9jZGBg+M+ABhhpIA4w0sQaQDUSBrAaQYpRbcCmEVyXYDWMZgCuS7AaRjcAANIXCf8K6mNaAAAAAElFTkSuQmCC'
   const buffer = Buffer.from(base64, 'base64')
   return nativeImage.createFromBuffer(buffer, { width: 16, height: 16 })
@@ -195,8 +172,8 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: preloadPath
-    }
+      preload: preloadPath,
+    },
   })
 
   if (windowState?.isMaximized) {
@@ -214,25 +191,25 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     }
   })
 
-  const id = ++windowIdCounter
+  const id = ++windowIdCounter.value
   windows.set(id, win)
   windowIds.set(win, id)
 
   win.on('focus', () => {
-    lastFocusedWindowId = id
+    lastFocusedWindowId.value = id
   })
 
   win.on('closed', () => {
     logger.info('Window closed', { windowId: id })
     windowOpenFiles.delete(id)
     windows.delete(id)
-    if (lastFocusedWindowId === id) {
-      lastFocusedWindowId = 0
+    if (lastFocusedWindowId.value === id) {
+      lastFocusedWindowId.value = 0
     }
   })
 
   win.on('close', (event) => {
-    if (!isQuiting && process.platform === 'darwin') {
+    if (!isQuiting.value && process.platform === 'darwin') {
       event.preventDefault()
       win.hide()
     }
@@ -250,7 +227,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
       win.webContents.openDevTools()
     }
   } else {
-    win.loadFile(htmlPath).catch(err => {
+    win.loadFile(htmlPath).catch((err) => {
       logger.error('Failed to load file', { htmlPath, error: String(err) })
     })
   }
@@ -286,7 +263,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
   if (filePath) {
     logger.info('File to open via did-finish-load', { filePath })
     const loadHandler = () => {
-      win.webContents.send('open-file', filePath)
+      win.webContents.send(EVENT_CHANNELS.OPEN_FILE, filePath)
     }
     win.webContents.once('did-finish-load', loadHandler)
   }
@@ -300,27 +277,9 @@ function createSplashWindow() {
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      margin: 0;
-      background: #1a1a2e;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      overflow: hidden;
-    }
+    body { margin: 0; background: #1a1a2e; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
     .loader { text-align: center; }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(255,255,255,0.2);
-      border-radius: 50%;
-      border-top-color: #4a9eff;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
-    }
+    .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2); border-radius: 50%; border-top-color: #4a9eff; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     h1 { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: 0.5px; }
     p { margin: 8px 0 0; opacity: 0.6; font-size: 13px; }
@@ -348,7 +307,7 @@ function createSplashWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-    }
+    },
   })
   splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`)
   splashWindow.once('ready-to-show', () => {
@@ -365,76 +324,72 @@ function createMenu() {
     return getFocusedOrLastWindow()
   }
 
-  const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{
-      label: 'Markdown Reader',
-      submenu: [
-        { role: 'about' as const, label: '关于' },
-        { type: 'separator' as const },
-        { role: 'services' as const, label: '服务' },
-        { type: 'separator' as const },
-        { role: 'hide' as const, label: '隐藏' },
-        { role: 'hideOthers' as const, label: '隐藏其他' },
-        { role: 'unhide' as const, label: '显示全部' },
-        { type: 'separator' as const },
-        { role: 'quit' as const, label: '退出' }
-      ]
-    }] : []),
+  const openFileMenuItem = (): Electron.MenuItemConstructorOptions => ({
+    label: '打开文件',
+    accelerator: 'CmdOrCtrl+O',
+    click: async () => {
+      const win = getTargetWindow()
+      if (!win || win.isDestroyed()) return
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        filters: [
+          { name: 'Markdown', extensions: ['md', 'markdown'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      })
+      if (!result.canceled && result.filePaths.length > 0) {
+        const filePath = result.filePaths[0]
+        if (!win.isDestroyed()) {
+          win.webContents.send(EVENT_CHANNELS.OPEN_FILE, filePath)
+        }
+      }
+    },
+  })
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac
+      ? [
+          {
+            label: 'Markdown Reader',
+            submenu: [
+              { role: 'about' as const, label: '关于' },
+              { type: 'separator' as const },
+              { role: 'services' as const, label: '服务' },
+              { type: 'separator' as const },
+              { role: 'hide' as const, label: '隐藏' },
+              { role: 'hideOthers' as const, label: '隐藏其他' },
+              { role: 'unhide' as const, label: '显示全部' },
+              { type: 'separator' as const },
+              { role: 'quit' as const, label: '退出' },
+            ],
+          },
+        ]
+      : []),
     {
       label: '文件',
       submenu: [
-        {
-          label: '新建窗口',
-          accelerator: 'CmdOrCtrl+Shift+N',
-          click: () => createWindow()
-        },
+        { label: '新建窗口', accelerator: 'CmdOrCtrl+Shift+N', click: () => createWindow() },
         { type: 'separator' },
-        {
-          label: '打开文件',
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            const win = getTargetWindow()
-            if (!win || win.isDestroyed()) return
-            const result = await dialog.showOpenDialog(win, {
-              properties: ['openFile'],
-              filters: [
-                { name: 'Markdown', extensions: ['md', 'markdown'] },
-                { name: 'All Files', extensions: ['*'] }
-              ]
-            })
-            if (!result.canceled && result.filePaths.length > 0) {
-              const filePath = result.filePaths[0]
-              if (!win.isDestroyed()) {
-                win.webContents.send('open-file', filePath)
-              }
-            }
-          }
-        },
+        openFileMenuItem(),
         {
           label: '打开文件夹',
           accelerator: 'CmdOrCtrl+Shift+O',
           click: async () => {
             const win = getTargetWindow()
             if (!win || win.isDestroyed()) return
-            const result = await dialog.showOpenDialog(win, {
-              properties: ['openDirectory']
-            })
+            const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
             if (!result.canceled && result.filePaths.length > 0) {
               if (!win.isDestroyed()) {
-                win.webContents.send('open-folder', result.filePaths[0])
+                win.webContents.send(EVENT_CHANNELS.OPEN_FOLDER, result.filePaths[0])
               }
             }
-          }
+          },
         },
         { type: 'separator' },
-        {
-          label: '打印',
-          accelerator: 'CmdOrCtrl+P',
-          click: () => getTargetWindow()?.webContents.print()
-        },
+        { label: '打印', accelerator: 'CmdOrCtrl+P', click: () => getTargetWindow()?.webContents.print() },
         { type: 'separator' },
-        isMac ? { role: 'close' as const, label: '关闭' } : { role: 'quit' as const, label: '退出' }
-      ]
+        isMac ? { role: 'close' as const, label: '关闭' } : { role: 'quit' as const, label: '退出' },
+      ],
     },
     {
       label: '编辑',
@@ -445,8 +400,8 @@ function createMenu() {
         { role: 'cut' as const, label: '剪切' },
         { role: 'copy' as const, label: '复制' },
         { role: 'paste' as const, label: '粘贴' },
-        { role: 'selectAll' as const, label: '全选' }
-      ]
+        { role: 'selectAll' as const, label: '全选' },
+      ],
     },
     {
       label: '视图',
@@ -459,23 +414,23 @@ function createMenu() {
         { role: 'zoomIn' as const, label: '放大' },
         { role: 'zoomOut' as const, label: '缩小' },
         { type: 'separator' as const },
-        { role: 'togglefullscreen' as const, label: '全屏' }
-      ]
+        { role: 'togglefullscreen' as const, label: '全屏' },
+      ],
     },
     {
       label: '窗口',
       submenu: [
         { role: 'minimize' as const, label: '最小化' },
         { role: 'zoom' as const, label: '缩放' },
-        ...(isMac ? [
-          { type: 'separator' as const },
-          { role: 'front' as const, label: '前置全部窗口' },
-          { type: 'separator' as const },
-          { role: 'window' as const, label: '窗口' }
-        ] : [
-          { role: 'close' as const, label: '关闭' }
-        ])
-      ]
+        ...(isMac
+          ? [
+              { type: 'separator' as const },
+              { role: 'front' as const, label: '前置全部窗口' },
+              { type: 'separator' as const },
+              { role: 'window' as const, label: '窗口' },
+            ]
+          : [{ role: 'close' as const, label: '关闭' }]),
+      ],
     },
     {
       label: '帮助',
@@ -512,10 +467,10 @@ function createMenu() {
             } else {
               dialog.showMessageBox({ type: 'info', title: '关于 Markdown Reader', message: 'Markdown Reader', detail })
             }
-          }
-        }
-      ]
-    }
+          },
+        },
+      ],
+    },
   ]
 
   const menu = Menu.buildFromTemplate(template)
@@ -544,7 +499,7 @@ function handleFileOpen(filePath: string) {
     return
   }
 
-  // If any window already has this file open, focus that window
+  // 多窗口文件去重：若任一窗口已打开此文件，聚焦该窗口
   for (const [id, files] of windowOpenFiles.entries()) {
     if (files.has(filePath)) {
       const win = windows.get(id)
@@ -559,7 +514,7 @@ function handleFileOpen(filePath: string) {
 
   const win = getFocusedOrLastWindow()
   if (win && !win.isDestroyed()) {
-    win.webContents.send('open-file', filePath)
+    win.webContents.send(EVENT_CHANNELS.OPEN_FILE, filePath)
     if (win.isMinimized()) win.restore()
     win.show()
     win.focus()
@@ -568,6 +523,9 @@ function handleFileOpen(filePath: string) {
   }
 }
 
+// ============================================================
+// 单实例锁
+// ============================================================
 const gotTheLock = app.requestSingleInstanceLock()
 logger.info('Got lock', { gotTheLock })
 
@@ -577,9 +535,7 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (_event, commandLine) => {
     logger.info('Second instance detected', { commandLine })
-    const filePath = commandLine.find(arg =>
-      arg.endsWith('.md') || arg.endsWith('.markdown')
-    )
+    const filePath = commandLine.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
     if (filePath) {
       handleFileOpen(filePath)
     }
@@ -593,39 +549,44 @@ if (!gotTheLock) {
   })
 }
 
+// ============================================================
+// 应用就绪：菜单 / 闪屏 / 初始窗口 / 托盘 / 更新 / IPC 注册 / 事件
+// ============================================================
 app.whenReady().then(() => {
   logger.info('App ready')
   createMenu()
 
-  // Show splash window during initial load (not in dev mode)
   if (!isDev) {
     createSplashWindow()
   }
 
   if (process.platform === 'darwin') {
-    app.dock?.setMenu(Menu.buildFromTemplate([
-      { label: '打开文件', click: async () => {
-        const win = getFocusedOrLastWindow()
-        if (!win || win.isDestroyed()) return
-        const result = await dialog.showOpenDialog(win, {
-          properties: ['openFile'],
-          filters: [
-            { name: 'Markdown', extensions: ['md', 'markdown'] },
-            { name: 'All Files', extensions: ['*'] }
-          ]
-        })
-        if (!result.canceled && result.filePaths.length > 0) {
-          if (!win.isDestroyed()) {
-            win.webContents.send('open-file', result.filePaths[0])
-          }
-        }
-      } }
-    ]))
+    app.dock?.setMenu(
+      Menu.buildFromTemplate([
+        {
+          label: '打开文件',
+          click: async () => {
+            const win = getFocusedOrLastWindow()
+            if (!win || win.isDestroyed()) return
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openFile'],
+              filters: [
+                { name: 'Markdown', extensions: ['md', 'markdown'] },
+                { name: 'All Files', extensions: ['*'] },
+              ],
+            })
+            if (!result.canceled && result.filePaths.length > 0) {
+              if (!win.isDestroyed()) {
+                win.webContents.send(EVENT_CHANNELS.OPEN_FILE, result.filePaths[0])
+              }
+            }
+          },
+        },
+      ])
+    )
   }
 
-  const filePath = process.argv.find(arg =>
-    arg.endsWith('.md') || arg.endsWith('.markdown')
-  )
+  const filePath = process.argv.find((arg) => arg.endsWith('.md') || arg.endsWith('.markdown'))
   logger.info('File from argv', { filePath, argv: process.argv })
 
   const store = loadStore()
@@ -642,39 +603,48 @@ app.whenReady().then(() => {
     createWindow()
   }
 
-  // System tray with proper icon
+  // 系统托盘
   const trayIcon = createTrayIcon()
   tray = new Tray(trayIcon)
   tray.setToolTip('Markdown Reader')
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开文件', click: async () => {
-      const win = getFocusedOrLastWindow()
-      if (!win || win.isDestroyed()) return
-      const result = await dialog.showOpenDialog(win, {
-        properties: ['openFile'],
-        filters: [
-          { name: 'Markdown', extensions: ['md', 'markdown'] },
-          { name: 'All Files', extensions: ['*'] }
-        ]
-      })
-      if (!result.canceled && result.filePaths.length > 0) {
-        if (!win.isDestroyed()) {
-          win.webContents.send('open-file', result.filePaths[0])
-        }
-      }
-    } },
-    { label: '显示窗口', click: () => {
-      const win = getFocusedOrLastWindow()
-      win?.show(); win?.focus()
-    } },
-    { type: 'separator' },
-    { label: '退出', click: () => { isQuiting = true; app.quit() } }
-  ]))
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: '打开文件',
+        click: async () => {
+          const win = getFocusedOrLastWindow()
+          if (!win || win.isDestroyed()) return
+          const result = await dialog.showOpenDialog(win, {
+            properties: ['openFile'],
+            filters: [
+              { name: 'Markdown', extensions: ['md', 'markdown'] },
+              { name: 'All Files', extensions: ['*'] },
+            ],
+          })
+          if (!result.canceled && result.filePaths.length > 0) {
+            if (!win.isDestroyed()) {
+              win.webContents.send(EVENT_CHANNELS.OPEN_FILE, result.filePaths[0])
+            }
+          }
+        },
+      },
+      {
+        label: '显示窗口',
+        click: () => {
+          const win = getFocusedOrLastWindow()
+          win?.show()
+          win?.focus()
+        },
+      },
+      { type: 'separator' },
+      { label: '退出', click: () => { isQuiting.value = true; app.quit() } },
+    ])
+  )
 
-  // Auto-updater (only in packaged builds)
+  // 自动更新（仅打包构建）
   if (app.isPackaged) {
     const sendToAllWindows = (channel: string, ...args: unknown[]) => {
-      windows.forEach(win => {
+      windows.forEach((win) => {
         if (!win.isDestroyed()) {
           win.webContents.send(channel, ...args)
         }
@@ -687,7 +657,7 @@ app.whenReady().then(() => {
 
     autoUpdater.on('update-available', (info) => {
       logger.info('Update available', { version: info.version })
-      sendToAllWindows('update-available', { version: info.version })
+      sendToAllWindows(EVENT_CHANNELS.UPDATE_AVAILABLE, { version: info.version })
     })
 
     autoUpdater.on('update-not-available', () => {
@@ -697,15 +667,14 @@ app.whenReady().then(() => {
     autoUpdater.on('error', (err) => {
       const msg = String(err)
       logger.error('Auto-updater error', { error: msg })
-      // Silently ignore "latest-mac.yml not found" (no release published yet)
       if (msg.includes('Cannot find latest-mac.yml') || msg.includes('404')) {
         return
       }
-      sendToAllWindows('update-error', { error: msg })
+      sendToAllWindows(EVENT_CHANNELS.UPDATE_ERROR, { error: msg })
     })
 
     autoUpdater.on('download-progress', (progress) => {
-      sendToAllWindows('update-progress', {
+      sendToAllWindows(EVENT_CHANNELS.UPDATE_PROGRESS, {
         percent: progress.percent,
         transferred: progress.transferred,
         total: progress.total,
@@ -714,7 +683,7 @@ app.whenReady().then(() => {
 
     autoUpdater.on('update-downloaded', (info) => {
       logger.info('Update downloaded', { version: info.version })
-      sendToAllWindows('update-downloaded', { version: info.version })
+      sendToAllWindows(EVENT_CHANNELS.UPDATE_DOWNLOADED, { version: info.version })
     })
 
     setTimeout(() => {
@@ -736,12 +705,12 @@ app.whenReady().then(() => {
     }
   })
 
-  // System theme
+  // 系统主题
   nativeTheme.on('updated', () => {
     const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
-    windows.forEach(win => {
+    windows.forEach((win) => {
       if (!win.isDestroyed()) {
-        win.webContents.send('system-theme-changed', theme)
+        win.webContents.send(EVENT_CHANNELS.SYSTEM_THEME_CHANGED, theme)
       }
     })
   })
@@ -756,13 +725,61 @@ app.whenReady().then(() => {
     }
   })
 
+  // ============================================================
+  // 注册全部 IPC handler（27 个原有 channel + 2 个新增 db channel）
+  // ============================================================
+  const ipcContext: IpcContext = {
+    loadConfigStore: (): ConfigStoreData => {
+      const s = loadStore()
+      return {
+        recentFiles: s.recentFiles,
+        lastFolder: s.lastFolder,
+        maxRecentFiles: s.maxRecentFiles,
+        windowStates: s.windowStates,
+      }
+    },
+    saveConfigStore: (data: ConfigStoreData) => {
+      saveStore({
+        recentFiles: data.recentFiles,
+        lastFolder: data.lastFolder,
+        maxRecentFiles: data.maxRecentFiles,
+        windowStates: data.windowStates,
+      })
+    },
+    watchers,
+    windows,
+    windowIds,
+    windowOpenFiles,
+    windowIdCounter,
+    lastFocusedWindowId,
+    getWindowId,
+    getFocusedOrLastWindow,
+    isQuiting,
+    logger,
+    fileDialogLimiter: createRateLimiter(5, 1000),
+  }
+  registerAllHandlers(ipcContext)
+  logger.info('All IPC handlers registered')
+
+  // 预热数据库：在启动阶段就建库 + 跑迁移，而非延迟到首次查询。
+  // 好处：迁移失败尽早暴露（不会拖到用户首次搜索时才崩）；后续 db 调用无冷启动。
+  try {
+    getDatabase()
+  } catch (err) {
+    // 迁移失败不阻断启动（文件读写等核心功能不依赖 DB），仅记录。
+    // 阅读数据/搜索功能会降级，db:* 通道会返回错误。
+    logger.error('Database initialization failed, DB features disabled', { error: String(err) })
+  }
 })
 
 app.on('window-all-closed', () => {
   logger.info('All windows closed')
-  watchers.forEach(watcher => watcher.close())
+  watchers.forEach((watcher) => watcher.close())
   watchers.clear()
+  // macOS 关闭所有窗口不退出应用（用户可能重开窗口），故不关库；
+  // 非 macOS 真正退出，由 before-quit 统一关库。
   if (process.platform !== 'darwin') {
+    closeDatabase()
     app.quit()
   }
 })
@@ -779,8 +796,9 @@ app.on('activate', () => {
 })
 
 app.on('before-quit', () => {
-  isQuiting = true
+  isQuiting.value = true
   saveWindowState()
+  closeDatabase()
 })
 
 process.on('uncaughtException', (error: Error) => {
@@ -789,609 +807,4 @@ process.on('uncaughtException', (error: Error) => {
 
 process.on('unhandledRejection', (reason: unknown) => {
   logger.error('Unhandled rejection', { reason: String(reason) })
-})
-
-// IPC handlers with timeout and rate limiting
-const DEFAULT_TIMEOUT = 10000 // 10s
-const DIALOG_TIMEOUT = 5 * 60 * 1000 // Users may spend time in native file pickers.
-const fileDialogLimiter = createRateLimiter(5, 1000) // 5 calls per second
-
-function wrapHandler(
-  channel: string,
-  handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any,
-  timeoutMs = DEFAULT_TIMEOUT
-): void {
-  ipcMain.handle(channel, createTimeoutHandler(handler, timeoutMs, channel))
-}
-
-wrapHandler('open-file-dialog', async () => {
-  if (!fileDialogLimiter()) {
-    logger.warn('Rate limit exceeded for open-file-dialog')
-    throw new Error('Rate limit exceeded. Please slow down.')
-  }
-  try {
-    const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
-    logger.info('open-file-dialog', { focusedWindow: BrowserWindow.getFocusedWindow()?.id, fallback: win?.id })
-    const options: Electron.OpenDialogOptions = {
-      properties: ['openFile'],
-      defaultPath: app.getPath('home'),
-      filters: [
-        { name: 'Markdown', extensions: ['md', 'markdown'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
-    }
-    const result = win
-      ? await dialog.showOpenDialog(win, options)
-      : await dialog.showOpenDialog(options)
-    logger.info('open-file-dialog result', { canceled: result.canceled, filePaths: result.filePaths })
-
-    if (!result.canceled && result.filePaths.length > 0) {
-      const filePath = result.filePaths[0]
-      try {
-        const stat = fs.statSync(filePath)
-        if (stat.isDirectory()) {
-          logger.info('Selected path is a directory, reading first file inside', { filePath })
-          const entries = fs.readdirSync(filePath, { withFileTypes: true })
-          const firstFile = entries.find(e =>
-            !e.isDirectory() && (e.name.endsWith('.md') || e.name.endsWith('.markdown'))
-          )
-          if (firstFile) {
-            const fullPath = path.join(filePath, firstFile.name)
-            const sizeCheck = validateFileSize(fullPath, MAX_FILE_SIZE)
-            if (!sizeCheck.valid) {
-              logger.warn('File too large in open-file-dialog', { filePath: fullPath, size: sizeCheck.size, max: MAX_FILE_SIZE })
-              return { filePath: fullPath, content: '', error: sizeCheck.error }
-            }
-            const content = fs.readFileSync(fullPath, 'utf-8')
-            return { filePath: fullPath, content }
-          }
-          return null
-        }
-        const sizeCheck = validateFileSize(filePath, MAX_FILE_SIZE)
-        if (!sizeCheck.valid) {
-          logger.warn('File too large in open-file-dialog', { filePath, size: sizeCheck.size, max: MAX_FILE_SIZE })
-          return { filePath, content: '', error: sizeCheck.error }
-        }
-        const content = fs.readFileSync(filePath, 'utf-8')
-        return { filePath, content }
-      } catch (readErr) {
-        logger.error('Failed to read file in open-file-dialog', { filePath, error: String(readErr) })
-        return null
-      }
-    }
-    return null
-  } catch (err) {
-    logger.error('open-file-dialog error', { error: String(err) })
-    throw err
-  }
-}, DIALOG_TIMEOUT)
-
-wrapHandler('open-folder-dialog', async () => {
-  if (!fileDialogLimiter()) {
-    logger.warn('Rate limit exceeded for open-folder-dialog')
-    throw new Error('Rate limit exceeded. Please slow down.')
-  }
-  try {
-    const win = BrowserWindow.getFocusedWindow() || getFocusedOrLastWindow()
-    logger.info('open-folder-dialog', { focusedWindow: BrowserWindow.getFocusedWindow()?.id, fallback: win?.id })
-    const options: Electron.OpenDialogOptions = {
-      properties: ['openDirectory'],
-      defaultPath: app.getPath('home')
-    }
-    const result = win
-      ? await dialog.showOpenDialog(win, options)
-      : await dialog.showOpenDialog(options)
-    logger.info('open-folder-dialog result', { canceled: result.canceled, filePaths: result.filePaths })
-
-    if (!result.canceled && result.filePaths.length > 0) {
-      return result.filePaths[0]
-    }
-    return null
-  } catch (err) {
-    logger.error('open-folder-dialog error', { error: String(err) })
-    throw err
-  }
-}, DIALOG_TIMEOUT)
-
-wrapHandler('read-folder', async (_event, folderPath: string) => {
-  if (!isPathSafe(folderPath)) {
-    return { success: false, error: '非法路径' }
-  }
-  try {
-    const entries = fs.readdirSync(folderPath, { withFileTypes: true })
-    const items = entries
-      .filter(f => f.isDirectory() || f.name.endsWith('.md') || f.name.endsWith('.markdown'))
-      .map(f => {
-        const filePath = path.join(folderPath, f.name)
-        if (f.isDirectory()) {
-          return {
-            name: f.name,
-            filePath,
-            isDirectory: true
-          }
-        }
-        const stats = fs.statSync(filePath)
-        return {
-          name: f.name,
-          filePath,
-          size: stats.size,
-          lastModified: stats.mtimeMs,
-          isDirectory: false
-        }
-      })
-    return { success: true, files: items }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('scan-markdown-files', async (_event, folderPath: string, options: { maxFileSizeBytes?: number; skipDirectoryNames?: string[] } = {}) => {
-  if (!isPathSafe(folderPath)) {
-    return { success: false, error: '非法路径' }
-  }
-
-  const files: Array<{ name: string; filePath: string }> = []
-  const skippedItems: Array<{ path: string; name: string; reason: 'ignored-directory' | 'large-file' | 'read-error'; detail?: string; size?: number; maxSize?: number }> = []
-  const maxFileSizeBytes = options.maxFileSizeBytes
-  const skipDirectoryNames = options.skipDirectoryNames ?? []
-
-  const scan = (currentFolderPath: string) => {
-    let entries: fs.Dirent[]
-    try {
-      entries = fs.readdirSync(currentFolderPath, { withFileTypes: true })
-    } catch (error) {
-      skippedItems.push({
-        path: currentFolderPath,
-        name: path.basename(currentFolderPath),
-        reason: 'read-error',
-        detail: String(error),
-      })
-      return
-    }
-
-    for (const entry of entries) {
-      const itemPath = path.join(currentFolderPath, entry.name)
-      if (entry.isDirectory()) {
-        if (shouldSkipScanDirectory(entry.name, skipDirectoryNames)) {
-          skippedItems.push({
-            path: itemPath,
-            name: entry.name,
-            reason: 'ignored-directory',
-          })
-          continue
-        }
-        scan(itemPath)
-        continue
-      }
-
-      if (!entry.name.endsWith('.md') && !entry.name.endsWith('.markdown')) {
-        continue
-      }
-
-      try {
-        const stat = fs.statSync(itemPath)
-        if (maxFileSizeBytes !== undefined && stat.size > maxFileSizeBytes) {
-          skippedItems.push({
-            path: itemPath,
-            name: entry.name,
-            reason: 'large-file',
-            size: stat.size,
-            maxSize: maxFileSizeBytes,
-          })
-          continue
-        }
-        files.push({ name: entry.name, filePath: itemPath })
-      } catch (error) {
-        skippedItems.push({
-          path: itemPath,
-          name: entry.name,
-          reason: 'read-error',
-          detail: String(error),
-        })
-      }
-    }
-  }
-
-  try {
-    scan(folderPath)
-    return { success: true, files, skippedItems }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-}, 5 * 60 * 1000)
-
-wrapHandler('read-file', async (_event, filePath: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-  const sizeCheck = validateFileSize(filePath, MAX_FILE_SIZE)
-  if (!sizeCheck.valid) {
-    logger.warn('File too large in read-file', { filePath, size: sizeCheck.size, max: MAX_FILE_SIZE })
-    return { success: false, error: sizeCheck.error }
-  }
-  try {
-    const stat = fs.statSync(filePath)
-    if (stat.isDirectory()) {
-      return { success: false, error: '路径是一个目录，不是文件' }
-    }
-    const content = fs.readFileSync(filePath, 'utf-8')
-    return { success: true, content }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('write-file', async (_event, filePath: string, content: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-  const ext = path.extname(filePath).toLowerCase()
-  if (ext !== '.md' && ext !== '.markdown') {
-    return { success: false, error: '只能创建 Markdown 文件' }
-  }
-  if (fs.existsSync(filePath)) {
-    return { success: false, error: '文件已存在' }
-  }
-  try {
-    fs.writeFileSync(filePath, content, { encoding: 'utf-8', flag: 'wx' })
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('update-markdown-file', async (_event, filePath: string, content: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-  const ext = path.extname(filePath).toLowerCase()
-  if (ext !== '.md' && ext !== '.markdown') {
-    return { success: false, error: '只能更新 Markdown 文件' }
-  }
-  try {
-    const stat = fs.statSync(filePath)
-    if (stat.isDirectory()) {
-      return { success: false, error: '路径是一个目录，不是文件' }
-    }
-    fs.writeFileSync(filePath, content, { encoding: 'utf-8' })
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('download-remote-image', async (_event, url: string, outputPath: string) => {
-  if (!/^https?:\/\//i.test(url)) {
-    return { success: false, error: '只支持 http(s) 图片' }
-  }
-  if (!isPathSafe(outputPath)) {
-    return { success: false, error: '非法路径' }
-  }
-  const ext = path.extname(outputPath).toLowerCase()
-  if (!IMAGE_MIME_TYPES[ext]) {
-    return { success: false, error: '不支持的图片格式' }
-  }
-  try {
-    const response = await fetch(url)
-    if (!response.ok) {
-      return { success: false, error: `下载失败：${response.status}` }
-    }
-    const arrayBuffer = await response.arrayBuffer()
-    if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
-      return { success: false, error: '图片过大' }
-    }
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-    fs.writeFileSync(outputPath, Buffer.from(arrayBuffer))
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('read-image-as-data-url', async (_event, filePath: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-
-  const ext = path.extname(filePath).toLowerCase()
-  const mimeType = IMAGE_MIME_TYPES[ext]
-  if (!mimeType) {
-    return { success: false, error: '不支持的图片格式' }
-  }
-
-  const sizeCheck = validateFileSize(filePath, MAX_IMAGE_SIZE)
-  if (!sizeCheck.valid) {
-    logger.warn('Image too large in read-image-as-data-url', { filePath, size: sizeCheck.size, max: MAX_IMAGE_SIZE })
-    return { success: false, error: sizeCheck.error }
-  }
-
-  try {
-    const data = fs.readFileSync(filePath)
-    return { success: true, dataUrl: `data:${mimeType};base64,${data.toString('base64')}` }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('get-file-info', async (_event, filePath: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-  try {
-    const stats = fs.statSync(filePath)
-    return {
-      success: true,
-      info: {
-        name: path.basename(filePath),
-        size: stats.size,
-        lastModified: stats.mtimeMs,
-        created: stats.birthtimeMs
-      }
-    }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('show-in-folder', async (_event, filePath: string) => {
-  if (!isPathSafe(filePath)) return
-  shell.showItemInFolder(filePath)
-})
-
-wrapHandler('get-recent-files', async () => {
-  return loadStore().recentFiles
-})
-
-wrapHandler('add-recent-file', async (_event, file: { name: string, filePath: string }) => {
-  const store = loadStore()
-  const existing = store.recentFiles.findIndex(f => f.filePath === file.filePath)
-  if (existing !== -1) {
-    store.recentFiles.splice(existing, 1)
-  }
-  store.recentFiles.unshift({
-    ...file,
-    openedAt: Date.now()
-  })
-  const maxFiles = store.maxRecentFiles || DEFAULT_MAX_RECENT_FILES
-  if (store.recentFiles.length > maxFiles) {
-    store.recentFiles.pop()
-  }
-  saveStore(store)
-})
-
-wrapHandler('remove-recent-file', async (_event, filePath: string) => {
-  const store = loadStore()
-  store.recentFiles = store.recentFiles.filter(f => f.filePath !== filePath)
-  saveStore(store)
-})
-
-wrapHandler('clear-recent-files', async () => {
-  const store = loadStore()
-  store.recentFiles = []
-  saveStore(store)
-})
-
-wrapHandler('get-last-folder', async () => {
-  return loadStore().lastFolder
-})
-
-wrapHandler('set-last-folder', async (_event, folderPath: string) => {
-  const store = loadStore()
-  store.lastFolder = folderPath
-  saveStore(store)
-})
-
-wrapHandler('get-max-recent-files', async () => {
-  return loadStore().maxRecentFiles || DEFAULT_MAX_RECENT_FILES
-})
-
-wrapHandler('set-max-recent-files', async (_event, max: number) => {
-  const store = loadStore()
-  store.maxRecentFiles = max
-  if (store.recentFiles.length > max) {
-    store.recentFiles = store.recentFiles.slice(0, max)
-  }
-  saveStore(store)
-})
-
-wrapHandler('watch-file', async (event, filePath: string) => {
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-  if (watchers.has(filePath)) {
-    return { success: true, message: 'Already watching' }
-  }
-  const sender = event.sender
-  try {
-    const watcher = fs.watch(filePath, (eventType) => {
-      if (eventType === 'change' || eventType === 'rename') {
-        const win = BrowserWindow.fromWebContents(sender)
-        if (win && !win.isDestroyed()) {
-          sender.send('file-changed', filePath)
-        }
-      }
-    })
-    watchers.set(filePath, watcher)
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-})
-
-wrapHandler('unwatch-file', async (_event, filePath: string) => {
-  if (!isPathSafe(filePath)) return
-  const watcher = watchers.get(filePath)
-  if (watcher) {
-    watcher.close()
-    watchers.delete(filePath)
-  }
-})
-
-wrapHandler('set-progress-bar', (event, progress: number) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win && !win.isDestroyed()) {
-    win.setProgressBar(progress)
-  }
-})
-
-wrapHandler('clear-progress-bar', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win && !win.isDestroyed()) {
-    win.setProgressBar(-1)
-  }
-})
-
-wrapHandler('export-html-to-pdf', async (event, options: { html: string; defaultPath: string; title: string }) => {
-  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
-  const result = parent
-    ? await dialog.showSaveDialog(parent, {
-      defaultPath: options.defaultPath,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    })
-    : await dialog.showSaveDialog({
-      defaultPath: options.defaultPath,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    })
-
-  if (result.canceled || !result.filePath) {
-    return { success: false }
-  }
-
-  let pdfWindow: BrowserWindow | null = null
-  try {
-    pdfWindow = new BrowserWindow({
-      show: false,
-      width: 900,
-      height: 1200,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-      },
-    })
-    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(options.html)}`)
-    const pdf = await pdfWindow.webContents.printToPDF({
-      printBackground: true,
-      margins: { marginType: 'default' },
-      pageSize: 'A4',
-    })
-    fs.writeFileSync(result.filePath, pdf)
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    logger.error('Failed to export PDF', { title: options.title, error: String(error) })
-    return { success: false, error: String(error) }
-  } finally {
-    if (pdfWindow && !pdfWindow.isDestroyed()) {
-      pdfWindow.close()
-    }
-  }
-}, DIALOG_TIMEOUT)
-
-wrapHandler('save-text-file', async (event, options: { defaultPath: string; content: string; filters?: Electron.FileFilter[] }) => {
-  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
-  const result = parent
-    ? await dialog.showSaveDialog(parent, {
-      defaultPath: options.defaultPath,
-      filters: options.filters,
-    })
-    : await dialog.showSaveDialog({
-      defaultPath: options.defaultPath,
-      filters: options.filters,
-    })
-
-  if (result.canceled || !result.filePath) {
-    return { success: false, cancelled: true }
-  }
-
-  if (!isPathSafe(result.filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-
-  try {
-    fs.writeFileSync(result.filePath, options.content, { encoding: 'utf-8' })
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-}, DIALOG_TIMEOUT)
-
-wrapHandler('open-text-file', async (event, options: { filters?: Electron.FileFilter[] } = {}) => {
-  const parent = BrowserWindow.fromWebContents(event.sender) || getFocusedOrLastWindow()
-  const result = parent
-    ? await dialog.showOpenDialog(parent, {
-      properties: ['openFile'],
-      filters: options.filters,
-    })
-    : await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: options.filters,
-    })
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return { success: false, cancelled: true }
-  }
-
-  const filePath = result.filePaths[0]
-  if (!isPathSafe(filePath)) {
-    return { success: false, error: '非法路径' }
-  }
-
-  const sizeCheck = validateFileSize(filePath, 5 * 1024 * 1024)
-  if (!sizeCheck.valid) {
-    return { success: false, error: sizeCheck.error }
-  }
-
-  try {
-    return { success: true, filePath, content: fs.readFileSync(filePath, 'utf-8') }
-  } catch (error) {
-    return { success: false, error: String(error) }
-  }
-}, DIALOG_TIMEOUT)
-
-wrapHandler('set-title', (event, title: string) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win && !win.isDestroyed()) {
-    win.setTitle(title ? `${title} - Markdown Reader` : 'Markdown Reader')
-  }
-})
-
-// Multi-window IPC handlers
-wrapHandler('get-window-id', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return 0
-  return getWindowId(win)
-})
-
-wrapHandler('focus-window', (_event, id: number) => {
-  const win = windows.get(id)
-  if (win && !win.isDestroyed()) {
-    win.show()
-    win.focus()
-  }
-})
-
-wrapHandler('get-window-states', () => {
-  const states: WindowState[] = []
-  for (const win of windows.values()) {
-    if (win.isDestroyed()) continue
-    const bounds = win.getBounds()
-    states.push({
-      width: bounds.width,
-      height: bounds.height,
-      x: bounds.x,
-      y: bounds.y,
-      isMaximized: win.isMaximized(),
-      isFullScreen: win.isFullScreen(),
-    })
-  }
-  return states
-})
-
-wrapHandler('register-window-files', (event, filePaths: string[]) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (!win) return
-  const id = getWindowId(win)
-  if (id) {
-    windowOpenFiles.set(id, new Set(filePaths))
-  }
 })

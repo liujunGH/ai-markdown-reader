@@ -46,6 +46,9 @@ export function isSupportedImageExt(ext: string): boolean {
 
 export const MARKDOWN_EXTENSIONS = ['.md', '.markdown'] as const
 
+/** 不带点的扩展名（Electron/OpenDialog 的 filters.extensions 要求不带点） */
+export const MARKDOWN_FILTER_EXTENSIONS = MARKDOWN_EXTENSIONS.map((ext) => ext.slice(1))
+
 /** 判断路径是否为 Markdown 文件 */
 export function isMarkdownPath(filePath: string): boolean {
   const lower = filePath.toLowerCase()

@@ -200,9 +200,9 @@ export const DB_CHANNELS = {
 export type DbChannel = (typeof DB_CHANNELS)[keyof typeof DB_CHANNELS]
 
 export interface DbQueryRequest {
-  /** SQL 语句，使用 ? 或 @name 占位符 */
+  /** SQL 语句，仅支持 ? 位置占位符（不支持 @name 命名占位符） */
   sql: string
-  /** 与占位符对应的参数 */
+  /** 与 ? 占位符按序对应的参数 */
   params?: unknown[]
 }
 

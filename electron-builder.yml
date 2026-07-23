@@ -7,6 +7,12 @@ copyright: Copyright © 2026 liujun
 
 asar: true
 
+# better-sqlite3 含原生二进制（.node），asar 内的 .node 无法被 dlopen，
+# 必须解包到真实文件系统。electron-builder 会把匹配的文件从 app.asar
+# 提取到 app.asar.unpacked/。
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+
 directories:
   output: release
   buildResources: build
@@ -14,10 +20,13 @@ directories:
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
 
+# better-sqlite3 是运行时依赖（主进程 import），必须随 node_modules 打包。
+# 其余 dependencies 同理由 electron-builder 默认收集（生产依赖）。
 files:
   - dist/**/*
   - dist-electron/**/*.js
   - package.json
+  - node_modules/better-sqlite3/**/*
 
 extraResources:
   - from: dist-electron/electron/preload.js

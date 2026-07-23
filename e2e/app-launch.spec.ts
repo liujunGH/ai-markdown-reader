@@ -10,7 +10,7 @@ test.describe('App Launch', () => {
     const userDataDir = path.join(os.tmpdir(), `playwright-e2e-${testInfo.workerIndex}-${Date.now()}`)
     electronApp = await _electron.launch({
       args: [
-        path.join(__dirname, '../dist-electron/main.js'),
+        path.join(__dirname, '../dist-electron/electron/main.js'),
         '--no-sandbox',
         '--disable-setuid-sandbox',
         `--user-data-dir=${userDataDir}`,
@@ -37,8 +37,10 @@ test.describe('App Launch', () => {
   })
 
   test('should have basic UI elements', async () => {
-    // The welcome home should be visible with primary action buttons
-    await expect(window.getByRole('button', { name: '打开文件' })).toBeVisible()
+    // The welcome home should be visible with primary action buttons.
+    // Use data-guide selector: '打开文件' substring-matches the toolbar's
+    // '打开文件夹' button, so role+name is ambiguous here.
+    await expect(window.locator('button[data-guide="file-opener"]')).toBeVisible()
     await expect(window.getByRole('button', { name: '打开文件夹' })).toBeVisible()
   })
 })
