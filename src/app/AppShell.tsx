@@ -22,6 +22,8 @@ import { ReaderQuickJump } from '../features/search/ReaderQuickJump'
 import { ReaderCommandPalette } from '../features/search/ReaderCommandPalette'
 import { ReaderWorkspace } from '../features/workspace/ReaderWorkspace'
 import { ReaderToolbar } from '../features/shell/ReaderToolbar'
+import { ReaderExportPanel } from '../features/export/ReaderExportPanel'
+import { ReaderGlobalSearch } from '../features/search/ReaderGlobalSearch'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -125,6 +127,8 @@ function MinimalAppShell() {
       <StatusBar />
       <ReaderCommandPalette />
       <ReaderQuickJump />
+      <ReaderExportPanel />
+      <ReaderGlobalSearch />
     </div>
   )
 }
