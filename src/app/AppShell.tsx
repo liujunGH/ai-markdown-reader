@@ -16,6 +16,7 @@ import { useOpenFileEvent, useOpenFolderEvent, useFileChangedEvent } from '../ip
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderPanel } from './ReaderPanel'
 import { TabBar } from '../features/tabs/TabBar'
+import { StatusBar } from '../features/reader/StatusBar'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -103,6 +104,7 @@ function MinimalAppShell({
       <main style={{ flex: 1, overflow: 'hidden' }}>
         <ReaderPanel />
       </main>
+      <StatusBar />
     </div>
   )
 }

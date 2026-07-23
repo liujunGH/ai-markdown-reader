@@ -16,6 +16,7 @@ import { DocumentView } from '../rendering/DocumentView'
 import { getDocHash } from '../rendering/enhancements'
 import { getContent } from '../resources/DocumentCache'
 import { useDocumentActions } from './useDocumentActions'
+import { ReaderOutline } from '../features/reader/ReaderOutline'
 
 export function ReaderPanel() {
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
@@ -61,31 +62,37 @@ export function ReaderPanel() {
   }
 
   return (
-    <div
-      style={{
-        fontSize: `${fontSize}px`,
-        height: '100%',
-        maxWidth: '820px',
-        margin: '0 auto',
-        padding: '24px 32px',
-      }}
-    >
-      <DocumentView
-        document={document}
-        contentVersion={contentVersion}
-        enhance={{
-          filePath,
-          docHash,
-          onWikiLinkClick: (target) => {
-            // 阶段 4.8+ 接入 wiki link 解析打开；现在先 console
-            console.log('[v2] wikilink click:', target)
-          },
-          onPreviewImage: (info) => {
-            // 阶段 4.10 接入图片大图预览 overlay
-            console.log('[v2] image preview:', info.originalSrc)
-          },
+    <div style={{ display: 'flex', height: '100%' }}>
+      <div
+        style={{
+          flex: 1,
+          fontSize: `${fontSize}px`,
+          height: '100%',
+          maxWidth: '820px',
+          margin: '0 auto',
+          padding: '24px 32px',
         }}
-      />
+      >
+        <DocumentView
+          document={document}
+          contentVersion={contentVersion}
+          enhance={{
+            filePath,
+            docHash,
+            onWikiLinkClick: (target) => {
+              // 阶段 4.10 接入 wiki link 解析打开
+              console.log('[v2] wikilink click:', target)
+            },
+            onPreviewImage: (info) => {
+              // 阶段 4.10 接入图片大图预览 overlay
+              console.log('[v2] image preview:', info.originalSrc)
+            },
+          }}
+        />
+      </div>
+      <aside style={{ width: 260, borderLeft: '1px solid var(--border, #e0e0e0)', overflowY: 'auto' }}>
+        <ReaderOutline document={document} filePath={filePath} />
+      </aside>
     </div>
   )
 }
