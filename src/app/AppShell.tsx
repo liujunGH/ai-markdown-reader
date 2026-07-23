@@ -20,6 +20,7 @@ import { StatusBar } from '../features/reader/StatusBar'
 import { ReaderSearch } from '../features/search/ReaderSearch'
 import { ReaderQuickJump } from '../features/search/ReaderQuickJump'
 import { ReaderCommandPalette } from '../features/search/ReaderCommandPalette'
+import { ReaderWorkspace } from '../features/workspace/ReaderWorkspace'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -80,6 +81,7 @@ function MinimalAppShell({
   const activeTabName = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.name)
   const togglePanel = useUIStore((s) => s.togglePanel)
   const showSearch = useUIStore((s) => s.panels.search)
+  const showFileSidebar = useUIStore((s) => s.panels.fileSidebar)
 
   // 全局快捷键（搜索/命令面板/快速跳转）
   useEffect(() => {
@@ -122,20 +124,30 @@ function MinimalAppShell({
         <button type="button" onClick={() => togglePanel('search')}>
           🔍 搜索
         </button>
+        <button type="button" onClick={() => togglePanel('fileSidebar')}>
+          📁 文件
+        </button>
         <span style={{ marginLeft: 'auto', color: '#888', fontSize: 13 }}>
           标签 {tabsCount}
           {activeTabName ? ` · ${activeTabName}` : ''}
         </span>
       </header>
       <TabBar />
-      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        <ReaderPanel />
-        {showSearch && (
-          <div style={{ position: 'absolute', top: 8, right: 16, zIndex: 100 }}>
-            <ReaderSearch />
-          </div>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {showFileSidebar && (
+          <aside style={{ width: 280, borderRight: '1px solid var(--border, #e0e0e0)', overflow: 'hidden' }}>
+            <ReaderWorkspace />
+          </aside>
         )}
-      </main>
+        <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          <ReaderPanel />
+          {showSearch && (
+            <div style={{ position: 'absolute', top: 8, right: 16, zIndex: 100 }}>
+              <ReaderSearch />
+            </div>
+          )}
+        </main>
+      </div>
       <StatusBar />
       {/* 浮层面板（命令面板/快速跳转） */}
       <ReaderCommandPalette />
