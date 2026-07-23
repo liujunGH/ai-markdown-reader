@@ -9,6 +9,7 @@ import { ReadingToolsPanel } from '../../components/ReadingToolsPanel'
 import { useReadingStore, useUIStore, useTabStore } from '../../state'
 import { useReadingSelectors } from './useReadingSelectors'
 import { scrollToLine } from '../../app/readerScrollRegistry'
+import { useDocumentActions } from '../../app/useDocumentActions'
 import type {
   ReaderMark,
   ReadLaterItem,
@@ -48,6 +49,7 @@ export function ReaderReadingTools() {
   const setActivePresetId = useReadingStore((s) => s.setActivePresetId)
   const addReadingSnapshot = useReadingStore((s) => s.addReadingSnapshot)
   const setSelectedReaderText = useReadingStore((s) => s.setSelectedReaderText)
+  const { openDocumentByPath } = useDocumentActions()
 
   const handleAddHighlight = useCallback(() => {
     const text = selectors.selectedText.trim()
@@ -150,7 +152,9 @@ export function ReaderReadingTools() {
       onAddHighlight={handleAddHighlight}
       onAddExcerpt={handleAddExcerpt}
       onAddReadLater={handleAddReadLater}
-      onOpenReadLater={(_item: ReadLaterItem) => { /* 阶段后续：打开 item.filePath */ }}
+      onOpenReadLater={(item: ReadLaterItem) => {
+        if (item.filePath) void openDocumentByPath(item.filePath)
+      }}
       onUpdateReadLaterStatus={handleUpdateReadLaterStatus}
       onResume={() => {
         // 滚动到 resumePoint 的行
@@ -159,8 +163,8 @@ export function ReaderReadingTools() {
       onApplyPreset={handleApplyPreset}
       onJumpToLandmark={(l: ReadingLandmark) => scrollToLine(l.line)}
       onJumpToMark={(_m: ReaderMark) => {
-        // mark 没存行号，按 position 滚动（position 是字符偏移，近似行）
-        // 阶段后续：mark 存行号后精确跳
+        // ReaderMark 无行号/位置字段，无法精确跳转
+        // 后续可在创建 mark 时记录行号
       }}
       onSetLayoutMode={(mode: ReadingLayoutMode) => setLayoutMode(mode)}
       onRemoveMark={removeReaderMark}

@@ -17,7 +17,9 @@ import { getDocHash } from '../rendering/enhancements'
 import { getContent } from '../resources/DocumentCache'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderOutline } from '../features/reader/ReaderOutline'
+import { SplitPanel } from './SplitPanel'
 import { registerReaderScroll } from './readerScrollRegistry'
+import { useScrollSpy } from '../rendering/hooks/useScrollSpy'
 import { readFile } from '../ipc/client'
 
 /** 解析 wiki link [[target]] 并打开对应文件 */
@@ -48,6 +50,7 @@ async function handleWikiLink(target: string, altTarget?: string): Promise<void>
 export function ReaderPanel() {
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
   const fontSize = useUIStore((s) => s.fontSize)
+  const isSplitView = useUIStore((s) => s.isSplitView)
   const { syncWindowTitle } = useDocumentActions()
   const docViewRef = useRef<DocumentViewHandle>(null)
 
@@ -99,6 +102,9 @@ export function ReaderPanel() {
     return document ? document.blocks.length + docHash.length : 0
   }, [document, docHash])
 
+  // scrollSpy：当前可见标题 id（供大纲高亮）
+  const activeHeadingId = useScrollSpy('main')
+
   if (!activeTab) {
     return <EmptyState message="没有打开的文档" />
   }
@@ -148,8 +154,13 @@ export function ReaderPanel() {
           }}
         />
       </div>
+      {isSplitView && (
+        <div style={{ flex: 1, borderLeft: '1px solid var(--border, #e0e0e0)', overflow: 'hidden' }}>
+          <SplitPanel />
+        </div>
+      )}
       <aside style={{ width: 260, borderLeft: '1px solid var(--border, #e0e0e0)', overflowY: 'auto' }}>
-        <ReaderOutline document={document} filePath={filePath} />
+        <ReaderOutline document={document} filePath={filePath} activeId={activeHeadingId} />
       </aside>
     </div>
   )

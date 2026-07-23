@@ -354,6 +354,28 @@ export const useTabStore = create<TabStore>()((set, get) => ({
           })
         )
         set({ isRestoringSession: false })
+
+        // 主动回源激活标签 content（确保恢复后文档能渲染）
+        // useDocument 也会做这件事，但显式调用避免时序依赖
+        const activeId = activeTabId && stored.some((t) => t.id === activeTabId) ? activeTabId : stored[0].id
+        const activeStored = stored.find((t) => t.id === activeId)
+        if (activeStored?.filePath) {
+          try {
+            const { setContent } = await import('../../resources/DocumentCache')
+            const api = window.electronAPI
+            if (api) {
+              const result = await api.readFile(activeStored.filePath)
+              if (result.success && result.content !== undefined) {
+                setContent(activeId, result.content, activeStored.filePath)
+                get().setContentStatus(activeId, 'ready')
+              } else {
+                get().setContentStatus(activeId, 'error', result.error)
+              }
+            }
+          } catch {
+            // 回源失败不影响应用启动，useDocument 会显示错误状态
+          }
+        }
       },
 
       clearFailedRestores: () =>

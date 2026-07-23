@@ -15,6 +15,7 @@ import { FirstUseGuide } from '../../components/FirstUseGuide'
 import { getContent } from '../../resources/DocumentCache'
 import { useDocument } from '../../rendering/hooks/useDocument'
 import { scrollToHeading } from '../../app/readerScrollRegistry'
+import { useScrollSpy } from '../../rendering/hooks/useScrollSpy'
 import type { OutlineItem } from '../../hooks/useOutline'
 import styles from './ReaderPanels.module.css'
 
@@ -44,6 +45,7 @@ export function ReaderPanels() {
   const content = useMemo(() => getContent(activeTabId) ?? '', [activeTabId])
 
   const { document } = useDocument(activeTabId, activeTab?.filePath)
+  const activeHeadingId = useScrollSpy('main')
   const outlineItems = useMemo<OutlineItem[]>(
     () => (document?.outline ?? []).map((o) => ({ level: o.level, text: o.text, id: o.id, position: o.line })),
     [document]
@@ -82,12 +84,12 @@ export function ReaderPanels() {
           <ProgressBar />
           <FloatingTOC
             outlineItems={outlineItems}
-            activeHeadingId={null}
+            activeHeadingId={activeHeadingId}
             onNavigate={(id) => scrollToHeading(id)}
           />
           <Minimap
             outlineItems={outlineItems}
-            activeHeadingId={null}
+            activeHeadingId={activeHeadingId}
             onNavigate={(id) => scrollToHeading(id)}
             contentLength={content.length}
           />
