@@ -10,7 +10,7 @@
  * 后续阶段接入：Outline/Minimap/搜索/阅读工具等围绕此面板。
  */
 import { useMemo, useRef, useEffect } from 'react'
-import { useTabStore, useUIStore } from '../state'
+import { useTabStore, useUIStore, useActiveDocStore, useReadingStore } from '../state'
 import { useDocument } from '../rendering/hooks/useDocument'
 import { DocumentView, type DocumentViewHandle } from '../rendering/DocumentView'
 import { getDocHash } from '../rendering/enhancements'
@@ -18,12 +18,54 @@ import { getContent } from '../resources/DocumentCache'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderOutline } from '../features/reader/ReaderOutline'
 import { registerReaderScroll } from './readerScrollRegistry'
+import { readFile } from '../ipc/client'
+
+/** 解析 wiki link [[target]] 并打开对应文件 */
+async function handleWikiLink(target: string, altTarget?: string): Promise<void> {
+  const activeTab = useTabStore.getState().tabs.find((t) => t.id === useTabStore.getState().activeTabId)
+  const api = window.electronAPI
+  if (!api) return
+  const dir = activeTab?.filePath ? api.pathDirname(activeTab.filePath) : ''
+  const candidates = [target, altTarget, `${target}.md`, `${target}.markdown`].filter(Boolean) as string[]
+  if (altTarget) candidates.push(`${altTarget}.md`, `${altTarget}.markdown`)
+  for (const c of candidates) {
+    const fullPath = dir ? api.pathJoin(dir, c) : c
+    const r = await readFile(fullPath)
+    if (r.success && r.content !== undefined) {
+      const name = api.pathBasename(fullPath)
+      useTabStore.getState().openFile(name, fullPath)
+      const { setContent } = await import('../resources/DocumentCache')
+      const tabId = useTabStore.getState().activeTabId
+      if (tabId) {
+        setContent(tabId, r.content, fullPath)
+        useTabStore.getState().setContentStatus(tabId, 'ready')
+      }
+      return
+    }
+  }
+}
 
 export function ReaderPanel() {
   const activeTab = useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId))
   const fontSize = useUIStore((s) => s.fontSize)
   const { syncWindowTitle } = useDocumentActions()
   const docViewRef = useRef<DocumentViewHandle>(null)
+
+  const tabId = activeTab?.id ?? ''
+  const filePath = activeTab?.filePath
+
+  // 搜索/阅读高亮 + 图片预览（从 activeDocStore / readingStore 取，兄弟组件写入）
+  const searchHighlight = useActiveDocStore((s) => s.searchHighlight)
+  const currentMatch = useActiveDocStore((s) => s.currentMatch)
+  const matchCount = useActiveDocStore((s) => s.matchCount)
+  const setPreviewImage = useActiveDocStore((s) => s.setPreviewImage)
+  const allMarks = useReadingStore((s) => s.readerMarks)
+  // 当前文件的高亮文本（≥2 字符）
+  const readingHighlights = useMemo(() => {
+    return allMarks
+      .filter((m) => m.kind === 'highlight' && m.filePath === filePath && m.text.length >= 2)
+      .map((m) => m.text)
+  }, [allMarks, filePath])
 
   // 注册 scroll handle 供阅读工具等兄弟组件触发
   useEffect(() => {
@@ -37,9 +79,6 @@ export function ReaderPanel() {
     )
     return () => registerReaderScroll(null)
   })
-
-  const tabId = activeTab?.id ?? ''
-  const filePath = activeTab?.filePath
 
   // 窗口标题随激活标签更新
   useMemo(() => {
@@ -95,13 +134,16 @@ export function ReaderPanel() {
           enhance={{
             filePath,
             docHash,
-            onWikiLinkClick: (target) => {
-              // 阶段 4.10 接入 wiki link 解析打开
-              console.log('[v2] wikilink click:', target)
+            searchHighlight: searchHighlight ?? undefined,
+            currentMatch,
+            matchCount,
+            readingHighlights,
+            onWikiLinkClick: (target, altTarget) => {
+              // wiki link 解析打开（复用 useDocumentActions 的路径解析）
+              void handleWikiLink(target, altTarget)
             },
             onPreviewImage: (info) => {
-              // 阶段 4.10 接入图片大图预览 overlay
-              console.log('[v2] image preview:', info.originalSrc)
+              setPreviewImage(info)
             },
           }}
         />

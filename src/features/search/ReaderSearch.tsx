@@ -8,8 +8,8 @@
  *  - 当前标签搜索：useSearch(getContent(activeTabId))
  *  - 跨标签搜索：构造 tabsWithContent（元数据 + DocumentCache content）传给 SearchBox
  */
-import { useMemo, useState, useCallback } from 'react'
-import { useTabStore, useUIStore } from '../../state'
+import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useTabStore, useUIStore, useActiveDocStore } from '../../state'
 import { useSearch } from '../../hooks/useSearch'
 import { getContent } from '../../resources/DocumentCache'
 import { SearchBox } from '../../components/SearchBox'
@@ -39,6 +39,18 @@ export function ReaderSearch() {
   const content = useMemo(() => getContent(activeTabId) ?? '', [activeTabId, tabs.length])
   const search = useSearch(content)
 
+  // 同步搜索高亮状态到 activeDocStore（ReaderPanel 的 DocumentView 消费）
+  const setSearchHighlight = useActiveDocStore((s) => s.setSearchHighlight)
+  const setSearchMatch = useActiveDocStore((s) => s.setSearchMatch)
+  useEffect(() => {
+    if (query.trim()) {
+      setSearchHighlight({ query, isRegex })
+    } else {
+      setSearchHighlight(null)
+    }
+    setSearchMatch(search.currentMatch, search.matches.length)
+  }, [query, isRegex, search.currentMatch, search.matches.length, setSearchHighlight, setSearchMatch])
+
   const handleQueryChange = useCallback(
     (q: string) => {
       setQuery(q)
@@ -62,7 +74,9 @@ export function ReaderSearch() {
     closePanel('search')
     search.clearSearch()
     setQuery('')
-  }, [closePanel, search])
+    setSearchHighlight(null)
+    setSearchMatch(-1, 0)
+  }, [closePanel, search, setSearchHighlight, setSearchMatch])
 
   // 跨标签搜索：构造含 content 的 tabs（从 DocumentCache 注入）
   const tabsWithContent = useMemo<Tab[]>(() => {

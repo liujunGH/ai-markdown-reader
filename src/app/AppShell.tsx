@@ -11,9 +11,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ThemeProvider } from '../context/ThemeContext'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-import { useTabStore, installTabSideEffects, useUIStore } from '../state'
+import { useTabStore, installTabSideEffects, useUIStore, useToastStore, useFileStore } from '../state'
 import { useOpenFileEvent, useOpenFolderEvent, useFileChangedEvent } from '../ipc/events'
 import { useDocumentActions } from './useDocumentActions'
+import { useDragAndDrop } from '../hooks/useDragAndDrop'
 import { ReaderPanel } from './ReaderPanel'
 import { TabBar } from '../features/tabs/TabBar'
 import { StatusBar } from '../features/reader/StatusBar'
@@ -25,6 +26,9 @@ import { ReaderToolbar } from '../features/shell/ReaderToolbar'
 import { ReaderExportPanel } from '../features/export/ReaderExportPanel'
 import { ReaderGlobalSearch } from '../features/search/ReaderGlobalSearch'
 import { ReaderReadingTools } from '../features/reading-tools/ReaderReadingTools'
+import { ImagePreviewOverlay } from '../features/reader/ImagePreviewOverlay'
+import { UpdateNotification } from '../components/UpdateNotification'
+import { basename } from '../utils/path'
 
 interface AppShellProps {
   /** 业务 UI 树（阶段 4.8+ 接入 TabBar/Sidebar 等；默认用内置最小 UI） */
@@ -33,7 +37,9 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [ready, setReady] = useState(false)
-  const { handleOpenFileEvent } = useDocumentActions()
+  const { handleOpenFileEvent, openDocumentWithContent } = useDocumentActions()
+  const showToast = useToastStore((s) => s.showToast)
+  const setFolder = useFileStore((s) => s.setFolder)
 
   // 一次性初始化：安装副作用 + 恢复会话
   useEffect(() => {
@@ -46,13 +52,28 @@ export function AppShell({ children }: AppShellProps) {
     handleOpenFileEvent(filePath)
   })
 
-  useOpenFolderEvent((_folderPath) => {
-    // 阶段 4.10 接入文件夹浏览器
+  useOpenFolderEvent((folderPath) => {
+    if (folderPath) {
+      const name = basename(folderPath)
+      setFolder(folderPath, name)
+      useUIStore.getState().openPanel('fileSidebar')
+    }
   })
 
-  useFileChangedEvent((_filePath) => {
-    // 阶段 4.10 接入文件变更提示
+  useFileChangedEvent((filePath) => {
+    if (filePath) {
+      const name = basename(filePath)
+      showToast(`文件已变更：${name}，重新加载以更新`, 'success')
+    }
   })
+
+  // 拖拽打开文件
+  useDragAndDrop(
+    (content, name, filePath) => {
+      openDocumentWithContent(content, name, filePath)
+    },
+    showToast
+  )
 
   if (!ready) {
     return (
@@ -131,6 +152,8 @@ function MinimalAppShell() {
       <ReaderExportPanel />
       <ReaderGlobalSearch />
       <ReaderReadingTools />
+      <ImagePreviewOverlay />
+      <UpdateNotification />
     </div>
   )
 }

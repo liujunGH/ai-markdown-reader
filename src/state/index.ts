@@ -18,3 +18,5 @@ export type { ToastStore, Toast } from './stores/toastStore'
 
 export { useReadingStore } from './stores/readingStore'
 export type { ReadingStore } from './stores/readingStore'
+
+export { useActiveDocStore } from './stores/activeDocStore'

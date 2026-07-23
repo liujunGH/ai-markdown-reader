@@ -5,9 +5,35 @@
  * v2 提供 onExecute：把命令 id 映射到 store action / useDocumentActions。
  */
 import { useCallback } from 'react'
-import { useUIStore, useTabStore } from '../../state'
+import { useUIStore, useTabStore, useFileStore } from '../../state'
 import { useDocumentActions } from '../../app/useDocumentActions'
+import { createReadingDataBackup, applyReadingDataBackup } from '../../utils/readingDataBackup'
 import CommandPalette from '../../components/CommandPalette'
+
+/** 导出阅读数据备份 */
+async function exportReadingDataBackup(): Promise<void> {
+  const api = window.electronAPI
+  if (!api) return
+  const backup = createReadingDataBackup()
+  const json = JSON.stringify(backup, null, 2)
+  await api.saveTextFile({
+    defaultPath: `reading-data-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    content: json,
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  })
+}
+
+/** 导入阅读数据备份 */
+async function importReadingDataBackup(): Promise<void> {
+  const api = window.electronAPI
+  if (!api) return
+  const result = await api.openTextFile({
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  })
+  if (result.success && result.content) {
+    applyReadingDataBackup(result.content)
+  }
+}
 
 export function ReaderCommandPalette() {
   const isOpen = useUIStore((s) => s.panels.commandPalette)
@@ -27,6 +53,19 @@ export function ReaderCommandPalette() {
       switch (commandId) {
         case 'open-file':
           void openFileDialog()
+          break
+        case 'open-folder':
+          void (async () => {
+            const api = window.electronAPI
+            if (api) {
+              const folder = await api.openFolderDialog()
+              if (folder) {
+                const name = api.pathBasename(folder)
+                useFileStore.getState().setFolder(folder, name)
+                useUIStore.getState().openPanel('fileSidebar')
+              }
+            }
+          })()
           break
         case 'open-example':
           openExample()
@@ -49,8 +88,17 @@ export function ReaderCommandPalette() {
         case 'show-shortcuts':
         case 'file-info':
         case 'export-html':
-          // 这些命令映射到对应面板开关
+        case 'workspaces':
+        case 'index-diagnostics':
           togglePanel(mapCommandToPanel(commandId))
+          break
+        case 'toggle-theme':
+          // 主题循环切换：通过 ThemeContext 的全局事件
+          window.dispatchEvent(new CustomEvent('toggle-theme'))
+          break
+        case 'toggle-split':
+          // 分屏切换（简化：开关 splitView）
+          useUIStore.setState((s) => ({ isSplitView: !s.isSplitView }))
           break
         case 'zoom-in':
           setFontSize(Math.min(32, fontSize + 1))
@@ -58,8 +106,14 @@ export function ReaderCommandPalette() {
         case 'zoom-out':
           setFontSize(Math.max(12, fontSize - 1))
           break
-        case 'toggle-split':
-          togglePanel('fileSidebar') // 占位：split 待接
+        case 'print':
+          window.print()
+          break
+        case 'export-reading-backup':
+          void exportReadingDataBackup()
+          break
+        case 'import-reading-backup':
+          void importReadingDataBackup()
           break
         default:
           console.log('[v2] command not yet wired:', commandId)
