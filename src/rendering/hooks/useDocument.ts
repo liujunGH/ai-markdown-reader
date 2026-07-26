@@ -111,6 +111,13 @@ export function useDocument(tabId: string, filePath?: string): UseDocumentResult
       // 1. 取 content（同步命中优先，否则异步回源）
       let content = getContent(tabId)
       if (content === undefined) {
+        // 无 filePath 的标签（如欢迎页）无法回源，视为空文档
+        if (!filePath) {
+          if (reqId !== currentRequestRef.current || !mountedRef.current) return
+          setDocument(null)
+          setLoading(false)
+          return
+        }
         content = await getContentAsync(tabId, filePath)
       }
       // 回源期间可能已切换标签

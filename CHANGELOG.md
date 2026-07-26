@@ -4,6 +4,42 @@
 
 ---
 
+## v2.0.0
+
+### 架构重构
+- 从单体 MarkdownRenderer 迁移到分层架构：`tokenizer`（markdown-it 块级解析）→ `blockModel`（块边界切分）→ `DocumentView`（TanStack Virtual 虚拟化渲染）。
+- 主线程渲染不再一次性注入整篇 HTML，改为按可见区间逐块渲染，大文档内存占用不再随阅读深度单调增长。
+- `tabStore` 只存标签元数据，正文内容下沉到 `DocumentCache` LRU，响应式状态树不再承载 MB 级正文。
+
+### 渲染与性能
+- 新增 `@tanstack/react-virtual` 虚拟列表，滚动时只渲染可见块，滚出视口的块自动卸载。
+- Markdown 解析在 Web Worker 中完成，worker 崩溃时降级到主线程同步解析，保证可用性。
+- 块级 DOMPurify 净化替代整篇净化，大幅降低首次渲染长任务。
+- 新增 `scripts/render-check.mjs`，用 Playwright Electron 验证 15 项渲染正确性（heading id、代码高亮、KaTeX、Mermaid、WikiLink、搜索高亮等）。
+
+### 全文索引
+- 全文索引从 IndexedDB 迁移到主进程 SQLite FTS5，使用 trigram tokenizer 支持中文 ≥3 字符子串匹配。
+- 文件删除时通过外键级联与触发器可靠清理 FTS 索引与桥接记录，根治旧 IndexedDB 的索引膨胀。
+- 阅读数据（高亮、稍后读、会话、章节、快照、书签）统一按 `file_path` 关联，具备 `ON DELETE CASCADE`。
+
+### 安全与 IPC
+- 主进程 IPC handler 按领域拆分（file / dialog / window / storage / db），channel 名、超时、限流集中管理。
+- 所有文件路径经过 `validateFilePath` 校验，解析符号链接并限制在 home/userData/temp/desktop/documents/downloads 等安全根目录。
+- `db:query` 只允许 SELECT 语句；`db:exec` 收紧为仅允许 INSERT/REPLACE/UPDATE/DELETE，拒绝 DDL 与连接配置变更。
+- `watch-file` 支持多窗口同时监听同一文件，窗口关闭时自动清理对应 watcher。
+
+### 修复
+- 修复 Prism 语言并行加载顺序问题（tsx 依赖 jsx），解决 `Cannot convert undefined or null to object`。
+- 修复 Minimap 参与 flex 布局导致文档可视高度为 0、虚拟列表无法渲染的问题。
+- 修复首次使用引导未检查 localStorage、始终遮挡界面且无法交互的问题。
+- 修复无 `filePath` 标签（欢迎页）在 `useDocument` 中抛错的问题。
+
+### 工程化
+- 单元测试 223 个、e2e 6 个全绿；新增 `render-check.mjs` 渲染验证。
+- 移除 FileInfo / FilePreview / Timeline / IndexDiag / Workspace / recent / quickSwitcher 等旧面板与旧 worker 代码。
+
+---
+
 ## v1.5.7
 
 ### 阅读优先收敛

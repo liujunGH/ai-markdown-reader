@@ -12,7 +12,7 @@ import fs from 'fs'
 import { createLogger } from './lib/logger'
 import { createRateLimiter } from './lib/ipcGuard'
 import { isExternalUrl } from './lib/externalLinks'
-import { registerAllHandlers, type IpcContext, type ConfigStoreData } from './ipc'
+import { registerAllHandlers, type IpcContext, type ConfigStoreData, type WatcherEntry } from './ipc'
 import { closeDatabase, getDatabase } from './db/connection'
 import { EVENT_CHANNELS } from '../shared'
 
@@ -91,7 +91,7 @@ function saveStore(data: StoreData): void {
 // ============================================================
 // 共享可变状态（IPC 上下文的数据源）
 // ============================================================
-const watchers = new Map<string, fs.FSWatcher>()
+const watchers = new Map<string, WatcherEntry>()
 const windows = new Map<number, BrowserWindow>()
 const windowIds = new WeakMap<BrowserWindow, number>()
 const windowOpenFiles = new Map<number, Set<string>>()
@@ -206,6 +206,14 @@ function createWindow(filePath?: string, windowState?: WindowState) {
     if (lastFocusedWindowId.value === id) {
       lastFocusedWindowId.value = 0
     }
+    // 清理该窗口注册的文件 watcher
+    for (const [filePath, entry] of watchers) {
+      entry.senders.delete(id)
+      if (entry.senders.size === 0) {
+        entry.watcher.close()
+        watchers.delete(filePath)
+      }
+    }
   })
 
   win.on('close', (event) => {
@@ -217,7 +225,7 @@ function createWindow(filePath?: string, windowState?: WindowState) {
 
   const htmlPath = isDev
     ? 'http://localhost:5173'
-    : path.join(__dirname, '../dist/index.html')
+    : path.join(__dirname, '../../dist/index.html')
 
   logger.info('Loading HTML', { htmlPath })
 
@@ -774,7 +782,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   logger.info('All windows closed')
-  watchers.forEach((watcher) => watcher.close())
+  for (const entry of watchers.values()) {
+    entry.watcher.close()
+  }
   watchers.clear()
   // macOS 关闭所有窗口不退出应用（用户可能重开窗口），故不关库；
   // 非 macOS 真正退出，由 before-quit 统一关库。

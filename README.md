@@ -3,9 +3,9 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-1.5.7-blue)
+![Version](https://img.shields.io/badge/Version-2.0.0-blue)
 
-Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。当前版本把功能重新收敛到阅读、导航、搜索、导出和轻量工作区管理，启动时优先打开界面，再按需读取文档内容，避免历史标签、文件夹索引和大型文档一起挤进首屏路径。
+Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。v2.0.0 完成了从单体渲染到分层架构的重构：块级 Markdown 解析、TanStack Virtual 虚拟化渲染、Zustand 状态分层、SQLite FTS5 全文索引，以及按领域拆分的 IPC 安全边界。
 
 ## 适合做什么
 
@@ -17,14 +17,14 @@ Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。当
 - 渲染 Mermaid、KaTeX、代码块、表格、任务列表、WikiLink 和本地图片
 - 将文档导出为 HTML、PDF，或复制为纯文本/富文本
 
-## v1.5.7 重点
+## v2.0.0 重点
 
-- 删除偏维护和发布运营的重型面板，让工具菜单回到阅读、查找、导航和导出。
-- 会话恢复改为懒加载：启动时只恢复标签元数据，当前标签内容优先加载，切换到其他文件时再读取对应文档。
-- Markdown 渲染优先走 Web Worker，worker 失败时再回退到主线程解析，降低大文档对界面的阻塞。
-- 启动流程延后非必要任务：不会在启动阶段自动恢复上次文件夹并触发索引。
-- 新增 `npm run perf:startup`，默认生成 12 个 5MB 临时 Markdown 文档，测试空会话和大数据会话启动耗时。
-- 新增 `npm run perf:document`，覆盖单个大文档的打开、首次搜索命中和滚动到底部渲染耗时。
+- **全新渲染层**：markdown-it 块级 token 解析 + TanStack Virtual 虚拟化渲染，根治大文档滚动卡顿与内存膨胀。
+- **状态分层重构**：Tab 只存元数据，正文内容下沉到 `DocumentCache` LRU，响应式状态树不再承载 MB 级正文。
+- **全文索引升级**：全文索引从 IndexedDB 迁移到主进程 SQLite FTS5，支持中文 trigram 子串匹配与可靠级联清理。
+- **IPC 安全边界**：主进程 handler 按领域拆分，路径校验、文件大小限制、SQL 白名单（`db:exec` 仅允许 DML）统一收口。
+- **多窗口文件监听**：同一文件可在多个窗口同时监听变更，关闭窗口时自动清理，不再互相覆盖。
+- **工程验证**：222 单元测试 + 6 e2e + `render-check.mjs` 15/15 渲染正确性验证全绿。
 
 ## 核心功能
 
@@ -170,7 +170,9 @@ scripts/release-local.sh 1.5.7 release/Markdown\ Reader-1.5.7-arm64.dmg
 |--|--|
 | 桌面框架 | Electron 35 |
 | 前端框架 | React 18 + TypeScript |
-| 状态管理 | Zustand + React Hooks |
+| 虚拟列表 | TanStack Virtual |
+| 状态管理 | Zustand + Immer |
+| 全文索引 | SQLite FTS5 (better-sqlite3) |
 | 构建工具 | Vite 5 |
 | 打包工具 | electron-builder 25 |
 | Markdown 解析 | markdown-it |
@@ -184,20 +186,23 @@ scripts/release-local.sh 1.5.7 release/Markdown\ Reader-1.5.7-arm64.dmg
 ```text
 markdown-reader/
 ├── electron/                  # Electron 主进程与 preload
+│   ├── ipc/                   # 按领域拆分的 IPC handler（file/dialog/window/storage/db）
+│   ├── lib/                   # 路径安全、限流、日志
+│   └── db/                    # SQLite 连接、schema、迁移
 ├── src/
-│   ├── components/            # React 组件
-│   │   ├── MarkdownRenderer/  # Markdown 渲染
-│   │   ├── ReadingToolsPanel/ # 阅读工具侧栏
-│   │   ├── DocumentLoadState/ # 懒加载文档状态
-│   │   ├── ToolsMenu/         # 阅读优先工具菜单
-│   │   └── ...
-│   ├── hooks/                 # useMarkdownWorker 等 Hooks
-│   ├── stores/                # Zustand 状态
-│   ├── utils/                 # Markdown、索引、阅读数据和存储工具
-│   ├── workers/               # Markdown worker
-│   └── styles/                # 全局样式与 CSS Modules
+│   ├── app/                   # AppShell、ReaderPanel、SplitPanel
+│   ├── rendering/             # 渲染层核心
+│   │   ├── pipeline/          # tokenizer、blockModel、renderer
+│   │   ├── workers/           # Markdown parse worker
+│   │   ├── enhancements/      # Mermaid/KaTeX/代码/图片等块增强
+│   │   └── hooks/             # useDocument、useScrollSpy
+│   ├── state/stores/          # Zustand 状态（tab/file/reading/ui/activeDoc/toast）
+│   ├── resources/             # DocumentCache LRU
+│   ├── features/              # 功能组件（tabs/search/reading-tools/reader/workspace）
+│   ├── components/            # 复用 UI 组件
+│   └── ipc/                   # 渲染进程 IPC 客户端封装
 ├── e2e/                       # Playwright Electron E2E
-├── docs/releases/             # GitHub Release notes
+├── scripts/render-check.mjs   # 渲染正确性验证
 ├── scripts/perf-startup.mjs   # 启动性能压测
 ├── scripts/perf-document.mjs  # 大文档阅读性能压测
 └── package.json

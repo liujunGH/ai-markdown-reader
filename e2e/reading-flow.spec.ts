@@ -42,6 +42,10 @@ test.describe('Reading Flow', () => {
     })
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
+    // 关闭首次使用引导，避免遮挡后续 UI 交互
+    await window.evaluate(() => { try { localStorage.setItem('has-seen-guide', '1') } catch {} })
+    await window.reload()
+    await window.waitForLoadState('domcontentloaded')
     // v2 AppShell: 等 header 渲染
     await window.waitForSelector('header', { timeout: 10000 })
   })

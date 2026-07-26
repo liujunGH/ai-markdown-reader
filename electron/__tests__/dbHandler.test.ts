@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isReadOnlyQuery, isForbiddenExec } from '../ipc/dbHandler'
+import { isReadOnlyQuery, isForbiddenExec, isAllowedExec } from '../ipc/dbHandler'
 
 /**
  * db:query / db:exec 的 SQL 安全校验。
@@ -41,20 +41,28 @@ describe('db:query read-only guard (isReadOnlyQuery)', () => {
   })
 })
 
-describe('db:exec forbidden guard (isForbiddenExec)', () => {
-  it('accepts normal write statements', () => {
-    expect(isForbiddenExec('INSERT INTO files VALUES (1)')).toBe(false)
-    expect(isForbiddenExec('UPDATE files SET deleted=1 WHERE path=?')).toBe(false)
-    expect(isForbiddenExec('DELETE FROM files WHERE path=?')).toBe(false)
-    expect(isForbiddenExec('CREATE TABLE foo (id INTEGER)')).toBe(false)
+describe('db:exec allowed guard (isAllowedExec)', () => {
+  it('accepts DML statements', () => {
+    expect(isAllowedExec('INSERT INTO files VALUES (1)')).toBe(true)
+    expect(isAllowedExec('INSERT OR REPLACE INTO files (path) VALUES (?)')).toBe(true)
+    expect(isAllowedExec('REPLACE INTO files (path) VALUES (?)')).toBe(true)
+    expect(isAllowedExec('UPDATE files SET deleted=1 WHERE path=?')).toBe(true)
+    expect(isAllowedExec('DELETE FROM files WHERE path=?')).toBe(true)
+  })
+
+  it('rejects DDL and schema-changing statements', () => {
+    expect(isAllowedExec('CREATE TABLE foo (id INTEGER)')).toBe(false)
+    expect(isAllowedExec('DROP TABLE files')).toBe(false)
+    expect(isAllowedExec('ALTER TABLE files ADD COLUMN x TEXT')).toBe(false)
+    expect(isAllowedExec('TRUNCATE TABLE files')).toBe(false)
   })
 
   it('rejects connection-config-breaking statements', () => {
-    expect(isForbiddenExec('PRAGMA journal_mode=DELETE')).toBe(true)
-    expect(isForbiddenExec('PRAGMA foreign_keys=OFF')).toBe(true)
-    expect(isForbiddenExec('ATTACH DATABASE "evil.db" AS evil')).toBe(true)
-    expect(isForbiddenExec('DETACH evil')).toBe(true)
-    expect(isForbiddenExec('VACUUM')).toBe(true)
-    expect(isForbiddenExec('REINDEX')).toBe(true)
+    expect(isAllowedExec('PRAGMA journal_mode=DELETE')).toBe(false)
+    expect(isAllowedExec('PRAGMA foreign_keys=OFF')).toBe(false)
+    expect(isAllowedExec('ATTACH DATABASE "evil.db" AS evil')).toBe(false)
+    expect(isAllowedExec('DETACH evil')).toBe(false)
+    expect(isAllowedExec('VACUUM')).toBe(false)
+    expect(isAllowedExec('REINDEX')).toBe(false)
   })
 })

@@ -13,6 +13,12 @@ import type { createLogger } from '../lib/logger'
 import type { createRateLimiter } from '../lib/ipcGuard'
 import type { RecentFile, WindowState } from '../../shared'
 
+/** 单个文件 watcher 条目：一个 fs.watch + 多个订阅窗口 */
+export interface WatcherEntry {
+  watcher: fs.FSWatcher
+  senders: Map<number, Electron.WebContents>
+}
+
 /** 配置存储（config.json）的数据结构 */
 export interface ConfigStoreData {
   recentFiles: RecentFile[]
@@ -30,8 +36,11 @@ export interface IpcContext {
   loadConfigStore: () => ConfigStoreData
   saveConfigStore: (data: ConfigStoreData) => void
 
-  /** 文件 watcher 注册表：filePath -> FSWatcher */
-  watchers: Map<string, fs.FSWatcher>
+  /**
+   * 文件 watcher 注册表：filePath -> { watcher, senders }。
+   * 多个窗口可共享同一个 fs.watch，但各自通过 webContentsId 独立接收通知。
+   */
+  watchers: Map<string, WatcherEntry>
 
   /** 窗口注册表：自增 id -> BrowserWindow */
   windows: Map<number, BrowserWindow>

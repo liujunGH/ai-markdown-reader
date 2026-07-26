@@ -125,47 +125,62 @@ async function main() {
   const checkboxes = await win.locator('input.task-checkbox').count()
   check('Task list checkbox', checkboxes >= 2, `count=${checkboxes}`)
 
-  // 6-10: 这些元素可能在虚拟列表的不可见块里——先滚动到底部让所有块渲染
-  await win.evaluate(() => {
-    const scrollEl = document.querySelector('main div[style*="overflow"]')
-    if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight
-  })
-  await win.waitForTimeout(2000)
+  // 辅助：滚动到文档指定比例（虚拟列表只渲染可见块，检查前需确保目标块在视口内）
+  async function scrollToRatio(ratio) {
+    const didScroll = await win.evaluate((r) => {
+      const scrollEl = document.querySelector('.document-view-scroll')
+      if (!scrollEl) return false
+      scrollEl.scrollTop = scrollEl.scrollHeight * r
+      return true
+    }, ratio)
+    if (!didScroll) console.log('WARN: scroll element not found')
+    await win.waitForTimeout(1000)
+  }
 
-  // 6. 检查 KaTeX 公式
+  // 6-10: 虚拟列表元素需分段滚动到视口内检查
+  // 先到底部，让整体文档高度稳定
+  await scrollToRatio(1)
+
+  // 7. 检查 KaTeX 公式（底部附近）
   const katex = await win.locator('.katex').count()
   check('KaTeX 公式渲染', katex > 0, `.katex count=${katex}`)
 
-  // 7. 检查 Mermaid 占位替换
+  // 8. 检查 Mermaid 占位替换（文档中部偏后，异步渲染需多等）
+  await scrollToRatio(0.62)
+  await win.waitForTimeout(3000)
   const mermaidWrapper = await win.locator('.mermaid-wrapper').count()
   check('Mermaid 占位替换', mermaidWrapper > 0, `count=${mermaidWrapper}`)
 
-  // 8. 检查 wiki link
+  // 9. 检查 WikiLink（文档中部）
+  await scrollToRatio(0.52)
   const wikiLinks = await win.locator('a.wikilink').count()
   check('WikiLink 渲染', wikiLinks >= 1, `count=${wikiLinks}`)
 
-  // 9. 检查 emoji
+  // 10. 检查 emoji（文档后部）
+  await scrollToRatio(0.78)
   const bodyText = await win.textContent('body')
   check('Emoji 渲染', bodyText.includes('🚀') || bodyText.includes('😄'), 'emoji found')
 
-  // 10. 检查链接安全（外部链接 target=_blank）
+  // 11. 检查链接安全（外部链接）
+  await scrollToRatio(0.48)
   const extLink = await win.locator('a[href*="github.com"]').count()
   check('外部链接', extLink > 0, `count=${extLink}`)
 
-  // 11. 搜索高亮测试
+  // 12. 搜索高亮测试：先回顶部确保匹配在可见区，再输入并等待增强完成
+  await scrollToRatio(0)
   await win.locator('header button[title="搜索"]').click()
-  await win.waitForTimeout(500)
+  await win.waitForTimeout(600)
   const searchInput = win.locator('input[type="text"]').first()
   if (await searchInput.count()) {
     await searchInput.fill('测试')
-    await win.waitForTimeout(1000)
+    await win.waitForTimeout(2500)
     const searchMarks = await win.locator('mark.search-highlight').count()
     check('搜索高亮', searchMarks > 0, `mark.search-highlight count=${searchMarks}`)
   } else {
     check('搜索高亮', false, '搜索输入框未找到')
   }
 
-  // 12. 标签测试——打开第二个文档
+  // 13. 标签测试——打开第二个文档
   await app.evaluate(({ dialog }, fp) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,

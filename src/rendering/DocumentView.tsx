@@ -179,7 +179,7 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
     return (
       <div
         ref={scrollRef}
-        className={className}
+        className={`document-view-scroll ${className ?? ''}`.trim()}
         style={{
           height: '100%',
           overflowY: 'auto',

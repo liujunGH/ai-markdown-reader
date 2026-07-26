@@ -22,4 +22,4 @@ export function registerAllHandlers(ctx: IpcContext): void {
   registerDbHandlers(ctx)
 }
 
-export type { IpcContext, ConfigStoreData } from './context'
+export type { IpcContext, ConfigStoreData, WatcherEntry } from './context'

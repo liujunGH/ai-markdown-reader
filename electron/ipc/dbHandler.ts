@@ -32,6 +32,8 @@ const logger = createLogger('ipc.db')
 export const READ_ONLY_PREFIX = /^\s*select\b/i
 /** exec 禁止的语句前缀（防止破坏连接级配置）。导出以便测试。 */
 export const FORBIDDEN_IN_EXEC = /^\s*(pragma|attach|detach|vacuum|reindex)\b/i
+/** exec 允许的语句前缀（只允许 DML：INSERT/REPLACE/UPDATE/DELETE）。导出以便测试。 */
+export const ALLOWED_EXEC_PREFIX = /^\s*(insert|replace|update|delete)\b/i
 
 /** 判定 SQL 是否被 db:query 接受（只读）。导出供测试。 */
 export function isReadOnlyQuery(sql: string): boolean {
@@ -40,6 +42,11 @@ export function isReadOnlyQuery(sql: string): boolean {
 /** 判定 SQL 是否被 db:exec 禁止。导出供测试。 */
 export function isForbiddenExec(sql: string): boolean {
   return FORBIDDEN_IN_EXEC.test(sql.trim())
+}
+/** 判定 SQL 是否被 db:exec 接受（仅 DML）。导出供测试。 */
+export function isAllowedExec(sql: string): boolean {
+  const trimmed = sql.trim()
+  return ALLOWED_EXEC_PREFIX.test(trimmed) && !FORBIDDEN_IN_EXEC.test(trimmed)
 }
 
 function toBoundParams(params?: unknown[]): unknown[] {
@@ -86,8 +93,11 @@ export function registerDbHandlers(_ctx: IpcContext): void {
         try {
           const sql = (request?.sql ?? '').trim()
           if (!sql) return { success: false, error: 'Empty SQL' }
-          if (FORBIDDEN_IN_EXEC.test(sql)) {
-            return { success: false, error: 'db:exec disallows PRAGMA/ATTACH/DETACH/VACUUM/REINDEX' }
+          if (!isAllowedExec(sql)) {
+            return {
+              success: false,
+              error: 'db:exec only allows INSERT/REPLACE/UPDATE/DELETE statements',
+            }
           }
           const db = getDatabase()
           const info = db.prepare(sql).run(...toBoundParams(request.params))

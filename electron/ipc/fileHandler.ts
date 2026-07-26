@@ -327,36 +327,59 @@ export function registerFileHandlers(ctx: IpcContext): void {
       if (!isPathSafe(filePath)) {
         return { success: false, error: '非法路径' }
       }
-      if (ctx.watchers.has(filePath)) {
+
+      const sender = event.sender
+      const senderId = sender.id
+      let entry = ctx.watchers.get(filePath)
+
+      if (!entry) {
+        try {
+          const watcher = fs.watch(filePath, (eventType) => {
+            if (eventType !== 'change' && eventType !== 'rename') return
+            const currentEntry = ctx.watchers.get(filePath)
+            if (!currentEntry) return
+            for (const [id, webContents] of currentEntry.senders) {
+              const win = BrowserWindow.fromWebContents(webContents)
+              if (win && !win.isDestroyed()) {
+                webContents.send('file-changed', filePath)
+              } else {
+                // 窗口已销毁，清理失效 sender
+                currentEntry.senders.delete(id)
+              }
+            }
+            if (currentEntry.senders.size === 0) {
+              currentEntry.watcher.close()
+              ctx.watchers.delete(filePath)
+            }
+          })
+          entry = { watcher, senders: new Map() }
+          ctx.watchers.set(filePath, entry)
+        } catch (error) {
+          return { success: false, error: String(error) }
+        }
+      }
+
+      if (entry.senders.has(senderId)) {
         return { success: true, message: 'Already watching' }
       }
-      // 关键：watcher 绑定首次注册它的 webContents，其它窗口不收到该文件变更通知
-      const sender = event.sender
-      try {
-        const watcher = fs.watch(filePath, (eventType) => {
-          if (eventType === 'change' || eventType === 'rename') {
-            const win = BrowserWindow.fromWebContents(sender)
-            if (win && !win.isDestroyed()) {
-              sender.send('file-changed', filePath)
-            }
-          }
-        })
-        ctx.watchers.set(filePath, watcher)
-        return { success: true }
-      } catch (error) {
-        return { success: false, error: String(error) }
-      }
+
+      entry.senders.set(senderId, sender)
+      return { success: true }
     },
   )
 
   // ---- unwatch-file ----
   registerHandler(
     Channels.UNWATCH_FILE,
-    async (_event, filePath: string) => {
+    async (event, filePath: string) => {
       if (!isPathSafe(filePath)) return
-      const watcher = ctx.watchers.get(filePath)
-      if (watcher) {
-        watcher.close()
+      const entry = ctx.watchers.get(filePath)
+      if (!entry) return
+
+      const senderId = event.sender.id
+      entry.senders.delete(senderId)
+      if (entry.senders.size === 0) {
+        entry.watcher.close()
         ctx.watchers.delete(filePath)
       }
     },

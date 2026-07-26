@@ -18,6 +18,10 @@ test.describe('App Launch', () => {
     })
     window = await electronApp.firstWindow()
     await window.waitForLoadState('domcontentloaded')
+    // 关闭首次使用引导，避免遮挡后续 UI 检查
+    await window.evaluate(() => { try { localStorage.setItem('has-seen-guide', '1') } catch {} })
+    await window.reload()
+    await window.waitForLoadState('domcontentloaded')
     // v2 AppShell: 等待 header 渲染（含 "Markdown Reader (v2)"）
     await window.waitForSelector('header', { timeout: 10000 })
   })
