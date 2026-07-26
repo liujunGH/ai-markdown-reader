@@ -107,24 +107,6 @@ async function main() {
   const h1Id = await win.locator('h1#综合测试文档').count()
   check('heading id 注入', h1Id > 0, `h1#综合测试文档 count=${h1Id}`)
 
-  // 3. 检查代码高亮（Prism class）
-  const codeHighlighted = await win.locator('pre.language-javascript').count()
-  check('代码高亮 (JS)', codeHighlighted > 0, `language-javascript count=${codeHighlighted}`)
-
-  const pythonCode = await win.locator('pre.language-python').count()
-  check('代码高亮 (Python)', pythonCode > 0, `count=${pythonCode}`)
-
-  const diffCode = await win.locator('pre.language-diff').count()
-  check('Diff 代码块', diffCode > 0, `count=${diffCode}`)
-
-  // 4. 检查表格包裹
-  const tableWrapper = await win.locator('.table-reader-wrapper').count()
-  check('表格包裹', tableWrapper > 0, `count=${tableWrapper}`)
-
-  // 5. 检查 task list checkbox
-  const checkboxes = await win.locator('input.task-checkbox').count()
-  check('Task list checkbox', checkboxes >= 2, `count=${checkboxes}`)
-
   // 辅助：滚动到文档指定比例（虚拟列表只渲染可见块，检查前需确保目标块在视口内）
   async function scrollToRatio(ratio) {
     const didScroll = await win.evaluate((r) => {
@@ -136,6 +118,26 @@ async function main() {
     if (!didScroll) console.log('WARN: scroll element not found')
     await win.waitForTimeout(1000)
   }
+
+  // 3. 检查代码高亮（Prism class）——滚动到代码块区域
+  await scrollToRatio(0.28)
+  const codeHighlighted = await win.locator('pre.language-javascript').count()
+  check('代码高亮 (JS)', codeHighlighted > 0, `language-javascript count=${codeHighlighted}`)
+
+  const pythonCode = await win.locator('pre.language-python').count()
+  check('代码高亮 (Python)', pythonCode > 0, `count=${pythonCode}`)
+
+  const diffCode = await win.locator('pre.language-diff').count()
+  check('Diff 代码块', diffCode > 0, `count=${diffCode}`)
+
+  // 4. 检查表格包裹——滚动到表格区域
+  await scrollToRatio(0.38)
+  const tableWrapper = await win.locator('.table-reader-wrapper').count()
+  check('表格包裹', tableWrapper > 0, `count=${tableWrapper}`)
+
+  // 5. 检查 task list checkbox
+  const checkboxes = await win.locator('input.task-checkbox').count()
+  check('Task list checkbox', checkboxes >= 2, `count=${checkboxes}`)
 
   // 6-10: 虚拟列表元素需分段滚动到视口内检查
   // 先到底部，让整体文档高度稳定
