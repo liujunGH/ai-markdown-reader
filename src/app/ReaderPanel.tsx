@@ -159,7 +159,7 @@ export function ReaderPanel() {
           <SplitPanel />
         </div>
       )}
-      <aside style={{ width: 260, borderLeft: '1px solid var(--border, #e0e0e0)', overflowY: 'auto' }}>
+      <aside style={{ width: 280, minWidth: 240, borderLeft: '1px solid var(--border, #e0e0e0)', overflowY: 'auto', flexShrink: 0 }}>
         <ReaderOutline document={document} filePath={filePath} activeId={activeHeadingId} />
       </aside>
     </div>

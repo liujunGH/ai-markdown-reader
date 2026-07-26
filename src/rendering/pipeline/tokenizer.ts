@@ -55,6 +55,16 @@ export function simpleHash(str: string): string {
   return (hash >>> 0).toString(36)
 }
 
+/**
+ * 移除文档开头的 YAML frontmatter（---\n...\n---）。
+ * markdown-it 默认不解析 frontmatter，会把它当普通段落渲染。
+ */
+export function stripFrontmatter(content: string): string {
+  if (!content.startsWith('---')) return content
+  const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/)
+  return match ? content.slice(match[0].length) : content
+}
+
 /** 解析器单例（记忆化，避免每篇文档都重新 import 整个解析栈） */
 let parserPromise: Promise<ParserBundle> | null = null
 

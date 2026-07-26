@@ -2,7 +2,7 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  padding: 16px;
+  padding: 20px 16px;
   background: var(--bg-secondary);
   height: 100%;
   overflow-y: auto;
@@ -12,8 +12,10 @@
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: var(--text-secondary);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 0 8px;
 }
 
 .list {
@@ -23,12 +25,12 @@
 }
 
 .item {
-  margin: 4px 0;
+  margin: 2px 0;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  max-height: 60px;
+  max-height: 44px;
   opacity: 1;
   overflow: hidden;
   transition: max-height 0.25s ease, opacity 0.25s ease, margin 0.25s ease;
@@ -45,19 +47,22 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
-  width: 16px;
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 3px;
 }
 
 .toggleBtn:hover {
   color: var(--accent);
+  background: var(--bg-tertiary);
 }
 
 .link {
@@ -66,15 +71,18 @@
   text-align: left;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--text-primary);
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .link:hover {
@@ -93,14 +101,14 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
-  gap: 8px;
+  padding: 48px 24px;
+  gap: 12px;
   text-align: center;
 }
 
 .emptyIcon {
-  font-size: 40px;
-  opacity: 0.6;
+  font-size: 48px;
+  opacity: 0.5;
 }
 
 .emptyTitle {
@@ -112,5 +120,5 @@
 .emptySubtitle {
   font-size: 12px;
   color: var(--text-secondary);
-  opacity: 0.8;
+  opacity: 0.7;
 }

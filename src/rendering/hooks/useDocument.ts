@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getContent, getContentAsync, updateContent } from '../../resources/DocumentCache'
-import { createParser, scanCodeLanguages, loadPrismLanguage } from '../pipeline/tokenizer'
+import { createParser, scanCodeLanguages, loadPrismLanguage, stripFrontmatter } from '../pipeline/tokenizer'
 import { splitIntoBlocks } from '../pipeline/blockModel'
 import type { ParseResponse, ParsedDocument } from '../types'
 
@@ -74,12 +74,13 @@ async function parseContent(content: string): Promise<ParsedDocument> {
 /** 主线程 fallback 解析（worker 不可用时） */
 async function parseInMainThread(content: string): Promise<ParsedDocument> {
   const { md, prism } = await createParser()
-  const langs = scanCodeLanguages(content)
+  const body = stripFrontmatter(content)
+  const langs = scanCodeLanguages(body)
   if (langs.length > 0) {
     await Promise.all(langs.map((lang) => loadPrismLanguage(prism, lang)))
   }
-  const tokens = md.parse(content, {})
-  return splitIntoBlocks(tokens, md, content)
+  const tokens = md.parse(body, {})
+  return splitIntoBlocks(tokens, md, body)
 }
 
 interface UseDocumentResult {

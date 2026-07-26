@@ -12,7 +12,7 @@
  * 协议：{ id, content } → { id, document | null, error? }
  * 用 id 配对请求/响应，支持取消过期请求（切换文档时）。
  */
-import { createParser, loadPrismLanguage, scanCodeLanguages } from '../pipeline/tokenizer'
+import { createParser, loadPrismLanguage, scanCodeLanguages, stripFrontmatter } from '../pipeline/tokenizer'
 import { splitIntoBlocks } from '../pipeline/blockModel'
 import type { ParseRequest, ParseResponse } from '../types'
 
@@ -22,15 +22,18 @@ self.onmessage = async (e: MessageEvent<ParseRequest>) => {
   try {
     const { md, prism } = await createParser()
 
+    // 移除 YAML frontmatter（markdown-it 不解析，会当普通段落渲染）
+    const body = stripFrontmatter(content)
+
     // 预加载文档内出现的代码语言
-    const langs = scanCodeLanguages(content)
+    const langs = scanCodeLanguages(body)
     if (langs.length > 0) {
       await Promise.all(langs.map((lang) => loadPrismLanguage(prism, lang)))
     }
 
     // 解析成 token 流，再切成块
-    const tokens = md.parse(content, {})
-    const document = splitIntoBlocks(tokens, md, content)
+    const tokens = md.parse(body, {})
+    const document = splitIntoBlocks(tokens, md, body)
 
     const response: ParseResponse = { id, document }
     self.postMessage(response)
