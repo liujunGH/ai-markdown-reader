@@ -83,9 +83,17 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
       () => ({
         getScrollElement: () => scrollRef.current,
         scrollToHeading: (headingId: string) => {
-          const el = scrollRef.current?.querySelector(`#${CSS.escape(headingId)}`)
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          // 虚拟列表场景：heading 可能在未渲染块中，用 scrollToIndex 滚动到对应块
+          const blockIdx = blocks.findIndex((b) => b.meta?.headingId === headingId)
+          if (blockIdx >= 0) {
+            virtualizer.scrollToIndex(blockIdx, { align: 'start' })
+            // 等虚拟列表渲染后再微调（可选）
+            requestAnimationFrame(() => {
+              const el = scrollRef.current?.querySelector(`#${CSS.escape(headingId)}`)
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            })
           }
         },
         scrollToLine: (line: number) => {
