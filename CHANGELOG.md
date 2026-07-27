@@ -4,6 +4,17 @@
 
 ---
 
+## v2.0.1
+
+### 修复
+- 修复 YAML frontmatter 被 markdown-it 渲染为普通文本的问题
+- 补充 markdown 内容全局样式（标题、列表、间距、代码块、表格等），修复 v2 移除旧 MarkdownRenderer 后样式丢失
+- 修复文件侧边栏遮挡标签栏的问题（调整 z-index 层级）
+- 工具栏按钮添加中文 tooltip 提示
+- 优化目录 Outline 面板间距与宽度
+
+---
+
 ## v2.0.0
 
 ### 架构重构

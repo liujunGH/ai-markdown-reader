@@ -3,7 +3,7 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-2.0.0-blue)
+![Version](https://img.shields.io/badge/Version-2.0.1-blue)
 
 Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。v2.0.0 完成了从单体渲染到分层架构的重构：块级 Markdown 解析、TanStack Virtual 虚拟化渲染、Zustand 状态分层、SQLite FTS5 全文索引，以及按领域拆分的 IPC 安全边界。
 
