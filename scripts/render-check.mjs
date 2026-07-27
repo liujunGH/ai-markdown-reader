@@ -143,7 +143,8 @@ async function main() {
   // 先到底部，让整体文档高度稳定
   await scrollToRatio(1)
 
-  // 7. 检查 KaTeX 公式（底部附近）
+  // 7. 检查 KaTeX 公式（滚动到公式区域）
+  await scrollToRatio(0.42)
   const katex = await win.locator('.katex').count()
   check('KaTeX 公式渲染', katex > 0, `.katex count=${katex}`)
 
@@ -154,7 +155,7 @@ async function main() {
   check('Mermaid 占位替换', mermaidWrapper > 0, `count=${mermaidWrapper}`)
 
   // 9. 检查 WikiLink（文档中部）
-  await scrollToRatio(0.52)
+  await scrollToRatio(0.56)
   const wikiLinks = await win.locator('a.wikilink').count()
   check('WikiLink 渲染', wikiLinks >= 1, `count=${wikiLinks}`)
 
@@ -164,7 +165,7 @@ async function main() {
   check('Emoji 渲染', bodyText.includes('🚀') || bodyText.includes('😄'), 'emoji found')
 
   // 11. 检查链接安全（外部链接）
-  await scrollToRatio(0.48)
+  await scrollToRatio(0.54)
   const extLink = await win.locator('a[href*="github.com"]').count()
   check('外部链接', extLink > 0, `count=${extLink}`)
 

@@ -15,22 +15,46 @@ export function ReaderToolbar() {
   const fontSize = useUIStore((s) => s.fontSize)
   const { openFileDialog, openExample } = useDocumentActions()
 
+  const btn = (onClick: () => void, title: string, tooltip: string, icon: string) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      data-tooltip={tooltip}
+      aria-label={tooltip}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '4px 8px',
+        border: '1px solid var(--border, #e0e0e0)',
+        borderRadius: 6,
+        background: 'transparent',
+        cursor: 'pointer',
+        fontSize: 14,
+        color: 'var(--text-primary)',
+      }}
+    >
+      <span aria-hidden="true">{icon}</span>
+    </button>
+  )
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button type="button" onClick={() => void openFileDialog()} title="打开文件">📂</button>
-      <button type="button" onClick={openExample} title="示例">📄</button>
-      <button type="button" onClick={() => togglePanel('search')} title="搜索">🔍</button>
-      <button type="button" onClick={() => togglePanel('fileSidebar')} title="文件">📁</button>
-      <button type="button" onClick={() => togglePanel('outline')} title="目录">📑</button>
-      <button type="button" onClick={() => togglePanel('source')} title="源码">📄</button>
-      <button type="button" onClick={() => togglePanel('focusMode')} title="专注">🎯</button>
-      <button type="button" onClick={() => setFontSize(Math.max(12, fontSize - 1))} title="缩小">A-</button>
-      <span style={{ fontSize: 12, color: '#888' }}>{fontSize}</span>
-      <button type="button" onClick={() => setFontSize(Math.min(32, fontSize + 1))} title="放大">A+</button>
-      <button type="button" onClick={() => togglePanel('commandPalette')} title="命令">⌘</button>
-      <button type="button" onClick={() => togglePanel('readingTools')} title="阅读工具">📖</button>
-      <button type="button" onClick={() => togglePanel('globalSearch')} title="全局搜索">🔎</button>
-      <button type="button" onClick={() => togglePanel('exportPanel')} title="导出">📤</button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      {btn(() => void openFileDialog(), '打开文件', '打开本地 Markdown 文件', '📂')}
+      {btn(openExample, '示例', '打开示例文档', '📄')}
+      {btn(() => togglePanel('search'), '搜索', '搜索文档内容', '🔍')}
+      {btn(() => togglePanel('fileSidebar'), '文件', '文件/工作区面板', '📁')}
+      {btn(() => togglePanel('outline'), '目录', '文档目录大纲', '📑')}
+      {btn(() => togglePanel('source'), '源码', '查看 Markdown 源码', '📄')}
+      {btn(() => togglePanel('focusMode'), '专注', '进入专注模式', '🎯')}
+      {btn(() => setFontSize(Math.max(12, fontSize - 1)), '缩小', '缩小字号', 'A-')}
+      <span style={{ fontSize: 12, color: 'var(--text-secondary)', minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
+      {btn(() => setFontSize(Math.min(32, fontSize + 1)), '放大', '放大字号', 'A+')}
+      {btn(() => togglePanel('commandPalette'), '命令', '打开命令面板', '⌘')}
+      {btn(() => togglePanel('readingTools'), '阅读工具', '阅读工具面板', '📖')}
+      {btn(() => togglePanel('globalSearch'), '全局搜索', '全局搜索', '🔎')}
+      {btn(() => togglePanel('exportPanel'), '导出', '导出文档', '📤')}
       <div style={{ marginLeft: 'auto' }}>
         <ThemeToggle />
       </div>

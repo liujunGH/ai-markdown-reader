@@ -125,7 +125,7 @@ function MinimalAppShell() {
       <TabBar />
       <div className="_appBody">
         {showFileSidebar && (
-          <aside style={{ width: 280, borderRight: '1px solid var(--border, #e0e0e0)', overflow: 'hidden' }}>
+          <aside style={{ width: 280, borderRight: '1px solid var(--border, #e0e0e0)', overflow: 'hidden', position: 'relative', zIndex: 10 }}>
             <ReaderWorkspace />
           </aside>
         )}
