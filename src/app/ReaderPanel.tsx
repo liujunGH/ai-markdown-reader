@@ -104,6 +104,7 @@ export function ReaderPanel() {
 
   // scrollSpy：当前可见标题 id（供大纲高亮）
   const activeHeadingId = useScrollSpy('main')
+  const showOutline = useUIStore((s) => s.panels.outline)
 
   if (!activeTab) {
     return <EmptyState message="没有打开的文档" />
@@ -122,12 +123,13 @@ export function ReaderPanel() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', minWidth: 0, position: 'relative' }}>
       <div
         style={{
           flex: 1,
           fontSize: `${fontSize}px`,
           height: '100%',
+          minWidth: 0,
           maxWidth: '820px',
           margin: '0 auto',
           padding: '24px 32px',
@@ -155,13 +157,44 @@ export function ReaderPanel() {
         />
       </div>
       {isSplitView && (
-        <div style={{ flex: 1, borderLeft: '1px solid var(--border, #e0e0e0)', overflow: 'hidden' }}>
+        <div style={{ flex: 1, borderLeft: '1px solid var(--border, #e0e0e0)', overflow: 'hidden', minWidth: 0 }}>
           <SplitPanel />
         </div>
       )}
-      <aside style={{ width: 280, minWidth: 240, borderLeft: '1px solid var(--border, #e0e0e0)', overflowY: 'auto', flexShrink: 0 }}>
-        <ReaderOutline document={document} filePath={filePath} activeId={activeHeadingId} />
-      </aside>
+      {showOutline && (
+        <aside style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: 260,
+          height: '100%',
+          borderLeft: '1px solid var(--border, #e0e0e0)',
+          background: 'var(--bg-secondary)',
+          overflowY: 'auto',
+          zIndex: 50,
+          boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px 0' }}>
+            <button
+              type="button"
+              onClick={() => useUIStore.getState().closePanel('outline')}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: 18,
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                padding: '2px 6px',
+                borderRadius: 4,
+              }}
+              title="关闭目录"
+            >
+              ×
+            </button>
+          </div>
+          <ReaderOutline document={document} filePath={filePath} activeId={activeHeadingId} />
+        </aside>
+      )}
     </div>
   )
 }

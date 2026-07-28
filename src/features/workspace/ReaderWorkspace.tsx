@@ -50,14 +50,14 @@ export function ReaderWorkspace() {
   )
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', gap: 4, padding: 8, borderBottom: '1px solid var(--border, #e0e0e0)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 4, padding: 8, borderBottom: '1px solid var(--border, #e0e0e0)', flexShrink: 0 }}>
         <button type="button" onClick={() => setView('files')}>文件</button>
         <button type="button" onClick={() => setView('recent')}>最近</button>
         <button type="button" onClick={() => setView('welcome')}>欢迎</button>
         <button type="button" onClick={() => closePanel('fileSidebar')} style={{ marginLeft: 'auto' }}>×</button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         {view === 'files' && (
           <ElectronFolderExplorer
             folderPath={folderPath}
