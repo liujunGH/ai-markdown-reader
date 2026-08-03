@@ -80,6 +80,9 @@ linux:
   syncDesktopName: true
   compression: maximum
 
+deb:
+  compression: xz
+
 fileAssociations:
   - ext: md
     name: Markdown Document
