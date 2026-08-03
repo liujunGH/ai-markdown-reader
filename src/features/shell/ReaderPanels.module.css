@@ -43,23 +43,39 @@
 }
 
 .sourceView {
-  position: fixed;
-  inset: 56px 0 32px 0;
+  position: absolute;
+  inset: 0;
   background: var(--bg-primary, #fff);
   z-index: 150;
   overflow: auto;
 }
 
 .closeSourceBtn {
-  position: fixed;
-  top: 64px;
+  position: absolute;
+  top: 12px;
   right: 16px;
   z-index: 151;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #1a1a1a);
+  padding: 6px 10px;
+  cursor: pointer;
 }
 
 .focusExit {
   position: fixed;
-  top: 8px;
+  top: 12px;
   right: 16px;
-  z-index: 300;
+  z-index: 500;
+}
+
+.focusExit button {
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 999px;
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-primary, #1a1a1a);
+  padding: 7px 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }

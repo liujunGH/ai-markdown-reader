@@ -12,6 +12,7 @@ import type fs from 'fs'
 import type { createLogger } from '../lib/logger'
 import type { createRateLimiter } from '../lib/ipcGuard'
 import type { RecentFile, WindowState } from '../../shared'
+import type { UpdateService } from '../updateService'
 
 /** 单个文件 watcher 条目：一个 fs.watch + 多个订阅窗口 */
 export interface WatcherEntry {
@@ -66,4 +67,7 @@ export interface IpcContext {
 
   /** 对话框限流器：全局 5 次/秒（跨所有窗口共享，仅 open/open-folder-dialog 使用） */
   fileDialogLimiter: ReturnType<typeof createRateLimiter>
+
+  /** 应用更新生命周期服务 */
+  updateService: UpdateService
 }

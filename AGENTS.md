@@ -2,16 +2,16 @@
 
 ## 项目概述
 
-AI Markdown Reader 是一个基于 Electron + React 18 + TypeScript + Vite 5 的桌面 Markdown 阅读器，支持多窗口、多标签页、Mermaid 图表、KaTeX 数学公式、代码高亮等功能。
+AI Markdown Reader 是一个基于 Electron + React 18 + TypeScript + Vite 8 的桌面 Markdown 阅读器，支持多窗口、多标签页、Mermaid 图表、KaTeX 数学公式、代码高亮等功能。
 
 ## 技术栈
 
 | 层 | 技术 |
 |--|--|
-| 桌面框架 | Electron 35 |
+| 桌面框架 | Electron 43 |
 | 前端框架 | React 18.2 + TypeScript 5.3 |
-| 构建工具 | Vite 5.1 |
-| 打包工具 | electron-builder 25.1 |
+| 构建工具 | Vite 8.2 |
+| 打包工具 | electron-builder 26.15 |
 | Markdown 解析 | markdown-it 14.0 |
 | 数学公式 | KaTeX 0.16.45 |
 | 图表渲染 | Mermaid 10.6 |
@@ -55,7 +55,7 @@ ai-markdown-reader/
 │   ├── entitlements.mac.plist # macOS 签名权限
 │   └── README.md             # 图标配置说明
 ├── .github/workflows/        # CI/CD
-├── vite.config.ts            # Vite 配置
+├── vite.config.mts           # Vite 配置
 ├── electron-builder.yml      # 打包配置
 └── package.json
 ```
@@ -113,7 +113,7 @@ npm run lint                 # tsc --noEmit
 ## 常见问题
 
 ### 本地构建失败
-- 确保 Node.js ≥ 18
+- 确保 Node.js ≥ 22.12
 - `npm ci` 重新安装依赖
 - 检查 `electron/preload.js` 是否存在（由 `electron:compile` 生成）
 

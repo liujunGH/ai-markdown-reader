@@ -14,7 +14,8 @@ import { createRateLimiter } from './lib/ipcGuard'
 import { isExternalUrl } from './lib/externalLinks'
 import { registerAllHandlers, type IpcContext, type ConfigStoreData, type WatcherEntry } from './ipc'
 import { closeDatabase, getDatabase } from './db/connection'
-import { EVENT_CHANNELS } from '../shared'
+import { createUpdateService, type UpdateService } from './updateService'
+import { EVENT_CHANNELS, type UpdateStatePayload } from '../shared'
 
 const logger = createLogger('main')
 
@@ -100,6 +101,7 @@ const lastFocusedWindowId = { value: 0 }
 const isQuiting = { value: false }
 let splashWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+let updateService: UpdateService | null = null
 const filesToOpenBeforeReady: string[] = []
 
 const isDev = !app.isPackaged
@@ -361,6 +363,10 @@ function createMenu() {
             label: 'Markdown Reader',
             submenu: [
               { role: 'about' as const, label: '关于' },
+              {
+                label: '检查更新…',
+                click: () => { void updateService?.checkForUpdates(true) },
+              },
               { type: 'separator' as const },
               { role: 'services' as const, label: '服务' },
               { type: 'separator' as const },
@@ -443,6 +449,11 @@ function createMenu() {
     {
       label: '帮助',
       submenu: [
+        {
+          label: '检查更新…',
+          click: () => { void updateService?.checkForUpdates(true) },
+        },
+        { type: 'separator' },
         {
           label: '关于 Markdown Reader',
           click: () => {
@@ -562,6 +573,24 @@ if (!gotTheLock) {
 // ============================================================
 app.whenReady().then(() => {
   logger.info('App ready')
+
+  const broadcastUpdateState = (state: UpdateStatePayload) => {
+    windows.forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send(EVENT_CHANNELS.UPDATE_STATE_CHANGED, state)
+      }
+    })
+  }
+  const updaterService = createUpdateService({
+    updater: autoUpdater,
+    isPackaged: app.isPackaged,
+    currentVersion: app.getVersion(),
+    broadcast: broadcastUpdateState,
+    logger,
+  })
+  updateService = updaterService
+  updaterService.start()
+
   createMenu()
 
   if (!isDev) {
@@ -649,58 +678,6 @@ app.whenReady().then(() => {
     ])
   )
 
-  // 自动更新（仅打包构建）
-  if (app.isPackaged) {
-    const sendToAllWindows = (channel: string, ...args: unknown[]) => {
-      windows.forEach((win) => {
-        if (!win.isDestroyed()) {
-          win.webContents.send(channel, ...args)
-        }
-      })
-    }
-
-    autoUpdater.on('checking-for-update', () => {
-      logger.info('Checking for update')
-    })
-
-    autoUpdater.on('update-available', (info) => {
-      logger.info('Update available', { version: info.version })
-      sendToAllWindows(EVENT_CHANNELS.UPDATE_AVAILABLE, { version: info.version })
-    })
-
-    autoUpdater.on('update-not-available', () => {
-      logger.info('Update not available')
-    })
-
-    autoUpdater.on('error', (err) => {
-      const msg = String(err)
-      logger.error('Auto-updater error', { error: msg })
-      if (msg.includes('Cannot find latest-mac.yml') || msg.includes('404')) {
-        return
-      }
-      sendToAllWindows(EVENT_CHANNELS.UPDATE_ERROR, { error: msg })
-    })
-
-    autoUpdater.on('download-progress', (progress) => {
-      sendToAllWindows(EVENT_CHANNELS.UPDATE_PROGRESS, {
-        percent: progress.percent,
-        transferred: progress.transferred,
-        total: progress.total,
-      })
-    })
-
-    autoUpdater.on('update-downloaded', (info) => {
-      logger.info('Update downloaded', { version: info.version })
-      sendToAllWindows(EVENT_CHANNELS.UPDATE_DOWNLOADED, { version: info.version })
-    })
-
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-        logger.error('Auto-updater check failed', { error: String(err) })
-      })
-    }, 10000)
-  }
-
   tray.on('click', () => {
     const win = getFocusedOrLastWindow()
     if (win) {
@@ -765,6 +742,7 @@ app.whenReady().then(() => {
     isQuiting,
     logger,
     fileDialogLimiter: createRateLimiter(5, 1000),
+    updateService: updaterService,
   }
   registerAllHandlers(ipcContext)
   logger.info('All IPC handlers registered')

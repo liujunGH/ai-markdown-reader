@@ -115,6 +115,7 @@ export function enhanceSearchHighlights(block: HTMLElement, options: SearchHighl
     if (!textNode.textContent) return
     const parent = textNode.parentElement
     if (!parent || parent.closest('.search-box')) return
+    if (parent.closest('pre, code, .katex, .mermaid-wrapper, svg, math, mark')) return
     if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return
     if (parent.classList.contains('search-highlight')) return
 

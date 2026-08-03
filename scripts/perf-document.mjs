@@ -8,7 +8,7 @@ import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const electronMain = path.join(rootDir, 'dist-electron', 'main.js')
+const electronMain = path.join(rootDir, 'dist-electron', 'electron', 'main.js')
 const distIndex = path.join(rootDir, 'dist', 'index.html')
 const previewUrl = 'http://localhost:5173'
 const options = parseArgs(process.argv.slice(2))
@@ -188,19 +188,22 @@ async function launchApp(userDataDir) {
 
 async function seedLocalStorage(userDataDir, file) {
   const { electronApp, page } = await launchApp(userDataDir)
-  await page.evaluate((item) => {
-    localStorage.clear()
-    localStorage.setItem('has-seen-guide', 'true')
-    localStorage.setItem('session-tabs', JSON.stringify([item]))
-    localStorage.setItem('session-active-tab', item.id)
-  }, {
-    id: file.id,
-    name: file.name,
-    filePath: file.filePath,
-    size: file.size,
-    lastModified: file.lastModified,
-  })
-  await electronApp.close()
+  try {
+    await page.evaluate((item) => {
+      localStorage.clear()
+      localStorage.setItem('has-seen-guide', '1')
+      localStorage.setItem('session-tabs', JSON.stringify([item]))
+      localStorage.setItem('session-active-tab', item.id)
+    }, {
+      id: file.id,
+      name: file.name,
+      filePath: file.filePath,
+      size: file.size,
+      lastModified: file.lastModified,
+    })
+  } finally {
+    await electronApp.close().catch(() => undefined)
+  }
 }
 
 async function getMemorySummary(electronApp) {
@@ -221,39 +224,54 @@ async function measureDocument(file) {
   await seedLocalStorage(userDataDir, file)
 
   const launch = await launchApp(userDataDir)
-  await launch.page.getByRole('heading', { name: 'Perf Document Fixture' }).waitFor({ state: 'visible', timeout: options.timeout })
-  const documentRenderedAt = performance.now()
+  try {
+    await launch.page.getByRole('heading', { name: 'Perf Document Fixture' }).waitFor({ state: 'visible', timeout: options.timeout })
+    console.log('Checkpoint: document heading rendered')
+    const documentRenderedAt = performance.now()
 
-  const searchStartedAt = performance.now()
-  await launch.page.locator('button[data-guide="search"]').click()
-  const searchPanelOpenedAt = performance.now()
-  await launch.page.locator('input[aria-label="搜索关键词"]').fill(options.query)
-  const searchFilledAt = performance.now()
-  await launch.page.locator('mark.search-highlight').first().waitFor({ state: 'visible', timeout: options.timeout })
-  const firstSearchHighlightAt = performance.now()
+    const searchStartedAt = performance.now()
+    await launch.page.locator('button[data-guide="search"]').click()
+    console.log('Checkpoint: search panel opened')
+    const searchPanelOpenedAt = performance.now()
+    await launch.page.locator('input[aria-label="搜索关键词"]').fill(options.query)
+    console.log('Checkpoint: search query filled')
+    const searchFilledAt = performance.now()
+    await launch.page.locator('mark.search-highlight').first().waitFor({ state: 'visible', timeout: options.timeout })
+    console.log('Checkpoint: first search highlight visible')
+    const firstSearchHighlightAt = performance.now()
 
-  const scrollStartedAt = performance.now()
-  await launch.page.locator('main').evaluate((main) => {
-    main.scrollTop = main.scrollHeight
-  })
-  await launch.page.getByRole('heading', { name: 'Tail Section' }).waitFor({ state: 'visible', timeout: options.timeout })
-  const tailRenderedAt = performance.now()
+    await launch.page.locator('.document-view-scroll[data-indexing="false"]').waitFor({ state: 'visible', timeout: options.timeout })
+    console.log('Checkpoint: document index complete')
+    const indexingCompletedAt = performance.now()
 
-  const memory = await getMemorySummary(launch.electronApp)
-  await launch.electronApp.close()
+    const scrollStartedAt = performance.now()
+    await launch.page.locator('.document-view-scroll').evaluate((scrollArea) => {
+      scrollArea.scrollTop = scrollArea.scrollHeight
+    })
+    console.log('Checkpoint: scrolled to document tail')
+    await launch.page.getByRole('heading', { name: 'Tail Section' }).waitFor({ state: 'visible', timeout: options.timeout })
+    const tailRenderedAt = performance.now()
 
-  return {
-    name: `large-document-${options.mb}mb`,
-    userDataDir,
-    fileMb: round(file.size / 1024 / 1024),
-    ...launch.metrics,
-    documentRenderedMs: round(documentRenderedAt - launch.startedAt),
-    openSearchMs: round(searchPanelOpenedAt - searchStartedAt),
-    fillSearchMs: round(searchFilledAt - searchPanelOpenedAt),
-    waitFirstHighlightMs: round(firstSearchHighlightAt - searchFilledAt),
-    searchFirstHighlightMs: round(firstSearchHighlightAt - searchStartedAt),
-    scrollToTailRenderMs: round(tailRenderedAt - scrollStartedAt),
-    ...memory,
+    const memory = await getMemorySummary(launch.electronApp)
+    await launch.page.waitForTimeout(1_000)
+    const settledMemory = await getMemorySummary(launch.electronApp)
+    return {
+      name: `large-document-${options.mb}mb`,
+      userDataDir,
+      fileMb: round(file.size / 1024 / 1024),
+      ...launch.metrics,
+      documentRenderedMs: round(documentRenderedAt - launch.startedAt),
+      indexingCompleteMs: round(indexingCompletedAt - launch.startedAt),
+      openSearchMs: round(searchPanelOpenedAt - searchStartedAt),
+      fillSearchMs: round(searchFilledAt - searchPanelOpenedAt),
+      waitFirstHighlightMs: round(firstSearchHighlightAt - searchFilledAt),
+      searchFirstHighlightMs: round(firstSearchHighlightAt - searchStartedAt),
+      scrollToTailRenderMs: round(tailRenderedAt - scrollStartedAt),
+      ...memory,
+      settledWorkingSetMb: settledMemory.workingSetMb,
+    }
+  } finally {
+    await launch.electronApp.close().catch(() => undefined)
   }
 }
 

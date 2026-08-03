@@ -72,9 +72,10 @@ export function enhanceBlock(dom: HTMLElement, options: EnhanceBlockOptions): vo
   }
 
   // 内容类增强：搜索高亮
-  if (options.searchHighlight && options.searchHighlight.query) {
-    enhanceSearchHighlights(dom, options.searchHighlight)
-  }
+  enhanceSearchHighlights(
+    dom,
+    options.searchHighlight ?? { query: '', isRegex: false },
+  )
 
   // Mermaid 异步增强（最后，渲染后触发 onHeightChange）
   if (block.meta?.hasMermaid) {

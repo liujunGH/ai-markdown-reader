@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { computeDocumentStats } from '../../utils/documentStats'
 import styles from './StatusBar.module.css'
 
 interface Props {
@@ -9,14 +10,7 @@ interface Props {
 export function StatusBar({ content }: Props) {
   const { t } = useTranslation()
   const stats = useMemo(() => {
-    const wordCount = content.trim().split(/\s+/).filter(Boolean).length
-    const readingTime = Math.ceil(wordCount / 300)
-
-    const crlfCount = (content.match(/\r\n/g) || []).length
-    const lfOnlyCount = (content.replace(/\r\n/g, '').match(/\n/g) || []).length
-    const lineEnding = crlfCount > lfOnlyCount ? 'CRLF' : 'LF'
-
-    return { wordCount, readingTime, lineEnding }
+    return computeDocumentStats(content)
   }, [content])
 
   return (

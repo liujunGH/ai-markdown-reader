@@ -25,8 +25,14 @@ gh release list --limit 5
 ### 1.4 构建验证
 ```bash
 npm run lint          # TypeScript 类型检查
-npm run build         # Vite 构建
+npm test              # 单元测试
 npm run electron:compile  # Electron 主进程编译
+npm run build         # Vite 构建
+node scripts/render-check.mjs  # 实际 Electron 渲染检查
+npm run e2e           # Electron E2E
+npm run perf:startup  # 大会话性能回归
+npm run perf:document # 长文档性能回归
+npm audit             # 完整依赖审计
 ```
 
 ## 2. 提交与打标签
@@ -43,9 +49,14 @@ git push origin v{x.y.z}
 ## 3. CI 自动构建
 
 推送 tag 后，GitHub Actions 会自动触发：
-- **macOS** (`macos-latest`): 构建 x64 + arm64 DMG
+- **macOS** (`macos-latest`): 构建 x64 + arm64 DMG、ZIP 与更新清单
 - **Ubuntu** (`ubuntu-latest`): 构建 AppImage + deb
 - **Windows** (`windows-latest`): 构建 NSIS exe
+
+自动更新资产也必须随 Release 上传：
+- macOS：x64/arm64 DMG、ZIP、blockmap 与 `latest-mac.yml`
+- Windows：NSIS 安装包、blockmap 与 `latest.yml`
+- Linux：AppImage、deb 与 `latest-linux.yml`
 
 CI 配置: `.github/workflows/build.yml`
 

@@ -15,6 +15,7 @@ import type {
   MarkdownScanSkippedItem,
   FileInfo,
   FileDialogFilter,
+  UpdateStatePayload,
 } from '../../shared'
 
 export type {
@@ -25,6 +26,7 @@ export type {
   MarkdownScanSkippedItem,
   FileInfo,
   FileDialogFilter,
+  UpdateStatePayload,
 }
 
 /**
@@ -93,6 +95,13 @@ export interface ElectronAPI {
   focusWindow: (id: number) => Promise<void>
   getWindowStates: () => Promise<WindowState[]>
   registerWindowFiles: (filePaths: string[]) => Promise<void>
+  // Auto-updater lifecycle
+  getUpdateState: () => Promise<UpdateStatePayload>
+  checkForUpdates: (manual?: boolean) => Promise<UpdateStatePayload>
+  downloadUpdate: () => Promise<UpdateStatePayload>
+  installUpdate: () => Promise<boolean>
+  onUpdateStateChange: (callback: (state: UpdateStatePayload) => void) => void
+  offUpdateStateChange: (callback: (state: UpdateStatePayload) => void) => void
   // Auto-updater events
   onUpdateAvailable: (callback: (info: { version: string }) => void) => void
   offUpdateAvailable: (callback: (info: { version: string }) => void) => void

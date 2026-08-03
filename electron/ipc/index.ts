@@ -13,6 +13,7 @@ import { registerDialogHandlers } from './dialogHandler'
 import { registerWindowHandlers } from './windowHandler'
 import { registerStorageHandlers } from './storageHandler'
 import { registerDbHandlers } from './dbHandler'
+import { registerUpdateHandlers } from './updateHandler'
 
 export function registerAllHandlers(ctx: IpcContext): void {
   registerFileHandlers(ctx)
@@ -20,6 +21,7 @@ export function registerAllHandlers(ctx: IpcContext): void {
   registerWindowHandlers(ctx)
   registerStorageHandlers(ctx)
   registerDbHandlers(ctx)
+  registerUpdateHandlers(ctx)
 }
 
 export type { IpcContext, ConfigStoreData, WatcherEntry } from './context'

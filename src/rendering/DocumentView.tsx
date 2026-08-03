@@ -5,18 +5,21 @@
  * 滚出视口的块自动卸载（React 不渲染），根治旧 VirtualMarkdown 的 visibleIds
  * 只增不减导致内存随阅读深度单调增长的问题。
  *
- * 每个可见块用 BlockRenderer 渲染：
- *  - 块级净化 HTML（per-document 缓存）
+ * 可见区及其预取窗口内的块按批次交给 Worker 渲染：
+ *  - 只在需要时生成 HTML，主线程块级净化并写入 per-document 有界 LRU
+ *  - 每个可见块再由 BlockRenderer 注入 HTML
  *  - 挂载后跑 enhanceBlock（链接/表格/代码/task/katex/wiki/image/mermaid/高亮）
  *  - measureElement 动态测量真实高度
  *
  * 增强选项通过 props 传入（filePath/readingHighlights/searchHighlight/wiki/image 回调）。
  */
-import { forwardRef, useImperativeHandle, useMemo, useRef, useEffect } from 'react'
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useEffect, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ParsedDocument } from './types'
-import { getSanitizedBlockHtml, createBlockSanitizeCache } from './pipeline/renderer'
 import { BlockRenderer } from './BlockRenderer'
+import { BlockHtmlCache } from './BlockHtmlCache'
+import { renderBlocksAsync } from './blockRenderClient'
+import { sanitizeBlock } from './sanitizer/config'
 import type { EnhanceBlockOptions } from './enhancements'
 import { markActiveSearchMatch } from './enhancements'
 import { enhanceMermaid } from './enhancements/mermaidEnhancer'
@@ -44,7 +47,9 @@ export interface DocumentViewProps {
   /** 已解析的文档块模型 */
   document: ParsedDocument
   /** 内容变更时递增的 key（触发净化缓存重建） */
-  contentVersion: number
+  contentVersion: string | number
+  /** 分段索引是否仍在后台扩展，用于可访问状态和性能验证。 */
+  indexing?: boolean
   /** 增强选项（不传则只净化注入，不跑增强——用于测试/纯展示） */
   enhance?: DocumentViewEnhanceProps
   /** 滚动容器 className */
@@ -61,15 +66,18 @@ export interface DocumentViewHandle {
 }
 
 export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
-  function DocumentView({ document: parsedDoc, contentVersion, enhance, className }, ref) {
+  function DocumentView({ document: parsedDoc, contentVersion, indexing = false, enhance, className }, ref) {
     const scrollRef = useRef<HTMLDivElement>(null)
     const { blocks } = parsedDoc
+    const previousBlockCountRef = useRef(blocks.length)
+    const stickToEndRef = useRef(false)
 
-    // per-document 净化缓存
-    const sanitizeCache = useMemo(
-      () => createBlockSanitizeCache(),
-      [parsedDoc, contentVersion]
+    // per-document 有界 HTML LRU；文档切换时整组释放。
+    const blockHtmlCache = useMemo(
+      () => new BlockHtmlCache(),
+      [contentVersion]
     )
+    const [htmlVersion, setHtmlVersion] = useState(0)
 
     const virtualizer = useVirtualizer({
       count: blocks.length,
@@ -112,16 +120,96 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
 
     const virtualItems = virtualizer.getVirtualItems()
 
-    // 预计算可见块的净化 HTML
-    const blockHtmlCache = useMemo(() => {
-      const map = new Map<number, string>()
-      for (const vi of virtualItems) {
-        const block = blocks[vi.index]
-        if (block) map.set(vi.index, getSanitizedBlockHtml(block, sanitizeCache))
+    // 用户在增量索引完成前已经拖到底部时，完整块索引到达后保持尾部锚定。
+    useEffect(() => {
+      const previousCount = previousBlockCountRef.current
+      previousBlockCountRef.current = blocks.length
+      if (blocks.length <= previousCount || !stickToEndRef.current) return
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(blocks.length - 1, { align: 'end' })
+      })
+    }, [blocks.length, virtualizer])
+
+    // 异步增强（尤其 Mermaid）改变块高后，必须重新测量现有 DOM。
+    // virtualizer.measure() 只会清空尺寸缓存；已挂载元素的 ref 不会因此重新触发，
+    // 会让后续块继续使用预估坐标并与图表重叠。
+    const measureVisibleBlocks = useCallback(() => {
+      requestAnimationFrame(() => {
+        const blockElements = scrollRef.current?.firstElementChild?.children
+        if (!blockElements) return
+        Array.from(blockElements).forEach((element) => {
+          if (element instanceof HTMLElement && element.hasAttribute('data-index')) {
+            const index = Number(element.getAttribute('data-index'))
+            if (Number.isInteger(index)) {
+              const measuredHeight = Math.ceil(element.getBoundingClientRect().height)
+              virtualizer.resizeItem(index, measuredHeight)
+            }
+          }
+        })
+      })
+    }, [virtualizer])
+
+    const firstVisibleIndex = virtualItems[0]?.index ?? -1
+    const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? -1
+
+    const renderBlockRange = useCallback((requestedStart: number, requestedEnd: number) => {
+      const start = Math.max(0, requestedStart)
+      const end = Math.min(blocks.length - 1, requestedEnd)
+      if (start > end) return
+      const ids: number[] = []
+      for (let index = start; index <= end; index += 1) ids.push(blocks[index].id)
+      const reservedIds = blockHtmlCache.reserve(ids)
+      if (reservedIds.length === 0) return
+
+      const reservedSet = new Set(reservedIds)
+      const requestedBlocks = blocks
+        .slice(start, end + 1)
+        .filter((block) => reservedSet.has(block.id))
+      void renderBlocksAsync(requestedBlocks, parsedDoc.referenceDefinitions).then(
+        (renderedBlocks) => {
+          blockHtmlCache.resolve(renderedBlocks.map(({ id, html }) => ({
+            id,
+            html: sanitizeBlock(html),
+          })))
+          setHtmlVersion((version) => version + 1)
+        },
+        () => {
+          blockHtmlCache.reject(reservedIds)
+          setHtmlVersion((version) => version + 1)
+        },
+      )
+    }, [blockHtmlCache, blocks, parsedDoc.referenceDefinitions])
+
+    // 可见区前后再预取 12 个语义块；只把这些块发给 HTML Worker。
+    useEffect(() => {
+      if (firstVisibleIndex < 0 || lastVisibleIndex < 0) return
+      renderBlockRange(firstVisibleIndex - 12, lastVisibleIndex + 12)
+    }, [firstVisibleIndex, lastVisibleIndex, renderBlockRange])
+
+    // 完整索引到达后低成本预热最后 20 个块。LRU 仍限制在 160 块，新增常驻
+    // HTML 很小，却能覆盖拖动滚动条到底、阅读进度恢复和“跳到尾部”等常见路径。
+    useEffect(() => {
+      if (indexing || blocks.length === 0) return
+      renderBlockRange(blocks.length - 20, blocks.length - 1)
+    }, [blocks.length, indexing, renderBlockRange])
+
+    const handleScroll = useCallback(() => {
+      const element = scrollRef.current
+      if (!element) return
+      const distanceFromEnd = element.scrollHeight - element.scrollTop - element.clientHeight
+      stickToEndRef.current = distanceFromEnd < 48
+
+      // 滚动条被直接拖到末尾时，在下一次 React effect 前就发出尾部渲染请求。
+      // reserve() 会与索引完成预热和可见区预取自动去重。
+      if (distanceFromEnd < Math.max(element.clientHeight, 512)) {
+        renderBlockRange(blocks.length - 20, blocks.length - 1)
       }
-      return map
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [virtualItems, blocks, sanitizeCache])
+    }, [blocks.length, renderBlockRange])
+
+    // 占位块替换成真实 HTML 后重新测量，避免累计高度误差。
+    useEffect(() => {
+      if (htmlVersion > 0) measureVisibleBlocks()
+    }, [htmlVersion, measureVisibleBlocks])
 
     // 搜索 active 标记：仅在 currentMatch/matchCount 变化时标 active 并滚动
     //（不在每次 render 跑，避免滚动时反复 scrollIntoView 与用户滚动打架）
@@ -157,7 +245,7 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
           const block = blocks[vi.index]
           const dom = scrollRef.current?.querySelector(`[data-index="${vi.index}"]`)
           if (block?.meta?.hasMermaid && dom instanceof HTMLElement) {
-            enhanceMermaid(dom, { onHeightChange: () => virtualizer.measure() })
+            enhanceMermaid(dom, { onHeightChange: measureVisibleBlocks })
           }
         }
       })
@@ -179,14 +267,17 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
         searchHighlight: enhance.searchHighlight,
         onWikiLinkClick: enhance.onWikiLinkClick,
         onPreviewImage: enhance.onPreviewImage,
-        onHeightChange: () => virtualizer.measure(),
+        onHeightChange: measureVisibleBlocks,
         mermaidTheme: undefined,
       }
-    }, [enhance, virtualizer])
+    }, [enhance, measureVisibleBlocks])
 
     return (
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
+        aria-busy={indexing}
+        data-indexing={indexing ? 'true' : 'false'}
         className={`document-view-scroll ${className ?? ''}`.trim()}
         style={{
           height: '100%',
@@ -205,7 +296,7 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
           {virtualItems.map((vi) => {
             const block = blocks[vi.index]
             if (!block) return null
-            const html = blockHtmlCache.get(vi.index) ?? ''
+            const html = blockHtmlCache.get(block.id)
             return (
               <div
                 key={vi.key}
@@ -219,7 +310,12 @@ export const DocumentView = forwardRef<DocumentViewHandle, DocumentViewProps>(
                   transform: `translateY(${vi.start}px)`,
                 }}
               >
-                {enhanceOptions ? (
+                {html === undefined ? (
+                  <div
+                    aria-busy="true"
+                    style={{ minHeight: `${block.estimatedHeight}px` }}
+                  />
+                ) : enhanceOptions ? (
                   <BlockRenderer block={block} html={html} enhanceOptions={enhanceOptions} />
                 ) : (
                   <div dangerouslySetInnerHTML={{ __html: html }} />

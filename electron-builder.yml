@@ -62,6 +62,11 @@ mac:
       arch:
         - x64
         - arm64
+    # electron-updater 在 macOS 通过 ZIP + latest-mac.yml 完成差分/替换安装。
+    - target: zip
+      arch:
+        - x64
+        - arm64
   artifactName: ${productName}-${version}-${arch}.${ext}
   category: public.app-category.productivity
   compression: maximum

@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useDocumentActions } from '../useDocumentActions'
 import { useTabStore } from '../../state'
 import { getContent, clearDocumentCache } from '../../resources/DocumentCache'
+import { EXAMPLE_MARKDOWN_NAME } from '../../data/exampleMarkdown'
 
 /**
  * useDocumentActions 端到端链路测试。
@@ -98,5 +99,21 @@ describe('useDocumentActions — openExample', () => {
     expect(tab).toBeTruthy()
     // 示例文档有内容（在 DocumentCache）
     expect(getContent(tab.id)).toBeTruthy()
+  })
+
+  it('修复恢复后正文缺失的示例标签，而不是新建重复标签', () => {
+    useTabStore.setState({
+      tabs: [{ id: 'restored-example', name: EXAMPLE_MARKDOWN_NAME, contentStatus: 'ready' }],
+      activeTabId: 'restored-example',
+    })
+    const { result } = renderHook(() => useDocumentActions())
+
+    act(() => {
+      result.current.openExample()
+    })
+
+    expect(useTabStore.getState().tabs).toHaveLength(1)
+    expect(useTabStore.getState().activeTabId).toBe('restored-example')
+    expect(getContent('restored-example')).toBeTruthy()
   })
 })

@@ -54,7 +54,7 @@ export function ReaderPanels() {
   return (
     <>
       {/* 源码视图（全屏覆盖） */}
-      {panels.source && content && (
+      {panels.source && !panels.focusMode && content && (
         <div className={styles.sourceView}>
           <SourceView
             content={content}
@@ -79,7 +79,7 @@ export function ReaderPanels() {
       )}
 
       {/* 阅读辅助（非源码模式时显示） */}
-      {content && !panels.source && (
+      {content && !panels.source && !panels.focusMode && (
         <>
           <ProgressBar />
           <FloatingTOC
@@ -97,7 +97,7 @@ export function ReaderPanels() {
       )}
 
       {/* 键盘快捷键面板 */}
-      {panels.keyboardShortcuts && (
+      {panels.keyboardShortcuts && !panels.focusMode && (
         <PanelOverlay title="键盘快捷键" onClose={() => closePanel('keyboardShortcuts')}>
           <KeyboardShortcuts onClose={() => closePanel('keyboardShortcuts')} />
         </PanelOverlay>
@@ -111,7 +111,7 @@ export function ReaderPanels() {
 
 /** 条件渲染首次引导（useState 初始化时检查 localStorage，避免渲染时序问题） */
 function FirstUseGuideConditional() {
-  const [seen] = useState(() => {
+  const [seen, setSeen] = useState(() => {
     try {
       return localStorage.getItem('has-seen-guide') === '1'
     } catch {
@@ -125,6 +125,7 @@ function FirstUseGuideConditional() {
     } catch {
       // ignore
     }
+    setSeen(true)
   }
   return <FirstUseGuide onComplete={markSeen} onSkip={markSeen} />
 }

@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { findSearchMatches, type SearchMatch } from '../utils/search'
+import { searchContentAsync } from '../utils/searchWorkerClient'
 
 const LARGE_DOCUMENT_SEARCH_THRESHOLD = 1_000_000
 const LARGE_DOCUMENT_SEARCH_DELAY_MS = 100
@@ -12,6 +13,7 @@ export function useSearch(content: string) {
   const [matches, setMatches] = useState<SearchMatch[]>([])
   const [currentMatch, setCurrentMatch] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
+  const searchRequestRef = useRef(0)
 
   const search = useCallback((searchQuery: string, useRegex: boolean) => {
     if (!searchQuery.trim()) {
@@ -40,12 +42,29 @@ export function useSearch(content: string) {
     }
 
     setIsSearching(true)
+    const requestId = ++searchRequestRef.current
     const timer = window.setTimeout(() => {
-      search(query, isRegex)
+      void searchContentAsync(content, query, isRegex).then(
+        (nextMatches) => {
+          if (searchRequestRef.current !== requestId) return
+          setMatches(nextMatches)
+          setCurrentMatch(0)
+          setIsSearching(false)
+        },
+        () => {
+          if (searchRequestRef.current !== requestId) return
+          setMatches([])
+          setCurrentMatch(0)
+          setIsSearching(false)
+        },
+      )
     }, LARGE_DOCUMENT_SEARCH_DELAY_MS)
 
-    return () => window.clearTimeout(timer)
-  }, [content.length, isRegex, query, search])
+    return () => {
+      searchRequestRef.current += 1
+      window.clearTimeout(timer)
+    }
+  }, [content, isRegex, query, search])
 
   const nextMatch = useCallback(() => {
     if (matches.length === 0) return

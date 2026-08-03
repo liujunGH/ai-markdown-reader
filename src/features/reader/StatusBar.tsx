@@ -8,6 +8,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTabStore } from '../../state'
 import { getContent } from '../../resources/DocumentCache'
+import { computeDocumentStats } from '../../utils/documentStats'
 import styles from '../../components/StatusBar/StatusBar.module.css'
 
 export function StatusBar() {
@@ -18,12 +19,7 @@ export function StatusBar() {
   const stats = useMemo(() => {
     void contentVersion // 依赖（标签集变化重算）
     const content = getContent(activeTabId) ?? ''
-    const wordCount = content.trim().split(/\s+/).filter(Boolean).length
-    const readingTime = Math.ceil(wordCount / 300)
-    const crlfCount = (content.match(/\r\n/g) || []).length
-    const lfOnlyCount = (content.replace(/\r\n/g, '').match(/\n/g) || []).length
-    const lineEnding = crlfCount > lfOnlyCount ? 'CRLF' : 'LF'
-    return { wordCount, readingTime, lineEnding }
+    return computeDocumentStats(content)
   }, [activeTabId, contentVersion])
 
   return (

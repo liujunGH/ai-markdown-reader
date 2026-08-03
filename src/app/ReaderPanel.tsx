@@ -14,7 +14,8 @@ import { useTabStore, useUIStore, useActiveDocStore, useReadingStore } from '../
 import { useDocument } from '../rendering/hooks/useDocument'
 import { DocumentView, type DocumentViewHandle } from '../rendering/DocumentView'
 import { getDocHash } from '../rendering/enhancements'
-import { getContent } from '../resources/DocumentCache'
+import { getContent, setContent } from '../resources/DocumentCache'
+import { setParsedDocumentCacheCapacity } from '../resources/ParsedDocumentCache'
 import { useDocumentActions } from './useDocumentActions'
 import { ReaderOutline } from '../features/reader/ReaderOutline'
 import { SplitPanel } from './SplitPanel'
@@ -36,7 +37,6 @@ async function handleWikiLink(target: string, altTarget?: string): Promise<void>
     if (r.success && r.content !== undefined) {
       const name = api.pathBasename(fullPath)
       useTabStore.getState().openFile(name, fullPath)
-      const { setContent } = await import('../resources/DocumentCache')
       const tabId = useTabStore.getState().activeTabId
       if (tabId) {
         setContent(tabId, r.content, fullPath)
@@ -53,6 +53,10 @@ export function ReaderPanel() {
   const isSplitView = useUIStore((s) => s.isSplitView)
   const { syncWindowTitle } = useDocumentActions()
   const docViewRef = useRef<DocumentViewHandle>(null)
+
+  useEffect(() => {
+    setParsedDocumentCacheCapacity(isSplitView ? 2 : 1)
+  }, [isSplitView])
 
   const tabId = activeTab?.id ?? ''
   const filePath = activeTab?.filePath
@@ -89,7 +93,7 @@ export function ReaderPanel() {
   }, [activeTab, syncWindowTitle])
 
   // 取文档块模型（useDocument 内部从 DocumentCache 取 content + worker 解析）
-  const { document, loading, error } = useDocument(tabId, filePath)
+  const { document, loading, indexing, error } = useDocument(tabId, filePath)
 
   // 文档内容指纹（code-fold/task-checks 持久化 key）——从 DocumentCache 取原始 content
   const docHash = useMemo(() => {
@@ -97,14 +101,13 @@ export function ReaderPanel() {
     return getDocHash(content)
   }, [tabId, document])
 
-  // contentVersion：文档变化时重建净化缓存（数字，用块数+hash 长度组合）
-  const contentVersion = useMemo(() => {
-    return document ? document.blocks.length + docHash.length : 0
-  }, [document, docHash])
+  // 同一内容的增量块批次共享 HTML LRU；正文指纹变化时才整体失效。
+  const contentVersion = docHash
 
   // scrollSpy：当前可见标题 id（供大纲高亮）
   const activeHeadingId = useScrollSpy('main')
   const showOutline = useUIStore((s) => s.panels.outline)
+  const focusMode = useUIStore((s) => s.panels.focusMode)
 
   if (!activeTab) {
     return <EmptyState message="没有打开的文档" />
@@ -139,6 +142,7 @@ export function ReaderPanel() {
           ref={docViewRef}
           document={document}
           contentVersion={contentVersion}
+          indexing={indexing}
           enhance={{
             filePath,
             docHash,
@@ -161,7 +165,7 @@ export function ReaderPanel() {
           <SplitPanel />
         </div>
       )}
-      {showOutline && (
+      {showOutline && !focusMode && (
         <aside style={{
           position: 'absolute',
           top: 0,

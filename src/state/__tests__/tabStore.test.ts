@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { useTabStore } from '../stores/tabStore'
+import { clearDocumentCache, getContent } from '../../resources/DocumentCache'
+import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from '../../data/exampleMarkdown'
 
 /**
  * tabStore v2 测试。
@@ -20,6 +22,7 @@ beforeEach(() => {
     closedTabs: [],
     maxTabs: 10,
   })
+  clearDocumentCache()
   localStorage.clear()
 })
 
@@ -135,5 +138,19 @@ describe('tabStore — restoreTab', () => {
     useTabStore.getState().restoreTab()
     expect(useTabStore.getState().tabs.length).toBe(1)
     expect(useTabStore.getState().activeTabId).toBe(useTabStore.getState().tabs[0].id)
+  })
+})
+
+describe('tabStore — restoreSession', () => {
+  it('恢复内置示例标签时重新注入正文', async () => {
+    const storedTab = { id: 'example-tab', name: EXAMPLE_MARKDOWN_NAME }
+    localStorage.setItem('session-tabs', JSON.stringify([storedTab]))
+    localStorage.setItem('session-active-tab', storedTab.id)
+
+    await useTabStore.getState().restoreSession()
+
+    expect(useTabStore.getState().activeTabId).toBe(storedTab.id)
+    expect(useTabStore.getState().tabs[0].contentStatus).toBe('ready')
+    expect(getContent(storedTab.id)).toBe(EXAMPLE_MARKDOWN)
   })
 })

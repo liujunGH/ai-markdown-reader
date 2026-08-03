@@ -23,7 +23,7 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'open-example', label: '打开示例文档', category: '文件', icon: '🧪', action: () => {} },
   { id: 'new-tab', label: '新建标签', shortcut: 'Ctrl+T', category: '标签', icon: '➕', action: () => {} },
   { id: 'close-tab', label: '关闭当前标签', shortcut: 'Ctrl+W', category: '标签', icon: '✕', action: () => {} },
-  { id: 'toggle-source', label: '切换源码视图', shortcut: 'Ctrl+S', category: '视图', icon: '📄', action: () => {} },
+  { id: 'toggle-source', label: '切换源码视图', category: '视图', icon: '📄', action: () => {} },
   { id: 'toggle-outline', label: '显示/隐藏目录', category: '视图', icon: '📑', action: () => {} },
   { id: 'toggle-search', label: '搜索', shortcut: 'Ctrl+F', category: '视图', icon: '🔍', action: () => {} },
   { id: 'global-search', label: '全局搜索', shortcut: 'Ctrl+Shift+F', category: '查找与导航', icon: '🔎', action: () => {} },
@@ -43,7 +43,17 @@ const DEFAULT_COMMANDS: Command[] = [
   { id: 'export-html', label: '导出为 HTML', shortcut: 'Ctrl+E', category: '导出', icon: '📤', action: () => {} },
   { id: 'print', label: '打印', shortcut: 'Ctrl+P', category: '导出', icon: '🖨️', action: () => {} },
   { id: 'show-shortcuts', label: '显示快捷键', shortcut: 'F1', category: '帮助', icon: '⌨️', action: () => {} },
+  { id: 'check-update', label: '检查软件更新', category: '帮助', icon: '↻', action: () => {} },
 ]
+
+function formatShortcut(shortcut: string): string {
+  if (typeof navigator === 'undefined' || !/Mac|iPhone|iPad/.test(navigator.platform)) {
+    return shortcut
+  }
+  return shortcut
+    .replace(/^Ctrl\+Shift\+/, '⌘⇧')
+    .replace(/^Ctrl\+/, '⌘')
+}
 
 // 常见中文字符到拼音首字母的映射（覆盖默认命令中的字符）
 const PINYIN_INITIAL_MAP: Record<string, string> = {
@@ -52,7 +62,7 @@ const PINYIN_INITIAL_MAP: Record<string, string> = {
   '关': 'g', '闭': 'b', '当': 'd', '前': 'q',
   '切': 'q', '换': 'h', '源': 'y', '码': 'm', '视': 's', '图': 't',
   '显': 'x', '示': 's', '隐': 'y', '藏': 'c', '目': 'm', '录': 'l',
-  '搜': 's', '索': 's', '诊': 'z', '断': 'd',
+  '搜': 's', '索': 's', '诊': 'z', '断': 'd', '更': 'g',
   '专': 'z', '注': 'z', '模': 'm', '式': 's',
   '最': 'z', '近': 'j',
   '主': 'z', '题': 't',
@@ -274,7 +284,7 @@ export default function CommandPalette({ isOpen, onClose, commands, onExecute }:
                   <span className={styles.itemIcon}>{item.command.icon}</span>
                   <span className={styles.itemLabel}>{item.command.label}</span>
                   {item.command.shortcut && (
-                    <span className={styles.itemShortcut}>{item.command.shortcut}</span>
+                    <span className={styles.itemShortcut}>{formatShortcut(item.command.shortcut)}</span>
                   )}
                 </div>
               )

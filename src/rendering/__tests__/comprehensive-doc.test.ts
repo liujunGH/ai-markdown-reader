@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createParser, scanCodeLanguages, loadPrismLanguage } from '../pipeline/tokenizer'
 import { splitIntoBlocks } from '../pipeline/blockModel'
+import { renderBlockSources } from '../pipeline/renderBlockSource'
 
 /**
  * 用综合测试文档验证完整解析链路。
@@ -64,7 +65,9 @@ graph TD
 
     expect(result.blocks.length).toBeGreaterThan(0)
     expect(result.outline.length).toBeGreaterThan(0)
-    // 验证不抛 "Cannot convert undefined or null to object"
-    expect(result.blocks.every((b) => b.html !== null && b.html !== undefined)).toBe(true)
+    expect(result.blocks.every((b) => b.source.length > 0)).toBe(true)
+    const rendered = await renderBlockSources(result.blocks)
+    expect(rendered).toHaveLength(result.blocks.length)
+    expect(rendered.some((block) => block.html.includes('mermaid-code'))).toBe(true)
   })
 })

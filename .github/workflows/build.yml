@@ -13,9 +13,20 @@ on:
 
 jobs:
   release:
-    runs-on: windows-latest
+    name: Build and publish (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
 
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -34,21 +45,12 @@ jobs:
           npm run electron:compile
           npm run build
 
-      - name: Build & Publish (Windows only)
-        run: npx electron-builder --win --publish always
+      - name: Run tests
+        run: npm test
+
+      - name: Build & Publish (${{ matrix.platform }})
+        run: npx electron-builder --${{ matrix.platform }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifacts to Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          cd release
-          for f in *.exe; do
-            if [ -f "$f" ]; then
-              echo "Uploading $f..."
-              gh release upload ${{ github.ref_name }} "$f" --clobber || true
-            fi
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}

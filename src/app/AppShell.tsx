@@ -95,7 +95,9 @@ export function AppShell({ children }: AppShellProps) {
 function MinimalAppShell() {
   const togglePanel = useUIStore((s) => s.togglePanel)
   const showSearch = useUIStore((s) => s.panels.search)
+  const showQuickJump = useUIStore((s) => s.panels.quickJump)
   const showFileSidebar = useUIStore((s) => s.panels.fileSidebar)
+  const focusMode = useUIStore((s) => s.panels.focusMode)
 
   // 全局快捷键（搜索/命令面板/快速跳转）
   useEffect(() => {
@@ -117,36 +119,38 @@ function MinimalAppShell() {
   }, [togglePanel])
 
   return (
-    <div className="_appShell" >
-      <header className="_appHeader">
-        <strong style={{ marginRight: 8 }}>Markdown Reader (v2)</strong>
-        <ReaderToolbar />
-      </header>
-      <TabBar />
+    <div className="_appShell" data-focus-mode={focusMode ? 'true' : 'false'}>
+      {!focusMode && (
+        <header className="_appHeader">
+          <strong style={{ marginRight: 8 }}>Markdown Reader (v2)</strong>
+          <ReaderToolbar />
+        </header>
+      )}
+      {!focusMode && <TabBar />}
       <div className="_appBody">
-        {showFileSidebar && (
+        {!focusMode && showFileSidebar && (
           <aside style={{ width: 280, borderRight: '1px solid var(--border, #e0e0e0)', overflow: 'hidden', position: 'relative', zIndex: 10 }}>
             <ReaderWorkspace />
           </aside>
         )}
         <main className="_appMain">
           <ReaderPanel />
-          {showSearch && (
-            <div style={{ position: 'absolute', top: 8, right: 16, zIndex: 100 }}>
-              <ReaderSearch />
-            </div>
-          )}
+          {!focusMode && showSearch && <ReaderSearch />}
+          <ReaderPanels />
         </main>
       </div>
-      <StatusBar />
-      <ReaderCommandPalette />
-      <ReaderQuickJump />
-      <ReaderExportPanel />
-      <ReaderGlobalSearch />
-      <ReaderReadingTools />
-      <ImagePreviewOverlay />
-      <ReaderPanels />
-      <UpdateNotification />
+      {!focusMode && <StatusBar />}
+      {!focusMode && (
+        <>
+          <ReaderCommandPalette />
+          {showQuickJump && <ReaderQuickJump />}
+          <ReaderExportPanel />
+          <ReaderGlobalSearch />
+          <ReaderReadingTools />
+          <ImagePreviewOverlay />
+          <UpdateNotification />
+        </>
+      )}
     </div>
   )
 }

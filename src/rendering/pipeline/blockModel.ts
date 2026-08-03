@@ -19,7 +19,7 @@ import type {
   DocumentBlock,
   ParsedDocument,
 } from '../types'
-import { processWikiLinks, simpleHash } from './tokenizer'
+import { simpleHash } from './tokenizer'
 
 /**
  * markdown-it 的 Token 类型。
@@ -68,9 +68,8 @@ export function slugify(text: string): string {
 }
 
 /** 预估块高度（px）。用于虚拟列表初始化，滚动后由 measureElement 校正 */
-function estimateBlockHeight(kind: BlockKind, html: string, meta?: BlockMeta): number {
-  // 粗略估算：按行数 × 行高 + 块间距。准确高度由虚拟列表测量覆盖。
-  const lineCount = html.split('\n').length
+function estimateBlockHeight(kind: BlockKind, lineCount: number, meta?: BlockMeta): number {
+  // 粗略估算：按源码行数 × 行高 + 块间距。准确高度由虚拟列表测量覆盖。
   const baseLineHeight = 26
   switch (kind) {
     case 'heading':
@@ -157,23 +156,26 @@ function maxEndLine(blockTokens: Token[]): number {
  * 把 markdown-it token 流切成块。
  *
  * @param tokens  md.parse(content) 的结果
- * @param md      markdown-it 实例（用于渲染块的 HTML）
+ * @param md      markdown-it 实例（保留参数兼容，token 已由它生成）
  * @param content 原始 markdown（用于总行数）
  */
 export function splitIntoBlocks(
   tokens: Token[],
-  md: MarkdownIt,
-  content: string
+  _md: MarkdownIt,
+  content: string,
+  options: { blockIdOffset?: number; lineOffset?: number; totalLines?: number } = {},
 ): ParsedDocument {
   const blocks: DocumentBlock[] = []
   const outline: Array<{ id: string; level: number; text: string; line: number }> = []
-  let blockId = 0
+  let blockId = options.blockIdOffset ?? 0
+  const lineOffset = options.lineOffset ?? 0
   let depth = 0
   let i = 0
-  const totalLines = content.split('\n').length
+  const totalLines = options.totalLines ?? countLines(content)
+  const lineOffsets = buildLineOffsets(content)
 
   // 用 0-based 行号，输出时转 1-based
-  const toLine = (n: number | null | undefined): number => (n == null ? 0 : n + 1)
+  const toLine = (n: number | null | undefined): number => (n == null ? 0 : n + 1 + lineOffset)
 
   while (i < tokens.length) {
     const token = tokens[i]
@@ -196,7 +198,16 @@ export function splitIntoBlocks(
         const blockTokens = tokens.slice(i, j + 1)
         // endLine 取 blockTokens 内最大的 map[1]（close token 的 map 恒为 null）
         const endLine = maxEndLine(blockTokens)
-        blocks.push(buildBlock(blockId++, openKind, blockTokens, md, toLine(token.map?.[0]), endLine))
+        const startLineIndex = token.map?.[0] ?? 0
+        blocks.push(buildBlock(
+          blockId++,
+          openKind,
+          blockTokens,
+          sliceLines(content, lineOffsets, startLineIndex, endLine),
+          toLine(startLineIndex),
+          endLine + lineOffset,
+          Math.max(1, endLine - startLineIndex),
+        ))
 
         if (openKind === 'heading') {
           const meta = blocks[blocks.length - 1].meta
@@ -216,8 +227,17 @@ export function splitIntoBlocks(
       if (selfKind) {
         const blockTokens = [token]
         const startLine = toLine(token.map?.[0])
-        const endLine = toLine(token.map?.[1] ?? token.map?.[0])
-        blocks.push(buildBlock(blockId++, selfKind, blockTokens, md, startLine, endLine))
+        const startLineIndex = token.map?.[0] ?? 0
+        const endLineIndex = token.map?.[1] ?? startLineIndex + 1
+        blocks.push(buildBlock(
+          blockId++,
+          selfKind,
+          blockTokens,
+          sliceLines(content, lineOffsets, startLineIndex, endLineIndex),
+          startLine,
+          endLineIndex + lineOffset,
+          Math.max(1, endLineIndex - startLineIndex),
+        ))
         i++
         continue
       }
@@ -232,37 +252,46 @@ export function splitIntoBlocks(
   return { blocks, totalLines, outline }
 }
 
-/** 构建单个块：渲染 HTML、收集元数据、估算高度 */
+function countLines(content: string): number {
+  let lines = 1
+  for (let index = 0; index < content.length; index += 1) {
+    if (content.charCodeAt(index) === 10) lines += 1
+  }
+  return lines
+}
+
+function buildLineOffsets(content: string): number[] {
+  const offsets = [0]
+  for (let index = 0; index < content.length; index += 1) {
+    if (content.charCodeAt(index) === 10) offsets.push(index + 1)
+  }
+  offsets.push(content.length)
+  return offsets
+}
+
+function sliceLines(content: string, offsets: number[], startLine: number, endLine: number): string {
+  const start = offsets[Math.max(0, startLine)] ?? 0
+  const end = offsets[Math.max(startLine, endLine)] ?? content.length
+  return content.slice(start, end).replace(/\r?\n$/, '')
+}
+
+/** 构建轻量块索引：只保留源码、元数据和高度估算，不在解析阶段生成 HTML。 */
 function buildBlock(
   id: number,
   kind: BlockKind,
   blockTokens: Token[],
-  md: MarkdownIt,
+  source: string,
   startLine: number,
-  endLine: number
+  endLine: number,
+  lineCount: number,
 ): DocumentBlock {
-  // 先收集元数据（heading id 等需注入到 HTML）
   const meta = collectBlockMeta(kind, blockTokens)
-
-  // 用 markdown-it 渲染这一组 token 成 HTML 片段
-  let html = md.renderer.render(blockTokens, md.options, {})
-
-  // heading 块注入 id（供大纲/scrollspy/锚点跳转，与旧渲染器 heading.id = slugify 一致）
-  if (kind === 'heading' && meta.headingId && meta.headingLevel) {
-    const tag = `h${meta.headingLevel}`
-    // 在开标签后注入 id="<headingId>"
-    html = html.replace(new RegExp(`<${tag}>`), `<${tag} id="${meta.headingId}">`)
-  }
-
-  // WikiLink 后处理（与旧 worker 一致）
-  html = processWikiLinks(html)
-
-  const estimatedHeight = estimateBlockHeight(kind, html, meta)
+  const estimatedHeight = estimateBlockHeight(kind, lineCount, meta)
 
   return {
     id,
     kind,
-    html,
+    source,
     startLine,
     endLine: endLine || startLine,
     estimatedHeight,

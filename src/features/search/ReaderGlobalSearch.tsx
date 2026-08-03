@@ -12,7 +12,9 @@ import { GlobalSearch } from '../../components/GlobalSearch'
 export function ReaderGlobalSearch() {
   const isOpen = useUIStore((s) => s.panels.globalSearch)
   const closePanel = useUIStore((s) => s.closePanel)
+  const openPanel = useUIStore((s) => s.openPanel)
   const folderPath = useFileStore((s) => s.currentFolderPath)
+  const setFolder = useFileStore((s) => s.setFolder)
   const { openDocumentByPath } = useDocumentActions()
 
   return (
@@ -20,6 +22,15 @@ export function ReaderGlobalSearch() {
       isOpen={isOpen}
       onClose={() => closePanel('globalSearch')}
       folderPath={folderPath}
+      onOpenFolder={async () => {
+        const api = window.electronAPI
+        if (!api) return
+        const selectedFolder = await api.openFolderDialog()
+        if (!selectedFolder) return
+        setFolder(selectedFolder, api.pathBasename(selectedFolder))
+        closePanel('globalSearch')
+        openPanel('fileSidebar')
+      }}
       onOpenFile={async (filePath) => {
         await openDocumentByPath(filePath)
         closePanel('globalSearch')

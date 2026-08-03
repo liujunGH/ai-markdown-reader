@@ -100,8 +100,6 @@ function dataToBlob(data: string, mimeType: string): Blob {
  */
 export function enhanceMermaid(block: HTMLElement, options: MermaidEnhanceOptions): void {
   const mermaidElements = block.querySelectorAll('.mermaid-code')
-  if (mermaidElements.length === 0) return
-
   mermaidElements.forEach((el, index) => {
     // 已替换为 wrapper 的跳过（块重挂载时 wrapper 已存在则不重复替换）
     if (el.parentElement?.classList.contains('mermaid-wrapper')) return
@@ -121,7 +119,7 @@ export function enhanceMermaid(block: HTMLElement, options: MermaidEnhanceOption
     el.parentNode?.replaceChild(wrapper, el)
   })
 
-  // 异步渲染所有 pending 的 mermaid
+  // 也处理主题切换时已存在的 pending wrapper，而不只处理原始占位。
   void renderPendingMermaid(block, options)
 }
 

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { UpdateStatePayload } from '../shared'
 
 interface RecentFile {
   name: string
@@ -51,6 +52,7 @@ const updateAvailableCallbacks = new Set<(info: { version: string }) => void>()
 const updateProgressCallbacks = new Set<(progress: { percent: number; transferred: number; total: number }) => void>()
 const updateDownloadedCallbacks = new Set<(info: { version: string }) => void>()
 const updateErrorCallbacks = new Set<(info: { error: string }) => void>()
+const updateStateCallbacks = new Set<(state: UpdateStatePayload) => void>()
 
 ipcRenderer.on('open-file', (_event, filePath: string) => {
   openFileCallbacks.forEach(cb => cb(filePath))
@@ -84,8 +86,13 @@ ipcRenderer.on('update-error', (_event, info: { error: string }) => {
   updateErrorCallbacks.forEach(cb => cb(info))
 })
 
+ipcRenderer.on('update:state-changed', (_event, state: UpdateStatePayload) => {
+  updateStateCallbacks.forEach(cb => cb(state))
+})
+
 const DEFAULT_RENDERER_TIMEOUT = 10000
 const DIALOG_RENDERER_TIMEOUT = 5 * 60 * 1000
+const UPDATE_RENDERER_TIMEOUT = 30 * 60 * 1000
 
 function makeCallKey(channel: string, args: unknown[]): string {
   try {
@@ -192,6 +199,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   focusWindow: createIPCCall<(id: number) => Promise<void>>('focus-window'),
   getWindowStates: createIPCCall<() => Promise<WindowState[]>>('get-window-states'),
   registerWindowFiles: createIPCCall<(filePaths: string[]) => Promise<void>>('register-window-files'),
+  // Auto-updater lifecycle
+  getUpdateState: createIPCCall<() => Promise<UpdateStatePayload>>('update:get-state'),
+  checkForUpdates: createIPCCall<(manual?: boolean) => Promise<UpdateStatePayload>>('update:check', { timeout: UPDATE_RENDERER_TIMEOUT }),
+  downloadUpdate: createIPCCall<() => Promise<UpdateStatePayload>>('update:download', { timeout: UPDATE_RENDERER_TIMEOUT }),
+  installUpdate: createIPCCall<() => Promise<boolean>>('update:install'),
+  onUpdateStateChange: (callback: (state: UpdateStatePayload) => void) => {
+    updateStateCallbacks.add(callback)
+  },
+  offUpdateStateChange: (callback: (state: UpdateStatePayload) => void) => {
+    updateStateCallbacks.delete(callback)
+  },
   // Auto-updater events
   onUpdateAvailable: (callback: (info: { version: string }) => void) => {
     updateAvailableCallbacks.add(callback)

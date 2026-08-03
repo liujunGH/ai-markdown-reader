@@ -67,9 +67,8 @@ const x = 1
 
     expect(blocks.length).toBe(1)
     expect(blocks[0].kind).toBe('table')
-    // 表格 HTML 含全部行
-    expect(blocks[0].html).toContain('<td>1</td>')
-    expect(blocks[0].html).toContain('<td>6</td>')
+    expect(blocks[0].source).toContain('| 1 | 2 | 3 |')
+    expect(blocks[0].source).toContain('| 4 | 5 | 6 |')
   })
 
   it('多级嵌套列表保持为一个块', () => {
@@ -82,8 +81,8 @@ const x = 1
 
     expect(blocks.length).toBe(1)
     expect(blocks[0].kind).toBe('list')
-    expect(blocks[0].html).toContain('嵌套1')
-    expect(blocks[0].html).toContain('顶层2')
+    expect(blocks[0].source).toContain('嵌套1')
+    expect(blocks[0].source).toContain('顶层2')
   })
 
   it('代码块不被切断（含多行内容）', () => {
@@ -95,8 +94,8 @@ const x = 1
     expect(blocks[0].kind).toBe('code')
     expect(blocks[0].meta?.codeLang).toBe('python')
     expect(blocks[0].meta?.codeLines).toBe(20)
-    expect(blocks[0].html).toContain('line0')
-    expect(blocks[0].html).toContain('line19')
+    expect(blocks[0].source).toContain('line0')
+    expect(blocks[0].source).toContain('line19')
   })
 
   it('mermaid 代码块标记 hasMermaid', () => {
@@ -123,7 +122,7 @@ describe('splitIntoBlocks — 块级公式（回归 #1：math_block 不能吞后
     expect(blocks[0].kind).toBe('math')
     expect(blocks[1].kind).toBe('paragraph')
     // 段落内容未被吞进 math 块
-    expect(blocks[1].html).toContain('公式后面的段落')
+    expect(blocks[1].source).toContain('公式后面的段落')
   })
 })
 
@@ -158,12 +157,12 @@ describe('splitIntoBlocks — 标题与大纲', () => {
     expect(outline[0].text).toBe('中文标题')
   })
 
-  it('heading id 注入到块 HTML（供大纲/锚点/scrollspy 定位）', () => {
+  it('heading 块保留按需渲染所需源码和 id 元数据', () => {
     const content = '# Hello World'
     const tokens = md.parse(content, {})
     const { blocks } = splitIntoBlocks(tokens, md, content)
-    // HTML 应含 <h1 id="hello-world">
-    expect(blocks[0].html).toContain('<h1 id="hello-world">')
+    expect(blocks[0].source).toBe('# Hello World')
+    expect(blocks[0].meta?.headingId).toBe('hello-world')
   })
 
   it('行号范围正确（1-based）', () => {

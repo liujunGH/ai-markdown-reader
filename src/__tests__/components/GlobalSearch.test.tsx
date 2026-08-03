@@ -21,6 +21,26 @@ describe('GlobalSearch', () => {
     vi.mocked(getIndexedFileCount).mockResolvedValue(0)
   })
 
+  it('没有工作区时说明原因并提供打开文件夹入口', async () => {
+    const user = userEvent.setup()
+    const onOpenFolder = vi.fn()
+
+    render(
+      <GlobalSearch
+        isOpen
+        folderPath={null}
+        onClose={vi.fn()}
+        onOpenFile={vi.fn()}
+        onReindex={vi.fn()}
+        onOpenFolder={onOpenFolder}
+      />
+    )
+
+    expect(screen.getByText('尚未打开文件夹')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '打开文件夹' }))
+    expect(onOpenFolder).toHaveBeenCalledOnce()
+  })
+
   it('explains that search needs an index when the current folder has no indexed files', async () => {
     const user = userEvent.setup()
     const onReindex = vi.fn()

@@ -18,16 +18,14 @@ export function SplitPanel() {
   const tabId = secondaryTab?.id ?? ''
   const filePath = secondaryTab?.filePath
 
-  const { document, loading, error } = useDocument(tabId, filePath)
+  const { document, loading, indexing, error } = useDocument(tabId, filePath)
 
   const docHash = useMemo(() => {
     const content = getContent(tabId) ?? ''
     return getDocHash(content)
   }, [tabId, document])
 
-  const contentVersion = useMemo(() => {
-    return document ? document.blocks.length + docHash.length : 0
-  }, [document, docHash])
+  const contentVersion = docHash
 
   if (!secondaryTab) {
     return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>选择一个标签分屏</div>
@@ -41,6 +39,7 @@ export function SplitPanel() {
       <DocumentView
         document={document}
         contentVersion={contentVersion}
+        indexing={indexing}
         enhance={{
           filePath,
           docHash,

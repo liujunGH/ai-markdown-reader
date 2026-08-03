@@ -15,12 +15,19 @@ export function ReaderToolbar() {
   const fontSize = useUIStore((s) => s.fontSize)
   const { openFileDialog, openExample } = useDocumentActions()
 
-  const btn = (onClick: () => void, title: string, tooltip: string, icon: string) => (
+  const btn = (
+    onClick: () => void,
+    title: string,
+    tooltip: string,
+    icon: string,
+    guideTarget?: string,
+  ) => (
     <button
       type="button"
       onClick={onClick}
       title={title}
       data-tooltip={tooltip}
+      data-guide={guideTarget}
       aria-label={tooltip}
       style={{
         display: 'inline-flex',
@@ -41,18 +48,18 @@ export function ReaderToolbar() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      {btn(() => void openFileDialog(), '打开文件', '打开本地 Markdown 文件', '📂')}
+      {btn(() => void openFileDialog(), '打开文件', '打开本地 Markdown 文件', '📂', 'file-opener')}
       {btn(openExample, '示例', '打开示例文档', '📄')}
-      {btn(() => togglePanel('search'), '搜索', '搜索文档内容', '🔍')}
-      {btn(() => togglePanel('fileSidebar'), '文件', '文件/工作区面板', '📁')}
-      {btn(() => togglePanel('outline'), '目录', '文档目录大纲', '📑')}
+      {btn(() => togglePanel('search'), '搜索', '搜索文档内容', '🔍', 'search')}
+      {btn(() => togglePanel('fileSidebar'), '文件', '文件/工作区面板', '📁', 'recent-files')}
+      {btn(() => togglePanel('outline'), '目录', '文档目录大纲', '📑', 'outline')}
       {btn(() => togglePanel('source'), '源码', '查看 Markdown 源码', '📄')}
       {btn(() => togglePanel('focusMode'), '专注', '进入专注模式', '🎯')}
       {btn(() => setFontSize(Math.max(12, fontSize - 1)), '缩小', '缩小字号', 'A-')}
       <span style={{ fontSize: 12, color: 'var(--text-secondary)', minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
       {btn(() => setFontSize(Math.min(32, fontSize + 1)), '放大', '放大字号', 'A+')}
       {btn(() => togglePanel('commandPalette'), '命令', '打开命令面板', '⌘')}
-      {btn(() => togglePanel('readingTools'), '阅读工具', '阅读工具面板', '📖')}
+      {btn(() => togglePanel('readingTools'), '阅读工具', '阅读工具面板', '📖', 'tools')}
       {btn(() => togglePanel('globalSearch'), '全局搜索', '全局搜索', '🔎')}
       {btn(() => togglePanel('exportPanel'), '导出', '导出文档', '📤')}
       <div style={{ marginLeft: 'auto' }}>

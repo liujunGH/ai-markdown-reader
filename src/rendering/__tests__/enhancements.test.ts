@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { enhanceLinks } from '../enhancements/linkEnhancer'
 import { enhanceTables } from '../enhancements/tableEnhancer'
 import { enhanceCodeBlocks } from '../enhancements/codeEnhancer'
@@ -6,7 +6,13 @@ import { enhanceTaskLists } from '../enhancements/taskListEnhancer'
 import { enhanceKatex } from '../enhancements/katexEnhancer'
 import { enhanceWikiLinks } from '../enhancements/wikiLinkEnhancer'
 import { enhanceMermaid } from '../enhancements/mermaidEnhancer'
+import { enhanceSearchHighlights } from '../enhancements/highlightEnhancer'
 import { encodeBase64 } from '../pipeline/tokenizer'
+import {
+  __resetMermaidLoaderForTests,
+  __setMermaidImporterForTests,
+  loadMermaid,
+} from '../../utils/mermaidLoader'
 
 /** 创建一个块 DOM 容器并注入 HTML */
 function makeBlock(html: string): HTMLElement {
@@ -131,6 +137,20 @@ describe('enhanceWikiLinks — 点击处理', () => {
 })
 
 describe('enhanceMermaid — 占位替换', () => {
+  const mermaidMock = {
+    initialize: vi.fn(),
+    render: vi.fn().mockResolvedValue({ svg: '<svg data-test="diagram"></svg>' }),
+  }
+
+  beforeEach(() => {
+    __resetMermaidLoaderForTests()
+    mermaidMock.initialize.mockClear()
+    mermaidMock.render.mockClear()
+    __setMermaidImporterForTests(async () => (
+      mermaidMock as unknown as Awaited<ReturnType<typeof loadMermaid>>
+    ))
+  })
+
   it('把 .mermaid-code 占位替换为 .mermaid-wrapper', () => {
     const code = 'graph TD\nA-->B'
     const encoded = encodeBase64(code)
@@ -148,5 +168,46 @@ describe('enhanceMermaid — 占位替换', () => {
     const wrapper = block.querySelector('.mermaid-wrapper')!
     expect(wrapper.getAttribute('data-mermaid-rendered')).toBe('empty')
     expect(wrapper.querySelector('.mermaid-empty')).toBeTruthy()
+  })
+
+  it('主题切换留下的 pending wrapper 会重新渲染', async () => {
+    const block = makeBlock(
+      '<div class="mermaid-wrapper" data-mermaid-rendered="pending"><div class="mermaid" data-code="graph%20TD%3B%20A--%3EB%3B"></div></div>'
+    )
+    document.body.appendChild(block)
+
+    enhanceMermaid(block, {})
+
+    await vi.waitFor(() => {
+      expect(block.querySelector('.mermaid-wrapper')?.getAttribute('data-mermaid-rendered')).toBe('true')
+    })
+    expect(block.querySelector('svg[data-test="diagram"]')).toBeTruthy()
+    block.remove()
+  })
+})
+
+describe('enhanceSearchHighlights — 结构化内容安全', () => {
+  it('不修改 Mermaid、代码和 KaTeX 内部文本', () => {
+    const block = makeBlock(`
+      <p>Mermaid 正文</p>
+      <div class="mermaid-wrapper"><svg><text>Mermaid 图内</text></svg></div>
+      <pre><code>Mermaid code</code></pre>
+      <span class="katex">Mermaid math</span>
+    `)
+
+    enhanceSearchHighlights(block, { query: 'Mermaid', isRegex: false })
+
+    expect(block.querySelectorAll('mark.search-highlight')).toHaveLength(1)
+    expect(block.querySelector('p mark.search-highlight')?.textContent).toBe('Mermaid')
+    expect(block.querySelector('.mermaid-wrapper mark, code mark, .katex mark')).toBeNull()
+  })
+
+  it('空查询会清理已有搜索高亮', () => {
+    const block = makeBlock('<p><mark class="search-highlight">命中</mark> 文本</p>')
+
+    enhanceSearchHighlights(block, { query: '', isRegex: false })
+
+    expect(block.querySelector('.search-highlight')).toBeNull()
+    expect(block.textContent).toBe('命中 文本')
   })
 })

@@ -17,6 +17,8 @@ import { produce } from 'immer'
 import type { TabColor, TabContentStatus } from '../../types/Tab'
 import type { RecentFile } from '../../../shared'
 import { DEFAULT_MAX_TABS } from '../../../shared'
+import { EXAMPLE_MARKDOWN, EXAMPLE_MARKDOWN_NAME } from '../../data/exampleMarkdown'
+import { setContent } from '../../resources/DocumentCache'
 
 /** Tab 元数据（不含 content —— content 在 DocumentCache） */
 export interface TabMeta {
@@ -279,8 +281,10 @@ export const useTabStore = create<TabStore>()((set, get) => ({
         let newTabId = ''
         set(
           produce((state: TabState) => {
-            // 同路径未修改标签复用
-            const existing = state.tabs.find((t) => t.filePath === filePath)
+            // 文件按路径复用；无路径文档按名称复用，避免所有临时标签共享空路径。
+            const existing = filePath
+              ? state.tabs.find((t) => t.filePath === filePath)
+              : state.tabs.find((t) => !t.filePath && t.name === name)
             if (existing) {
               existing.name = name
               if (size !== undefined) existing.size = size
@@ -355,13 +359,23 @@ export const useTabStore = create<TabStore>()((set, get) => ({
         )
         set({ isRestoringSession: false })
 
+        // 示例文档没有 filePath，无法从磁盘回源；恢复标签时重新注入内置正文。
+        const restoredExampleTabs = stored.filter(
+          (tab) => !tab.filePath && tab.name === EXAMPLE_MARKDOWN_NAME
+        )
+        if (restoredExampleTabs.length > 0) {
+          for (const tab of restoredExampleTabs) {
+            setContent(tab.id, EXAMPLE_MARKDOWN)
+            get().setContentStatus(tab.id, 'ready')
+          }
+        }
+
         // 主动回源激活标签 content（确保恢复后文档能渲染）
         // useDocument 也会做这件事，但显式调用避免时序依赖
         const activeId = activeTabId && stored.some((t) => t.id === activeTabId) ? activeTabId : stored[0].id
         const activeStored = stored.find((t) => t.id === activeId)
         if (activeStored?.filePath) {
           try {
-            const { setContent } = await import('../../resources/DocumentCache')
             const api = window.electronAPI
             if (api) {
               const result = await api.readFile(activeStored.filePath)

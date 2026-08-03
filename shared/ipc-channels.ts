@@ -114,6 +114,12 @@ export const INVOKE_CHANNELS = {
   FOCUS_WINDOW: 'focus-window',
   GET_WINDOW_STATES: 'get-window-states',
   REGISTER_WINDOW_FILES: 'register-window-files',
+
+  // 应用更新
+  GET_UPDATE_STATE: 'update:get-state',
+  CHECK_FOR_UPDATES: 'update:check',
+  DOWNLOAD_UPDATE: 'update:download',
+  INSTALL_UPDATE: 'update:install',
 } as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNELS]
@@ -125,6 +131,7 @@ export type InvokeChannel = (typeof INVOKE_CHANNELS)[keyof typeof INVOKE_CHANNEL
 export const IPC_DEFAULT_TIMEOUT = 10_000
 export const IPC_DIALOG_TIMEOUT = 5 * 60 * 1000
 export const IPC_SCAN_TIMEOUT = 5 * 60 * 1000
+export const IPC_UPDATE_TIMEOUT = 30 * 60 * 1000
 
 /** 需要 dedup 的 channel（同参数并发复用 Promise） */
 export const DEDUP_CHANNELS: ReadonlySet<string> = new Set([
@@ -144,6 +151,8 @@ export const CHANNEL_TIMEOUTS: Readonly<Record<string, number>> = {
   [INVOKE_CHANNELS.SAVE_TEXT_FILE]: IPC_DIALOG_TIMEOUT,
   [INVOKE_CHANNELS.EXPORT_HTML_TO_PDF]: IPC_DIALOG_TIMEOUT,
   [INVOKE_CHANNELS.SCAN_MARKDOWN_FILES]: IPC_SCAN_TIMEOUT,
+  [INVOKE_CHANNELS.CHECK_FOR_UPDATES]: IPC_UPDATE_TIMEOUT,
+  [INVOKE_CHANNELS.DOWNLOAD_UPDATE]: IPC_UPDATE_TIMEOUT,
 }
 
 /* ============================================================
@@ -159,6 +168,7 @@ export const EVENT_CHANNELS = {
   UPDATE_PROGRESS: 'update-progress',
   UPDATE_DOWNLOADED: 'update-downloaded',
   UPDATE_ERROR: 'update-error',
+  UPDATE_STATE_CHANGED: 'update:state-changed',
 } as const
 
 export type EventChannel = (typeof EVENT_CHANNELS)[keyof typeof EVENT_CHANNELS]
@@ -179,6 +189,31 @@ export interface UpdateVersionPayload {
 
 export interface UpdateErrorPayload {
   error: string
+}
+
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'up-to-date'
+  | 'error'
+  | 'unsupported'
+
+/** 自动更新完整状态。新窗口可主动获取，避免错过早先广播的事件。 */
+export interface UpdateStatePayload {
+  status: UpdateStatus
+  currentVersion: string
+  version?: string
+  releaseNotes?: string
+  percent?: number
+  transferred?: number
+  total?: number
+  error?: string
+  checkedAt?: number
+  /** 是否由用户手动触发；自动检查中的无更新/错误不打扰用户。 */
+  manual: boolean
 }
 
 export type SystemTheme = 'light' | 'dark'

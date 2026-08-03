@@ -8,6 +8,7 @@ interface GlobalSearchProps {
   onClose: () => void
   folderPath: string | null
   onOpenFile: (filePath: string, line?: number) => void
+  onOpenFolder?: () => Promise<void> | void
   onReindex?: () => Promise<void> | void
   isIndexing?: boolean
   indexProgress?: IndexProgress | null
@@ -26,6 +27,7 @@ export function GlobalSearch({
   onClose,
   folderPath,
   onOpenFile,
+  onOpenFolder,
   onReindex,
   isIndexing = false,
   indexProgress,
@@ -287,6 +289,18 @@ export function GlobalSearch({
         {isIndexing && latestSkippedItem && (
           <div className={styles.indexSkipNotice} role="status">
             最近跳过：{formatIndexSkippedItem(latestSkippedItem)}
+          </div>
+        )}
+
+        {!folderPath && (
+          <div className={styles.indexHint} role="status">
+            <strong>尚未打开文件夹</strong>
+            <span>选择一个 Markdown 文件夹后即可建立索引并进行全文搜索。</span>
+            {onOpenFolder && (
+              <button type="button" className={styles.indexHintBtn} onClick={onOpenFolder}>
+                打开文件夹
+              </button>
+            )}
           </div>
         )}
 

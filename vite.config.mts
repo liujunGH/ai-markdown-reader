@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import pkg from './package.json'
+import pkg from './package.json' with { type: 'json' }
 
 export default defineConfig({
   plugins: [react()],
@@ -18,13 +18,15 @@ export default defineConfig({
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-markdown': ['markdown-it', 'markdown-it-emoji', 'markdown-it-texmath'],
-          'katex': ['katex'],
-          'prism': ['prismjs'],
-          'mermaid': ['mermaid'],
-        }
+        manualChunks(id) {
+          if (!id.includes('/node_modules/')) return undefined
+
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+          if (/\/node_modules\/(markdown-it|markdown-it-emoji|markdown-it-texmath)\//.test(id)) return 'vendor-markdown'
+          if (id.includes('/node_modules/katex/')) return 'katex'
+          if (id.includes('/node_modules/prismjs/')) return 'prism'
+          return undefined
+        },
       }
     }
   }

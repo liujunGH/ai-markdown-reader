@@ -8,7 +8,7 @@ import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const electronMain = path.join(rootDir, 'dist-electron', 'main.js')
+const electronMain = path.join(rootDir, 'dist-electron', 'electron', 'main.js')
 const distIndex = path.join(rootDir, 'dist', 'index.html')
 const previewUrl = 'http://localhost:5173'
 
@@ -200,13 +200,16 @@ async function launchApp(userDataDir) {
 
 async function seedLocalStorage(userDataDir, entries) {
   const { electronApp, page } = await launchApp(userDataDir)
-  await page.evaluate((items) => {
-    localStorage.clear()
-    for (const [key, value] of Object.entries(items)) {
-      localStorage.setItem(key, value)
-    }
-  }, entries)
-  await electronApp.close()
+  try {
+    await page.evaluate((items) => {
+      localStorage.clear()
+      for (const [key, value] of Object.entries(items)) {
+        localStorage.setItem(key, value)
+      }
+    }, entries)
+  } finally {
+    await electronApp.close().catch(() => undefined)
+  }
 }
 
 async function getMemorySummary(electronApp) {
@@ -228,20 +231,25 @@ async function getMemorySummary(electronApp) {
 async function measureBaseline() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-markdown-reader-baseline-'))
   await seedLocalStorage(userDataDir, {
-    'has-seen-guide': 'true',
+    'has-seen-guide': '1',
   })
 
   const launch = await launchApp(userDataDir)
-  const homeVisibleAt = performance.now()
-  const memory = await getMemorySummary(launch.electronApp)
-  await launch.electronApp.close()
-
-  return {
-    name: 'baseline-empty-session',
-    userDataDir,
-    ...launch.metrics,
-    homeReadyMs: round(homeVisibleAt - launch.startedAt),
-    ...memory,
+  try {
+    const homeVisibleAt = performance.now()
+    const memory = await getMemorySummary(launch.electronApp)
+    await launch.page.waitForTimeout(1_000)
+    const settledMemory = await getMemorySummary(launch.electronApp)
+    return {
+      name: 'baseline-empty-session',
+      userDataDir,
+      ...launch.metrics,
+      homeReadyMs: round(homeVisibleAt - launch.startedAt),
+      ...memory,
+      settledWorkingSetMb: settledMemory.workingSetMb,
+    }
+  } finally {
+    await launch.electronApp.close().catch(() => undefined)
   }
 }
 
@@ -251,7 +259,7 @@ async function measureLargeSession(files) {
   const targetTab = files[files.length - 1]
 
   await seedLocalStorage(userDataDir, {
-    'has-seen-guide': 'true',
+    'has-seen-guide': '1',
     'session-tabs': JSON.stringify(files.map(file => ({
       id: file.id,
       name: file.name,
@@ -263,31 +271,35 @@ async function measureLargeSession(files) {
   })
 
   const launch = await launchApp(userDataDir)
+  try {
+    await launch.page.getByRole('tab', { name: targetTab.name }).waitFor({ state: 'visible', timeout: options.timeout })
+    const tabsRestoredAt = performance.now()
 
-  await launch.page.getByRole('tab', { name: targetTab.name }).waitFor({ state: 'visible', timeout: options.timeout })
-  const tabsRestoredAt = performance.now()
+    await launch.page.getByRole('heading', { name: 'Perf Large Document 01' }).waitFor({ state: 'visible', timeout: options.timeout })
+    const activeDocumentRenderedAt = performance.now()
 
-  await launch.page.getByRole('heading', { name: 'Perf Large Document 01' }).waitFor({ state: 'visible', timeout: options.timeout })
-  const activeDocumentRenderedAt = performance.now()
+    const switchStartedAt = performance.now()
+    await launch.page.getByRole('tab', { name: targetTab.name }).click()
+    await launch.page.getByRole('heading', { name: `Perf Large Document ${String(files.length).padStart(2, '0')}` }).waitFor({ state: 'visible', timeout: options.timeout })
+    const inactiveDocumentRenderedAt = performance.now()
 
-  const switchStartedAt = performance.now()
-  await launch.page.getByRole('tab', { name: targetTab.name }).click()
-  await launch.page.getByRole('heading', { name: `Perf Large Document ${String(files.length).padStart(2, '0')}` }).waitFor({ state: 'visible', timeout: options.timeout })
-  const inactiveDocumentRenderedAt = performance.now()
-
-  const memory = await getMemorySummary(launch.electronApp)
-  await launch.electronApp.close()
-
-  return {
-    name: `large-session-${files.length}x${options.mb}mb`,
-    userDataDir,
-    totalFixtureMb: round(files.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024),
-    activeFileMb: round(activeTab.size / 1024 / 1024),
-    ...launch.metrics,
-    tabsRestoredMs: round(tabsRestoredAt - launch.startedAt),
-    activeDocumentRenderedMs: round(activeDocumentRenderedAt - launch.startedAt),
-    inactiveTabSwitchRenderMs: round(inactiveDocumentRenderedAt - switchStartedAt),
-    ...memory,
+    const memory = await getMemorySummary(launch.electronApp)
+    await launch.page.waitForTimeout(1_000)
+    const settledMemory = await getMemorySummary(launch.electronApp)
+    return {
+      name: `large-session-${files.length}x${options.mb}mb`,
+      userDataDir,
+      totalFixtureMb: round(files.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024),
+      activeFileMb: round(activeTab.size / 1024 / 1024),
+      ...launch.metrics,
+      tabsRestoredMs: round(tabsRestoredAt - launch.startedAt),
+      activeDocumentRenderedMs: round(activeDocumentRenderedAt - launch.startedAt),
+      inactiveTabSwitchRenderMs: round(inactiveDocumentRenderedAt - switchStartedAt),
+      ...memory,
+      settledWorkingSetMb: settledMemory.workingSetMb,
+    }
+  } finally {
+    await launch.electronApp.close().catch(() => undefined)
   }
 }
 

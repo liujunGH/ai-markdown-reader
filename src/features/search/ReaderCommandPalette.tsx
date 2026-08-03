@@ -110,6 +110,9 @@ export function ReaderCommandPalette() {
         case 'import-reading-backup':
           void importReadingDataBackup()
           break
+        case 'check-update':
+          void window.electronAPI?.checkForUpdates(true)
+          break
         default:
           console.log('[v2] command not yet wired:', commandId)
       }

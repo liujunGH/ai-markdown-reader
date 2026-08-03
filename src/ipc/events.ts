@@ -19,6 +19,7 @@ import type {
   UpdateProgressPayload,
   UpdateVersionPayload,
   UpdateErrorPayload,
+  UpdateStatePayload,
 } from '../../shared'
 
 /**
@@ -106,4 +107,10 @@ export function useUpdateEvents(events: UpdateEvents): void {
   useIPCSubscription(api?.onUpdateError, api?.offUpdateError, (error: UpdateErrorPayload) => {
     events.onError?.(error)
   })
+}
+
+/** 订阅统一更新状态；新代码应优先使用，避免多个事件之间出现状态竞态。 */
+export function useUpdateStateEvent(callback: (state: UpdateStatePayload) => void): void {
+  const api = getCachedAPI()
+  useIPCSubscription(api?.onUpdateStateChange, api?.offUpdateStateChange, callback)
 }

@@ -184,7 +184,7 @@ describe('useSearch', () => {
     expect(result.current.matches).toHaveLength(1)
   })
 
-  it('defers scanning very large documents so typing does not update matches synchronously', () => {
+  it('defers scanning very large documents so typing does not update matches synchronously', async () => {
     vi.useFakeTimers()
     const largeContent = `${'padding '.repeat(160000)}target`
     const { result } = renderHook(() => useSearch(largeContent))
@@ -196,8 +196,9 @@ describe('useSearch', () => {
     expect(result.current.isSearching).toBe(true)
     expect(result.current.matches).toEqual([])
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(120)
+      await Promise.resolve()
     })
 
     expect(result.current.isSearching).toBe(false)

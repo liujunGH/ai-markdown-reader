@@ -4,9 +4,9 @@
 
 | 版本 | 支持状态 |
 |------|----------|
-| v1.5.1 | ✅ 当前支持 |
-| v1.4.x - v1.5.0 | ⚠️ 仅关键安全修复 |
-| v1.3.x 及更早 | ❌ 不再支持 |
+| v2.1.x | ✅ 当前支持 |
+| v2.0.x | ⚠️ 仅关键安全修复 |
+| v1.x 及更早 | ❌ 不再支持 |
 
 ## 安全加固说明 (v1.5.1+)
 
@@ -39,15 +39,11 @@ connect-src 'self';
 ### 资源本地化
 - KaTeX CSS 由 Vite 本地打包，不再依赖外部 CDN
 
-## 已知依赖审计项
+## 依赖审计
 
-`npm audit --omit=dev` 当前仍会报告 Mermaid 间接依赖 `uuid` 的 moderate 项：
+v2.1.0 已升级 Electron 43、better-sqlite3 13、electron-builder 26、Vite 8，以及 DOMPurify、markdown-it、Mermaid、electron-updater 的安全修复版本。发行锁文件在 Node.js 22 环境下执行 `npm audit` 与 `npm audit --omit=dev` 均为 0 项已知漏洞。
 
-- 来源：`mermaid -> uuid`
-- 审计项：`uuid <14.0.0`
-- npm 自动修复建议：`npm audit fix --force`
-
-暂不执行强制修复，原因是该命令会把 Mermaid 降级到 `9.1.7`，属于破坏性回退，可能影响图表兼容性和现有渲染能力。当前项目已将 Mermaid 动态加载，并使用 `securityLevel: 'strict'`；普通文档不会加载 Mermaid。后续会在 Mermaid 或其依赖链提供兼容修复后再升级处理。
+依赖升级后仍需执行完整单元测试、Electron E2E 和实包验证；不能只以审计结果代替功能与兼容性验证。
 
 ## 报告安全问题
 
