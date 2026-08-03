@@ -3,7 +3,11 @@
   "private": true,
   "version": "2.1.0",
   "description": "A Markdown Reader",
-  "author": "liujun",
+  "author": {
+    "name": "liujun",
+    "email": "liujunGH@users.noreply.github.com"
+  },
+  "desktopName": "markdown-reader",
   "main": "dist-electron/electron/main.js",
   "engines": {
     "node": ">=22.12.0"
