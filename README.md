@@ -90,7 +90,7 @@ xattr -cr /Applications/Markdown\ Reader.app
 
 ### macOS
 
-下载 `Markdown Reader-x.x.x-arm64.dmg` 或 `Markdown Reader-x.x.x-x64.dmg` 并拖入应用程序文件夹。
+下载 `Markdown-Reader-x.x.x-arm64.dmg` 或 `Markdown-Reader-x.x.x-x64.dmg` 并拖入应用程序文件夹。
 
 ## 软件更新
 

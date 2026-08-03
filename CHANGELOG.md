@@ -23,6 +23,7 @@
 - 新增统一更新状态服务，支持静默检查、手动检查、发行说明、确认下载、下载进度、失败重试以及重启安装。
 - 更新状态可跨多窗口查询；开发模式不会连接发布源，后台无更新或检查失败不会打断阅读。
 - macOS 新增 ZIP 与 `latest-mac.yml` 更新资产；GitHub Actions 恢复 Windows、macOS、Linux 三平台构建发布矩阵。
+- 三平台先独立生成 Actions artifact，全部通过后再由单独发布作业串行写入 GitHub Release，避免更新清单和 blockmap 并发上传冲突。
 - 升级 Electron 43、better-sqlite3 13、electron-builder 26、Vite 8、Vitest 4 和相关内容解析依赖，生产与完整 `npm audit` 均收敛为 0 项已知漏洞。
 - README、发布流程、E2E 指南和性能脚本与当前实现同步。
 

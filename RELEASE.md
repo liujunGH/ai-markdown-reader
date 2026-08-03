@@ -58,6 +58,8 @@ git push origin v{x.y.z}
 - Windows：NSIS 安装包、blockmap 与 `latest.yml`
 - Linux：AppImage、deb 与 `latest-linux.yml`
 
+矩阵作业只负责构建并上传 GitHub Actions artifact；三个平台全部成功后，独立 `publish` 作业统一上传 Release 资产并公开版本。不要让多个矩阵作业并发写同一个 Release，否则 ZIP blockmap 等同名资产可能产生上传竞争。
+
 CI 配置: `.github/workflows/build.yml`
 
 ### CI 环境变量（如需代码签名）

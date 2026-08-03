@@ -45,7 +45,7 @@ win:
     - target: nsis
       arch:
         - x64
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: Markdown-Reader-${version}.${ext}
   compression: maximum
 
 nsis:
@@ -67,7 +67,7 @@ mac:
       arch:
         - x64
         - arm64
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Markdown-Reader-${version}-${arch}.${ext}
   category: public.app-category.productivity
   compression: maximum
 
@@ -75,7 +75,7 @@ linux:
   target:
     - AppImage
     - deb
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: Markdown-Reader-${version}.${ext}
   category: Office
   syncDesktopName: true
   compression: maximum
