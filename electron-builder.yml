@@ -5,13 +5,16 @@ copyright: Copyright © 2026 liujun
 # electron-builder will auto-detect platform-specific formats from build/icon.*
 # If no icon is provided, the default Electron icon is used.
 
-asar: true
+asar:
+  # 原生模块由下方 asarUnpack 精确控制，避免 smartUnpack 把整个依赖
+  # （包括其他平台的预编译二进制）复制到 app.asar.unpacked。
+  smartUnpack: false
 
-# better-sqlite3 含原生二进制（.node），asar 内的 .node 无法被 dlopen，
-# 必须解包到真实文件系统。electron-builder 会把匹配的文件从 app.asar
-# 提取到 app.asar.unpacked/。
+# better-sqlite3 的运行时原生模块（.node）无法从 asar 内 dlopen，
+# 只解包实际运行需要的模块。不要解包整个依赖目录，否则 node-gyp 的
+# 编译期工具（例如包含 x86_64 切片的 python3）也会被装进 macOS App。
 asarUnpack:
-  - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/better-sqlite3/**/*.node"
 
 directories:
   output: release
@@ -27,6 +30,10 @@ files:
   - dist-electron/**/*.js
   - package.json
   - node_modules/better-sqlite3/**/*
+  # node-gyp 编译期产物不属于运行时，macOS 会把其中的 x86_64 切片识别为
+  # Intel 组件并显示兼容性警告。
+  - "!node_modules/better-sqlite3/build/node_gyp_bins{,/**/*}"
+  - "!node_modules/better-sqlite3/build/Release/test_extension.node"
 
 extraResources:
   - from: dist-electron/electron/preload.js
@@ -38,6 +45,7 @@ extraMetadata:
 # Ad-hoc signing when no real Apple Developer ID certificate is available.
 # This allows the app to run on macOS with right-click > Open.
 # To enable proper code signing, add CSC_LINK / CSC_KEY_PASSWORD secrets to GitHub.
+afterPack: build/afterPack.js
 afterSign: build/afterSign.js
 
 win:

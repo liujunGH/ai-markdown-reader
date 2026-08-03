@@ -4,6 +4,20 @@
 
 ---
 
+## v2.1.1
+
+### macOS 打包修复
+- Apple Silicon 安装包只保留 `darwin-arm64` 的 better-sqlite3 原生模块，不再夹带 x86_64 预编译模块或 node-gyp 编译期 Python，消除 macOS 的“即将结束对 Intel 芯片 App 的支持”警告。
+- Intel 安装包对应只保留 `darwin-x64` 原生模块；Windows 与 Linux 构建同样按目标平台和架构裁剪。
+- 新增打包后校验，缺少目标原生模块或残留其他架构模块时直接终止构建，防止问题回归。
+
+### 验证
+- arm64 与 x64 macOS App 均完成实包启动、页面加载、SQLite 数据库创建与迁移验证。
+- arm64 App 全包 Mach-O 扫描不再包含 x86_64 文件，代码签名结构验证通过。
+- TypeScript 检查与 259 个单元测试通过。
+
+---
+
 ## v2.1.0
 
 ### 长文档性能

@@ -3,9 +3,9 @@
 ![Theme Preview](https://img.shields.io/badge/Theme-Light%20%7C%20Dark%20%7C%20Sepia-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
-![Version](https://img.shields.io/badge/Version-2.1.0-blue)
+![Version](https://img.shields.io/badge/Version-2.1.1-blue)
 
-Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。v2.0.0 完成了从单体渲染到分层架构的重构；v2.1.0 在此基础上补齐安全分段与按需渲染、阅读体验修复，以及可下载、重试和重启安装的软件更新闭环。
+Markdown Reader 是一个以本地 Markdown 阅读为核心的桌面应用。v2.0.0 完成了从单体渲染到分层架构的重构；v2.1.0 在此基础上补齐安全分段与按需渲染、阅读体验修复，以及可下载、重试和重启安装的软件更新闭环；v2.1.1 修复 Apple Silicon 安装包误带 Intel 原生组件的问题。
 
 ## 适合做什么
 
